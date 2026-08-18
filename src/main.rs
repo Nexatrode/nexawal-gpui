@@ -2909,9 +2909,9 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                         .child(headline),
                 )
                 .child(div().text_xs().text_color(rgb(ACCENT)).child(if expanded {
-                    "v"
+                    format!("{} {}", "v", l10n::t(sync_status::HIDE_SYNC_DETAILS))
                 } else {
-                    ">"
+                    format!("{} {}", ">", l10n::t(sync_status::SHOW_SYNC_DETAILS))
                 })),
         )
         .when(expanded, |card| {

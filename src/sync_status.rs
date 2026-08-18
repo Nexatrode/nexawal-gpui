@@ -2,6 +2,7 @@
 
 use std::time::{Duration, Instant};
 
+use crate::l10n;
 use monerowalletcore::api::SyncStatus;
 
 const TIP_TOLERANCE: u64 = 3;
@@ -175,15 +176,19 @@ pub fn detail(
         return format!("{}…", trimmed.chars().take(117).collect::<String>());
     }
     if synced {
-        return format!("Scanned to block {last_scanned}");
+        return with_i64("Scanned to block %lld", last_scanned);
     }
     if !has_tip {
-        return "Waiting for network height".into();
+        return l10n::t("Waiting for network height").into();
     }
     if running && last_scanned == restore_height {
-        return format!("Fetching initial blocks from {restore_height}");
+        return with_i64("Fetching initial blocks from %lld", restore_height);
     }
-    format!("{remaining} blocks remaining")
+    with_i64("%lld blocks remaining", remaining)
+}
+
+fn with_i64(key: &str, value: u64) -> String {
+    format!("{}", l10n::t(key)).replace("%lld", &value.to_string())
 }
 
 #[cfg(test)]
