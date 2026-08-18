@@ -1587,6 +1587,10 @@ impl Home {
     }
 
     fn open_wallet(&mut self, _: &OpenWallet, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.has_stored && !self.show_restore_form {
+            self.try_unlock_stored(cx);
+            return;
+        }
         self.open_from_form(cx);
     }
 
