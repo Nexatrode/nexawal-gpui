@@ -73,6 +73,11 @@ const ACTIVE_SYNC_AUX_POLL_INTERVAL: Duration = Duration::from_secs(10);
 const ACTIVE_SYNC_CACHE_INTERVAL: Duration = Duration::from_secs(120);
 const ACTIVE_SYNC_CACHE_BLOCK_DELTA: u64 = 1_000;
 
+fn should_auto_unlock_stored() -> bool {
+    let initial_seed = env_or("NEXAWAL_MNEMONIC", "");
+    wallet_store::is_marked_stored() && !paths::terms_need_accept() && initial_seed.is_empty()
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Field {
     Seed,
@@ -193,10 +198,10 @@ impl Home {
         let has_stored = wallet_store::is_marked_stored();
         let needs_terms = paths::terms_need_accept();
         let initial_seed = env_or("NEXAWAL_MNEMONIC", "");
+        let should_auto_unlock = should_auto_unlock_stored();
         let saved_auth_preference = paths::load_device_auth_preference();
         let require_device_auth =
             saved_auth_preference.unwrap_or_else(|| has_stored && device_auth::is_available());
-        let should_auto_unlock = has_stored && !needs_terms && initial_seed.is_empty();
         if has_stored && saved_auth_preference.is_none() && require_device_auth {
             let _ = paths::save_device_auth(true);
         }
@@ -3957,7 +3962,7 @@ fn main() {
                 ..Default::default()
             },
             |window, cx| {
-                let should_unlock = !paths::terms_need_accept() && wallet_store::is_marked_stored();
+                let should_unlock = should_auto_unlock_stored();
                 let home = cx.new(|cx| {
                     let mut home = Home::new(cx);
                     if !should_unlock {
