@@ -72,65 +72,12 @@ objc2-local-authentication = { version = "0.3.2", default-features = false, feat
 ] }
 block2 = "0.6"
 
-# Scan/decode is the hot path. Keep `cargo run` closer to Catalyst than a fully
-# unoptimized debug walletcore.
-[profile.dev.package.walletcore]
+# Wallet scanning crosses many small crypto and codec crates. Optimizing only
+# the obvious WalletCore packages leaves generic helpers at opt-level 0 and
+# makes plain `cargo run` roughly twice as slow as Catalyst/release. Keep
+# incremental builds and light debug info, but optimize the complete runtime.
+[profile.dev]
 opt-level = 3
-[profile.dev.package.monero-wallet]
-opt-level = 3
-[profile.dev.package.monero-oxide]
-opt-level = 3
-[profile.dev.package.monero-daemon-rpc]
-opt-level = 3
-[profile.dev.package.monero-simple-request-rpc]
-opt-level = 3
-[profile.dev.package.monero-epee]
-opt-level = 3
-[profile.dev.package.monero-interface]
-opt-level = 3
-[profile.dev.package.monero-io]
-opt-level = 3
-[profile.dev.package.monero-primitives]
-opt-level = 3
-[profile.dev.package.monero-ed25519]
-opt-level = 3
-[profile.dev.package.monero-address]
-opt-level = 3
-[profile.dev.package.monero-clsag]
-opt-level = 3
-[profile.dev.package.monero-mlsag]
-opt-level = 3
-[profile.dev.package.monero-borromean]
-opt-level = 3
-[profile.dev.package.monero-bulletproofs]
-opt-level = 3
-[profile.dev.package.monero-bulletproofs-generators]
-opt-level = 3
-[profile.dev.package.simple-request]
-opt-level = 3
-[profile.dev.package.ureq]
-opt-level = 3
-[profile.dev.package.hyper]
-opt-level = 3
-[profile.dev.package.hyper-rustls]
-opt-level = 3
-[profile.dev.package.tokio]
-opt-level = 3
-[profile.dev.package.rustls]
-opt-level = 3
-[profile.dev.package.bytes]
-opt-level = 3
-[profile.dev.package.serde]
-opt-level = 3
-[profile.dev.package.serde_json]
-opt-level = 3
-[profile.dev.package.cuprate-epee-encoding]
-opt-level = 3
-[profile.dev.package.curve25519-dalek]
-opt-level = 3
-[profile.dev.package.sha3]
-opt-level = 3
-[profile.dev.package.subtle]
-opt-level = 3
-[profile.dev.package.zeroize]
-opt-level = 3
+debug = 1
+debug-assertions = false
+overflow-checks = false

@@ -36,6 +36,10 @@ On macOS 26, GPUI’s default Metal AOT compile needs Apple’s Metal toolchain 
 cargo run
 ```
 
+The development profile optimizes the complete WalletCore dependency graph, so
+plain `cargo run` scans close to release speed. Use `cargo run --release` for
+comparable throughput measurements across frontends.
+
 Optional env:
 
 ```bash
