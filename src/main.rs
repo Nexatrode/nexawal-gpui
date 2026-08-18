@@ -240,22 +240,15 @@ impl Home {
             challenge_focus: cx.focus_handle(),
             i2p_rpc_focus: cx.focus_handle(),
             i2p_proxy_focus: cx.focus_handle(),
-            status: if should_auto_unlock && require_device_auth {
-                "Waiting for Touch ID or your Mac login password…".into()
-            } else if should_auto_unlock {
-                format!(
-                    "Opening existing wallet from {}…",
-                    wallet_store::secure_store_name()
-                )
-                .into()
+            status: if should_auto_unlock {
+                l10n::t("Unlocking Wallet...").into()
             } else if has_stored {
-                format!(
-                    "Open the existing wallet from {}, or restore a different seed.",
-                    wallet_store::secure_store_name()
-                )
-                .into()
+                l10n::t("Open the existing wallet from {}, or restore a different seed.")
+                    .replace("{}", wallet_store::secure_store_name())
+                    .into()
             } else {
-                "Click the seed box, paste with ⌘V, set restore height, then Open & sync.".into()
+                l10n::t("Click the seed box, paste with ⌘V, set restore height, then Open & sync.")
+                    .into()
             },
             opened: false,
             screen: if needs_terms {
@@ -1811,11 +1804,9 @@ impl Home {
         self.has_stored = wallet_store::is_marked_stored();
         self.active = Field::Seed;
         self.status = if self.has_stored {
-            format!(
-                "Locked. Open the existing wallet from {}, or restore a different seed.",
-                wallet_store::secure_store_name()
-            )
-            .into()
+            l10n::t("Locked. Open the existing wallet from {}, or restore a different seed.")
+                .replace("{}", wallet_store::secure_store_name())
+                .into()
         } else {
             l10n::t("Session cleared.").into()
         };
@@ -1855,7 +1846,7 @@ impl Home {
         if self.require_device_auth && !device_auth::is_available() {
             self.unlocking = false;
             self.status = l10n::t(
-                "Device authentication is required, but Touch ID / password is not available.",
+                "Device authentication is required but unavailable. Enable biometrics or a screen lock, then retry.",
             )
             .into();
             cx.notify();
@@ -1866,13 +1857,9 @@ impl Home {
         self.unlocking = true;
         self.unlock_started = true;
         self.status = if require_device_auth {
-            "Waiting for Touch ID or your Mac login password…".into()
+            l10n::t("Unlocking Wallet...").into()
         } else {
-            format!(
-                "Opening existing wallet from {}…",
-                wallet_store::secure_store_name()
-            )
-            .into()
+            l10n::t("Unlocking Wallet...").into()
         };
         cx.notify();
 
@@ -1881,7 +1868,8 @@ impl Home {
                 .background_executor()
                 .spawn(async move {
                     if require_device_auth {
-                        device_auth::authenticate("Authenticate to unlock nexawal")?;
+                        let reason = l10n::t("Authenticate to unlock nexawal");
+                        device_auth::authenticate(&reason)?;
                     }
                     wallet_store::load()
                 })
@@ -1898,7 +1886,8 @@ impl Home {
                     Err(err) => {
                         this.has_stored = true;
                         this.status = format!(
-                            "{err}. Use Open existing wallet to try again, or restore from seed."
+                            "{err}. {}",
+                            l10n::t("Use Open existing wallet to try again, or restore from seed.")
                         )
                         .into();
                         cx.notify();
@@ -1936,9 +1925,10 @@ impl Home {
             return true;
         }
         if !device_auth::is_available() {
-            self.status =
-                "Device authentication is required, but Touch ID / password is not available."
-                    .into();
+            self.status = l10n::t(
+                "Device authentication is required but unavailable. Enable biometrics or a screen lock, then retry.",
+            )
+            .into();
             cx.notify();
             return false;
         }
@@ -2423,16 +2413,16 @@ fn unlocking_card(home: &Home) -> impl IntoElement {
             div()
                 .text_xl()
                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                .child("Unlocking wallet…"),
+                .child(l10n::t("Unlocking Wallet...")),
         )
         .child(
             div()
                 .text_sm()
                 .text_color(rgb(MUTED))
                 .child(if home.require_device_auth {
-                    "Use Touch ID or your Mac login password to continue."
+                    l10n::t("Use biometrics or device credentials for wallet access and sending.")
                 } else {
-                    "Opening the wallet from secure storage."
+                    l10n::t("Opening the wallet from secure storage.")
                 }),
         )
 }
@@ -2443,9 +2433,10 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
     let node_focused = home.node_focus.is_focused(window);
     let seed_label = if home.seed.trim().is_empty() {
         if home.has_stored {
-            "Paste here only to restore a different wallet.".to_string()
+            l10n::t("Paste here only to restore a different wallet.").to_string()
         } else {
-            "Click this box, then ⌘V or Edit → Paste. Open is a separate button.".to_string()
+            l10n::t("Click this box, then ⌘V or Edit → Paste. Open is a separate button.")
+                .to_string()
         }
     } else {
         home.seed.clone()
@@ -2487,7 +2478,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                     )
                     .child(action_button(
                         "open-existing-wallet",
-                        l10n::t("Open existing wallet"),
+                        l10n::t("Unlock Existing Wallet"),
                         cx.listener(|this, _: &ClickEvent, _, cx| this.try_unlock_stored(cx)),
                     )),
             )
