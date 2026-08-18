@@ -4,11 +4,16 @@ Desktop [nexawal](https://github.com/Nexatrode/nexawal) for **macOS, Windows, an
 
 This is a **new client**, not a port of the SwiftUI or Compose apps. Scan, restore, history, and send stay in the shared Rust wallet core.
 
+- Desktop app: this repository
+- iOS / Mac Catalyst app: [nexawal](https://github.com/Nexatrode/nexawal)
+- Android app: [nexawal-android](https://github.com/Nexatrode/nexawal-android)
+- Website: [nexatrode.com](https://nexatrode.com)
+
 | Repo | Role |
 | --- | --- |
 | [nexawal](https://github.com/Nexatrode/nexawal) | iOS / Mac Catalyst (SwiftUI) |
 | [nexawal-android](https://github.com/Nexatrode/nexawal-android) | Android (Compose) + walletcore |
-| **nexawal-gpui** | macOS / Windows / Linux desktop (this repo) |
+| [nexawal-gpui](https://github.com/Nexatrode/nexawal-gpui) | macOS / Windows / Linux desktop (this repo) |
 
 The Catalyst app can stay as the App Store / iPhone+iPad Mac companion. This binary is a native desktop app on all three OSes (Metal / DirectX / Wayland+X11).
 
