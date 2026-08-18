@@ -41,7 +41,7 @@ gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "0ad5441b
     "runtime_shaders",
 ] }
 
-walletcore = { path = "../nexawal-android/MoneroWalletCoreFFI/monero-oxide-output" }
+walletcore = { git = "https://github.com/cacaosteve/MoneroWalletCoreFFI.git", rev = "529c724b06866a03e71ab044c3e91dc600477687" }
 dirs = "5"
 keyring = "3"
 qrcode = { version = "0.14", default-features = false }

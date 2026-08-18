@@ -14,7 +14,13 @@ The Catalyst app can stay as the App Store / iPhone+iPad Mac companion. This bin
 
 ## Status
 
-Walletcore is linked as a Rust crate (`rlib`). The restore screen has seed and restore-height fields; **Open & sync** is a separate step so paste does not jump into the wallet. Env vars prefill the fields and do not auto-open.
+Walletcore is linked as a Rust crate (`rlib`) from a pinned revision of the
+source-only `cargo-walletcore` branch in
+[MoneroWalletCoreFFI](https://github.com/cacaosteve/MoneroWalletCoreFFI). This
+keeps the dependency fetch small and lets this repository build from a standalone
+clone. The restore screen has seed and restore-height fields; **Open & sync** is
+a separate step so paste does not jump into the wallet. Env vars prefill the
+fields and do not auto-open.
 
 On macOS the menu bar is `nexawal | Edit | Wallet | Window` (Zed-style: Hide, Paste, Minimize, Quit) so you can Hide or Cmd-Tab back to the running app.
 
