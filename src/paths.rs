@@ -207,15 +207,22 @@ pub fn clear_fiat_rate() {
     let _ = fs::remove_file(fiat_rate_path());
 }
 
-pub fn load_device_auth() -> bool {
+pub fn load_device_auth_preference() -> Option<bool> {
     fs::read_to_string(device_auth_path())
         .ok()
-        .map(|s| matches!(s.trim(), "1" | "true"))
-        .unwrap_or(false)
+        .and_then(|value| parse_bool_preference(&value))
 }
 
 pub fn save_device_auth(enabled: bool) -> std::io::Result<()> {
     write_bytes(device_auth_path(), if enabled { b"1" } else { b"0" })
+}
+
+fn parse_bool_preference(value: &str) -> Option<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" => Some(true),
+        "0" | "false" => Some(false),
+        _ => None,
+    }
 }
 
 pub fn load_network_policy() -> crate::network::Policy {
@@ -289,4 +296,19 @@ pub(crate) fn write_bytes(path: PathBuf, bytes: &[u8]) -> std::io::Result<()> {
         fs::create_dir_all(parent)?;
     }
     fs::write(path, bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_bool_preference;
+
+    #[test]
+    fn device_auth_preference_is_tristate() {
+        assert_eq!(parse_bool_preference("1"), Some(true));
+        assert_eq!(parse_bool_preference("TRUE\n"), Some(true));
+        assert_eq!(parse_bool_preference("0"), Some(false));
+        assert_eq!(parse_bool_preference("false"), Some(false));
+        assert_eq!(parse_bool_preference(""), None);
+        assert_eq!(parse_bool_preference("invalid"), None);
+    }
 }

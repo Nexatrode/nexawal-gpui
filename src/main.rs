@@ -129,6 +129,8 @@ struct Home {
     legal_return: Screen,
     terms_checked: bool,
     has_stored: bool,
+    unlocking: bool,
+    unlock_started: bool,
     mnemonic: String,
     address: SharedString,
     receive_address: SharedString,
@@ -187,6 +189,17 @@ struct Home {
 
 impl Home {
     fn new(cx: &mut Context<Self>) -> Self {
+        let has_stored = wallet_store::is_marked_stored();
+        let needs_terms = paths::terms_need_accept();
+        let initial_seed = env_or("NEXAWAL_MNEMONIC", "");
+        let saved_auth_preference = paths::load_device_auth_preference();
+        let require_device_auth = saved_auth_preference
+            .unwrap_or_else(|| has_stored && device_auth::is_available());
+        let should_auto_unlock = has_stored && !needs_terms && initial_seed.is_empty();
+        if has_stored && saved_auth_preference.is_none() && require_device_auth {
+            let _ = paths::save_device_auth(true);
+        }
+
         Self {
             core_version: api::version().into(),
             node_url: std::env::var("NEXAWAL_NODE_URL")
@@ -194,7 +207,7 @@ impl Home {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .unwrap_or_else(paths::load_node_url),
-            seed: env_or("NEXAWAL_MNEMONIC", ""),
+            seed: initial_seed,
             restore_height_text: {
                 let from_env = std::env::var("NEXAWAL_RESTORE_HEIGHT")
                     .ok()
@@ -202,7 +215,7 @@ impl Home {
                     .filter(|s| !s.is_empty());
                 if let Some(value) = from_env {
                     value
-                } else if wallet_store::is_marked_stored() {
+                } else if has_stored {
                     paths::load_restore_height().to_string()
                 } else {
                     "0".into()
@@ -221,7 +234,12 @@ impl Home {
             challenge_focus: cx.focus_handle(),
             i2p_rpc_focus: cx.focus_handle(),
             i2p_proxy_focus: cx.focus_handle(),
-            status: if wallet_store::is_marked_stored() {
+            status: if should_auto_unlock && require_device_auth {
+                "Waiting for Touch ID or your Mac login password…".into()
+            } else if should_auto_unlock {
+                format!("Opening existing wallet from {}…", wallet_store::secure_store_name())
+                    .into()
+            } else if has_stored {
                 format!(
                     "Open the existing wallet from {}, or restore a different seed.",
                     wallet_store::secure_store_name()
@@ -231,7 +249,7 @@ impl Home {
                 "Click the seed box, paste with ⌘V, set restore height, then Open & sync.".into()
             },
             opened: false,
-            screen: if paths::terms_need_accept() {
+            screen: if needs_terms {
                 Screen::Terms
             } else {
                 Screen::Restore
@@ -239,12 +257,14 @@ impl Home {
             legal_doc: legal::Document::Terms,
             legal_return: Screen::Restore,
             terms_checked: false,
-            has_stored: wallet_store::is_marked_stored(),
+            has_stored,
+            unlocking: should_auto_unlock,
+            unlock_started: false,
             mnemonic: String::new(),
             address: "".into(),
             receive_address: "".into(),
             receive_book: receive_book::load(),
-            require_device_auth: paths::load_device_auth(),
+            require_device_auth,
             total_piconero: 0,
             unlocked_piconero: 0,
             sync: None,
@@ -1619,6 +1639,12 @@ impl Home {
             Ok(()) => {
                 self.has_stored = true;
                 self.seed.clear();
+                if paths::load_device_auth_preference().is_none()
+                    && device_auth::is_available()
+                {
+                    self.require_device_auth = true;
+                    let _ = paths::save_device_auth(true);
+                }
                 None
             }
             Err(err) => Some(err),
@@ -1707,6 +1733,8 @@ impl Home {
         let _ = api::refresh_cancel(WALLET_ID);
         let _ = api::reset_tracked_outputs(WALLET_ID);
         self.opened = false;
+        self.unlocking = false;
+        self.unlock_started = false;
         self.screen = Screen::Restore;
         self.address = "".into();
         self.total_piconero = 0;
@@ -1780,30 +1808,66 @@ impl Home {
     }
 
     fn try_unlock_stored(&mut self, cx: &mut Context<Self>) {
-        if self.blocked_by_terms() || self.opened {
+        if self.blocked_by_terms() || self.opened || self.unlock_started {
             return;
         }
         if !env_or("NEXAWAL_MNEMONIC", "").is_empty() {
+            self.unlocking = false;
             return;
         }
         if !wallet_store::is_marked_stored() {
+            self.unlocking = false;
             return;
         }
-        if !self.authenticate_if_required("Authenticate to unlock nexawal", cx) {
+        if self.require_device_auth && !device_auth::is_available() {
+            self.unlocking = false;
+            self.status =
+                "Device authentication is required, but Touch ID / password is not available."
+                    .into();
+            cx.notify();
             return;
         }
-        match wallet_store::load() {
-            Ok((mnemonic, height)) => {
-                self.restore_height_text = height.to_string();
-                self.open_with_mnemonic(&mnemonic, height, cx);
-                self.seed.clear();
-            }
-            Err(err) => {
-                self.has_stored = true;
-                self.status = format!("{err}. Paste a seed, or try Unlock again.").into();
-                cx.notify();
-            }
-        }
+
+        let require_device_auth = self.require_device_auth;
+        self.unlocking = true;
+        self.unlock_started = true;
+        self.status = if require_device_auth {
+            "Waiting for Touch ID or your Mac login password…".into()
+        } else {
+            format!("Opening existing wallet from {}…", wallet_store::secure_store_name()).into()
+        };
+        cx.notify();
+
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_executor()
+                .spawn(async move {
+                    if require_device_auth {
+                        device_auth::authenticate("Authenticate to unlock nexawal")?;
+                    }
+                    wallet_store::load()
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.unlocking = false;
+                this.unlock_started = false;
+                match result {
+                    Ok((mnemonic, height)) => {
+                        this.restore_height_text = height.to_string();
+                        this.open_with_mnemonic(&mnemonic, height, cx);
+                        this.seed.clear();
+                    }
+                    Err(err) => {
+                        this.has_stored = true;
+                        this.status =
+                            format!("{err}. Use Open existing wallet to try again, or restore from seed.")
+                                .into();
+                        cx.notify();
+                    }
+                }
+            });
+        })
+        .detach();
     }
 
     fn receive_uri(&self) -> String {
@@ -2205,7 +2269,10 @@ impl Render for Home {
             .when(self.screen == Screen::Legal, |body| {
                 body.child(legal_card(self, cx))
             })
-            .when(self.screen == Screen::Restore, |body| {
+            .when(self.screen == Screen::Restore && self.unlocking, |body| {
+                body.child(unlocking_card(self))
+            })
+            .when(self.screen == Screen::Restore && !self.unlocking, |body| {
                 body.child(locked_card(self, window, cx))
             })
             .when(self.screen == Screen::Settings, |body| {
@@ -2300,6 +2367,42 @@ fn resize_handle() -> impl IntoElement {
             window.start_window_resize(ResizeEdge::BottomRight);
         })
         .child("⌟")
+}
+
+fn unlocking_card(home: &Home) -> impl IntoElement {
+    div()
+        .flex_1()
+        .min_h(px(360.))
+        .flex()
+        .flex_col()
+        .items_center()
+        .justify_center()
+        .gap_4()
+        .p_6()
+        .rounded_lg()
+        .bg(rgb(CARD))
+        .child(
+            div()
+                .text_3xl()
+                .text_color(rgb(ACCENT))
+                .child("◉"),
+        )
+        .child(
+            div()
+                .text_xl()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .child("Unlocking wallet…"),
+        )
+        .child(
+            div()
+                .text_sm()
+                .text_color(rgb(MUTED))
+                .child(if home.require_device_auth {
+                    "Use Touch ID or your Mac login password to continue."
+                } else {
+                    "Opening the wallet from secure storage."
+                }),
+        )
 }
 
 fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoElement {
@@ -3812,17 +3915,27 @@ fn main() {
                 ..Default::default()
             },
             |window, cx| {
-                cx.new(|cx| {
+                let should_unlock =
+                    !paths::terms_need_accept() && wallet_store::is_marked_stored();
+                let home = cx.new(|cx| {
                     let mut home = Home::new(cx);
-                    home.seed_focus.focus(window, cx);
-                    if !paths::terms_need_accept() {
-                        home.try_unlock_stored(cx);
+                    if !should_unlock {
+                        home.seed_focus.focus(window, cx);
                     }
                     if home.fiat_enabled {
                         home.maybe_refresh_fiat(cx);
                     }
                     home
-                })
+                });
+                if should_unlock {
+                    let startup_home = home.clone();
+                    window.defer(cx, move |_, cx| {
+                        let _ = startup_home.update(cx, |home, cx| {
+                            home.try_unlock_stored(cx);
+                        });
+                    });
+                }
+                home
             },
         )
         .unwrap();

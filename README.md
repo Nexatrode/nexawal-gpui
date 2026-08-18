@@ -29,7 +29,9 @@ fields and do not auto-open.
 
 On macOS the menu bar is `nexawal | Edit | Wallet | Window` (Zed-style: Hide, Paste, Minimize, Quit) so you can Hide or Cmd-Tab back to the running app.
 
-Scan cache is stored at `~/Library/Application Support/nexawal/main_wallet.cache` on macOS (XDG data dir on Linux). The seed is **never written to the app data directory**. After the first restore, it is saved in the native per-user secure store: macOS Keychain, Windows Credential Manager, or Linux Secret Service. The next launch shows **Open existing wallet** and reuses the same scan cache and wallet UI without asking for the seed again.
+Scan cache is stored at `~/Library/Application Support/nexawal/main_wallet.cache` on macOS (XDG data dir on Linux). The seed is **never written to the app data directory**. After the first restore, it is saved in the native per-user secure store: macOS Keychain, Windows Credential Manager, or Linux Secret Service. The next launch opens the stored wallet automatically and reuses the same scan cache and wallet UI without asking for the seed again; **Open existing wallet** remains available after a cancelled or failed unlock.
+
+On macOS, device authentication defaults on when a stored wallet is first detected. Launch shows an **Unlocking wallet…** screen, requests Touch ID (with the Mac login password fallback supplied by macOS), and opens directly into the wallet after success. Cancelling or failing authentication reveals the manual retry and seed-recovery screen. An explicit device-authentication choice in Settings is preserved.
 
 Keyring v3 does not enable a native backend by default. This repository enables each platform backend explicitly; builds before this change used a temporary in-memory backend and require entering the seed one final time to migrate it into persistent secure storage.
 
