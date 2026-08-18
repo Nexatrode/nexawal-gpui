@@ -222,7 +222,11 @@ impl Home {
             i2p_rpc_focus: cx.focus_handle(),
             i2p_proxy_focus: cx.focus_handle(),
             status: if wallet_store::is_marked_stored() {
-                "Unlock the stored wallet, or paste a seed to replace it.".into()
+                format!(
+                    "Open the existing wallet from {}, or restore a different seed.",
+                    wallet_store::secure_store_name()
+                )
+                .into()
             } else {
                 "Click the seed box, paste with ⌘V, set restore height, then Open & sync.".into()
             },
@@ -1559,10 +1563,6 @@ impl Home {
             cx.notify();
             return;
         }
-        if wallet_store::is_marked_stored() {
-            receive_book::clear();
-            self.receive_book = receive_book::Book::primary();
-        }
         self.open_with_mnemonic(&mnemonic, self.restore_height(), cx);
     }
 
@@ -1602,15 +1602,11 @@ impl Home {
         self.scan_was_running = false;
         self.scan_rate.reset();
         self.apply_scan_proxy();
-        if let Err(err) = self.start_fast_scan() {
-            self.status = format!("Refresh failed: {err}").into();
-            cx.notify();
-            return;
-        }
+        let scan_error = self.start_fast_scan().err().map(|err| err.to_string());
 
         self.opened = true;
         self.screen = Screen::Wallet;
-        self.scan_needs_retry = false;
+        self.scan_needs_retry = scan_error.is_some();
         self.mnemonic = mnemonic.to_string();
         self.created_seed = false;
         self.wrote_seed_down = false;
@@ -1619,14 +1615,20 @@ impl Home {
         self.receive_book = receive_book::load();
         receive_book::save(&self.receive_book);
         self.refresh_receive_address();
-        match wallet_store::save(mnemonic, restore_height) {
+        let store_error = match wallet_store::save(mnemonic, restore_height) {
             Ok(()) => {
                 self.has_stored = true;
                 self.seed.clear();
+                None
             }
-            Err(err) => {
-                self.status = format!("{} Keychain save skipped: {err}", self.status).into();
-            }
+            Err(err) => Some(err),
+        };
+        if let Some(err) = scan_error {
+            self.status = format!("Wallet opened, but refresh failed: {err}. Use Wallet → Retry sync.")
+                .into();
+        }
+        if let Some(err) = store_error {
+            self.status = format!("{} Secure-store save skipped: {err}", self.status).into();
         }
         self.poll_core();
         self.start_poll(cx);
@@ -1748,7 +1750,11 @@ impl Home {
         self.has_stored = wallet_store::is_marked_stored();
         self.active = Field::Seed;
         self.status = if self.has_stored {
-            "Locked. Unlock the stored wallet, or paste a seed to replace it.".into()
+            format!(
+                "Locked. Open the existing wallet from {}, or restore a different seed.",
+                wallet_store::secure_store_name()
+            )
+            .into()
         } else {
             "Session cleared.".into()
         };
@@ -1757,7 +1763,12 @@ impl Home {
 
     fn remove_stored_wallet(&mut self, cx: &mut Context<Self>) {
         self.forget(cx);
-        wallet_store::delete();
+        if let Err(err) = wallet_store::delete() {
+            self.has_stored = wallet_store::is_marked_stored();
+            self.status = err.into();
+            cx.notify();
+            return;
+        }
         let _ = fs::remove_file(paths::cache_path());
         paths::clear_pending_send();
         receive_book::clear();
@@ -2296,7 +2307,11 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
     let height_focused = home.height_focus.is_focused(window);
     let node_focused = home.node_focus.is_focused(window);
     let seed_label = if home.seed.trim().is_empty() {
-        "Click this box, then ⌘V or Edit → Paste. Open is a separate button.".to_string()
+        if home.has_stored {
+            "Paste here only to restore a different wallet.".to_string()
+        } else {
+            "Click this box, then ⌘V or Edit → Paste. Open is a separate button.".to_string()
+        }
     } else {
         home.seed.clone()
     };
@@ -2309,6 +2324,46 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
         .p_5()
         .rounded_lg()
         .bg(rgb(CARD))
+        .when(home.has_stored, |card| {
+            card.child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    .p_4()
+                    .rounded_md()
+                    .border_1()
+                    .border_color(rgb(ACCENT))
+                    .bg(rgb(FIELD))
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .child("Existing wallet"),
+                    )
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(rgb(MUTED))
+                            .child(format!(
+                                "Your recovery seed is stored in {}. Open it with the same wallet screens, settings, history, and local scan cache.",
+                                wallet_store::secure_store_name()
+                            )),
+                    )
+                    .child(action_button(
+                        "open-existing-wallet",
+                        "Open existing wallet",
+                        cx.listener(|this, _: &ClickEvent, _, cx| this.try_unlock_stored(cx)),
+                    )),
+            )
+            .child(
+                div()
+                    .pt_2()
+                    .text_xs()
+                    .text_color(rgb(MUTED))
+                    .child("Restore a different wallet"),
+            )
+        })
         .child(div().text_xs().text_color(rgb(MUTED)).child(if home.network_policy == network::Policy::I2p {
             "Scan uses the I2P node from Settings"
         } else {
@@ -2495,13 +2550,6 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                             .text_color(rgb(MUTED))
                             .child("Open & sync"),
                     )
-                })
-                .when(home.has_stored, |row| {
-                    row.child(action_button(
-                        "unlock-wallet",
-                        "Unlock stored wallet",
-                        cx.listener(|this, _: &ClickEvent, _, cx| this.try_unlock_stored(cx)),
-                    ))
                 })
                 .child(action_button(
                     "restore-settings",

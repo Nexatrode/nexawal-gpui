@@ -24,7 +24,9 @@ fields and do not auto-open.
 
 On macOS the menu bar is `nexawal | Edit | Wallet | Window` (Zed-style: Hide, Paste, Minimize, Quit) so you can Hide or Cmd-Tab back to the running app.
 
-Scan cache is stored at `~/Library/Application Support/nexawal/main_wallet.cache` on macOS (XDG data dir on Linux). The seed is **not** written to disk.
+Scan cache is stored at `~/Library/Application Support/nexawal/main_wallet.cache` on macOS (XDG data dir on Linux). The seed is **never written to the app data directory**. After the first restore, it is saved in the native per-user secure store: macOS Keychain, Windows Credential Manager, or Linux Secret Service. The next launch shows **Open existing wallet** and reuses the same scan cache and wallet UI without asking for the seed again.
+
+Keyring v3 does not enable a native backend by default. This repository enables each platform backend explicitly; builds before this change used a temporary in-memory backend and require entering the seed one final time to migrate it into persistent secure storage.
 
 ## Run
 
@@ -86,5 +88,5 @@ If you already have Zed at `~/github/zed` on the same machine, you can switch th
 ## Platforms
 
 - **macOS** — Metal + `font-kit`; runtime Dock icon and `.icns` bundle icon
-- **Windows** — Win32 + DirectX with an embedded multi-resolution `.ico`. Install MSVC + Windows SDK as in [Building Zed for Windows](https://github.com/zed-industries/zed/blob/main/docs/src/development/windows.md).
-- **Linux** — Wayland and/or X11 (both features enabled), with hicolor and desktop-entry assets
+- **Windows** — Win32 + DirectX with an embedded multi-resolution `.ico` and Windows Credential Manager for the stored wallet. Install MSVC + Windows SDK as in [Building Zed for Windows](https://github.com/zed-industries/zed/blob/main/docs/src/development/windows.md).
+- **Linux** — Wayland and/or X11 (both features enabled), with hicolor and desktop-entry assets. Stored wallets use the desktop Secret Service provided by GNOME Keyring or a compatible KWallet integration.
