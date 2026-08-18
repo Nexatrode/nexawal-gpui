@@ -2471,11 +2471,11 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                     .border_1()
                     .border_color(rgb(ACCENT))
                     .bg(rgb(FIELD))
-                    .child(
-                        div()
-                            .text_lg()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .child(l10n::t("Existing wallet")),
+                .child(
+                    div()
+                        .text_lg()
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .child(l10n::t("Existing wallet")),
                     )
                     .child(
                         div()
@@ -2486,11 +2486,24 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                                 wallet_store::secure_store_name()
                             )),
                     )
-                    .child(action_button(
-                        "open-existing-wallet",
-                        l10n::t("Unlock Existing Wallet"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| this.try_unlock_stored(cx)),
-                    )),
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .gap_2()
+                            .child(action_button(
+                                "open-existing-wallet",
+                                l10n::t("Unlock Existing Wallet"),
+                                cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.try_unlock_stored(cx)
+                                }),
+                            ))
+                            .child(action_button(
+                                "open-existing-wallet-settings",
+                                l10n::t("Settings"),
+                                cx.listener(|this, _: &ClickEvent, _, cx| this.go_settings(cx)),
+                            )),
+                    ),
             )
             .child(
                 if home.show_restore_form {
