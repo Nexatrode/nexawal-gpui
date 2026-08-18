@@ -109,6 +109,48 @@ fn percent_encode(value: &str) -> String {
 mod tests {
     use super::*;
 
+    const PRIMARY: &str =
+        "4B33mFPMq6mKi7Eiyd5XuyKRVMGVZz1Rqb9ZTyGApXW5d1aT7UBDZ89ewmnWFkzJ5wPd2SFbn313vCT8a4E2Qf4KQH4pNey";
+
+    #[test]
+    fn address_extracted() {
+        let parsed = parse(&format!("monero:{PRIMARY}")).unwrap();
+        assert_eq!(parsed.address, PRIMARY);
+        assert_eq!(parsed.amount_xmr, None);
+    }
+
+    #[test]
+    fn amount_extracted() {
+        let parsed = parse(&format!("monero:{PRIMARY}?tx_amount=1.5")).unwrap();
+        assert_eq!(parsed.address, PRIMARY);
+        assert_eq!(parsed.amount_xmr.as_deref(), Some("1.5"));
+    }
+
+    #[test]
+    fn spend_and_view_keys_ignored_as_send_targets() {
+        let uri = format!(
+            "monero:{PRIMARY}?spend_key=deadbeefdeadbeef&view_key=cafebabecafebabe&tx_amount=1.0"
+        );
+        let parsed = parse(&uri).unwrap();
+        assert_eq!(parsed.address, PRIMARY);
+        assert_eq!(parsed.amount_xmr.as_deref(), Some("1.0"));
+        assert_ne!(parsed.address, "deadbeefdeadbeef");
+        assert_ne!(parsed.address, "cafebabecafebabe");
+    }
+
+    #[test]
+    fn slash_slash_prefix() {
+        let parsed = parse(&format!("monero://{PRIMARY}?amount=0.25")).unwrap();
+        assert_eq!(parsed.address, PRIMARY);
+        assert_eq!(parsed.amount_xmr.as_deref(), Some("0.25"));
+    }
+
+    #[test]
+    fn non_monero_rejected() {
+        assert!(parse(PRIMARY).is_none());
+        assert!(parse(&format!("bitcoin:{PRIMARY}")).is_none());
+    }
+
     #[test]
     fn parse_uri_with_amount() {
         let uri = parse("monero:4abc?amount=1.25").unwrap();

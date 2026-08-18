@@ -7,6 +7,10 @@ use monerowalletcore::api::SyncStatus;
 const TIP_TOLERANCE: u64 = 3;
 const RECENT_WINDOW: Duration = Duration::from_secs(30);
 
+/// English labels matching iOS/Android. Full locale catalogs are not copied yet.
+pub const SHOW_SYNC_DETAILS: &str = "Show sync details";
+pub const HIDE_SYNC_DETAILS: &str = "Hide sync details";
+
 #[derive(Clone, Debug, Default)]
 pub struct ScanRate {
     session_start: Option<Instant>,
@@ -247,5 +251,11 @@ mod tests {
         rate.note_at(1_100, start + Duration::from_secs(4));
 
         assert_eq!(rate.avg, 200.0);
+    }
+
+    #[test]
+    fn sync_detail_a11y_labels_match_ios_android_english() {
+        assert_eq!(SHOW_SYNC_DETAILS, "Show sync details");
+        assert_eq!(HIDE_SYNC_DETAILS, "Hide sync details");
     }
 }

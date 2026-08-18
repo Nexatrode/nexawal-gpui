@@ -56,6 +56,39 @@ mod tests {
     use super::*;
 
     #[test]
+    fn one_xmr() {
+        assert_eq!(parse_piconero("1.0"), Some(1_000_000_000_000));
+        assert_eq!(parse_piconero("1"), Some(1_000_000_000_000));
+    }
+
+    #[test]
+    fn one_piconero() {
+        assert_eq!(parse_piconero("0.000000000001"), Some(1));
+    }
+
+    #[test]
+    fn format_for_input_matches_logic() {
+        assert_eq!(format_for_input(1_000_000_000_000), "1");
+        assert_eq!(format_for_input(500_000_000_000), "0.5");
+        assert_eq!(format_for_input(1), "0.000000000001");
+    }
+
+    #[test]
+    fn overflow_rejected() {
+        assert_eq!(parse_piconero("18446745"), None);
+        assert_eq!(parse_piconero("18446744073710.0"), None);
+        assert_eq!(parse_piconero("999999999999999"), None);
+    }
+
+    #[test]
+    fn invalid_rejected() {
+        assert_eq!(parse_piconero(""), None);
+        assert_eq!(parse_piconero("abc"), None);
+        assert_eq!(parse_piconero("1.2.3"), None);
+        assert_eq!(parse_piconero("0.0000000000001"), None);
+    }
+
+    #[test]
     fn parse_and_format_round_trip() {
         let pico = parse_piconero("1.5").unwrap();
         assert_eq!(pico, 1_500_000_000_000);
