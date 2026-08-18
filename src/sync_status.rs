@@ -136,23 +136,23 @@ pub fn headline(
     error: Option<&str>,
     has_tip: bool,
     last_scanned_eq_restore: bool,
-) -> &'static str {
+) -> String {
     if stalled && error.is_some_and(is_stall_error) {
-        return "Sync stalled";
+        return l10n::t("Sync stalled").into();
     }
     if error.is_some() && !running && !synced {
-        return "Node unreachable";
+        return l10n::t("Node unreachable").into();
     }
     if synced {
-        return "Wallet synced";
+        return l10n::t("Wallet synced").into();
     }
     if !has_tip {
-        return "Connecting to node";
+        return l10n::t("Connecting to node").into();
     }
     if running && last_scanned_eq_restore {
-        return "Scanning blockchain";
+        return l10n::t("Scanning blockchain").into();
     }
-    "Syncing wallet"
+    l10n::t("Syncing wallet").into()
 }
 
 pub fn detail(
@@ -166,7 +166,7 @@ pub fn detail(
     remaining: u64,
 ) -> String {
     if stalled && error.is_some_and(is_stall_error) {
-        return "Tap Retry sync to continue (or reopen the app).".into();
+        return l10n::t("Tap Retry sync to continue (or reopen the app).").into();
     }
     if let Some(err) = error.filter(|_| !running && !synced) {
         let trimmed = err.trim();
@@ -227,7 +227,7 @@ mod tests {
         let st = sync(80, 80, 80, 0);
         assert_eq!(progress(&st), 0.0);
         assert_eq!(
-            headline(false, true, false, None, false, true),
+            headline(false, true, false, None, false, true).as_str(),
             "Connecting to node"
         );
         assert_eq!(
