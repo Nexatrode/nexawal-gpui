@@ -6,9 +6,11 @@ use std::time::{Duration, Instant};
 use gpui::{
     App, Bounds, ClickEvent, ClipboardEntry, Context, CursorStyle, FocusHandle, Focusable,
     ImageSource, KeyBinding, KeyDownEvent, Menu, MenuItem, ObjectFit, OsAction, PathPromptOptions,
-    RenderImage, SharedString, SystemMenuType, TitlebarOptions, Window, WindowBounds, WindowOptions,
-    actions, div, img, prelude::*, px, rgb, relative, size,
+    MouseButton, RenderImage, ResizeEdge, SharedString, TitlebarOptions, Window, WindowBounds,
+    WindowOptions, actions, div, img, prelude::*, px, rgb, relative, size,
 };
+#[cfg(target_os = "macos")]
+use gpui::SystemMenuType;
 use gpui_platform::application;
 use monerowalletcore::api::{self, RefreshJob, SyncStatus, Transfer};
 
@@ -2177,8 +2179,44 @@ impl Render for Home {
         if self.screen == Screen::Receive {
             self.ensure_qr();
         }
+
+        let body = div()
+            .id("main-scroll")
+            .flex_1()
+            .min_h(px(0.))
+            .overflow_y_scroll()
+            .flex()
+            .flex_col()
+            .gap_4()
+            .when(self.screen == Screen::Terms, |body| {
+                body.child(terms_card(self, cx))
+            })
+            .when(self.screen == Screen::Legal, |body| {
+                body.child(legal_card(self, cx))
+            })
+            .when(self.screen == Screen::Restore, |body| {
+                body.child(locked_card(self, window, cx))
+            })
+            .when(self.screen == Screen::Settings, |body| {
+                body.child(settings_card(self, window, cx))
+            })
+            .when(self.opened && self.screen == Screen::Wallet, |body| {
+                body.child(opened_card(self, cx)).child(sync_card(self, cx))
+            })
+            .when(self.opened && self.screen == Screen::Receive, |body| {
+                body.child(receive_card(self, window, cx))
+            })
+            .when(self.opened && self.screen == Screen::Send, |body| {
+                body.child(send_card(self, window, cx))
+            })
+            .child(status_line(self))
+            .when(self.opened && self.screen == Screen::Wallet, |body| {
+                body.child(history(self))
+            });
+
         div()
             .size_full()
+            .relative()
             .bg(rgb(BG))
             .text_color(rgb(TEXT))
             .flex()
@@ -2203,40 +2241,27 @@ impl Render for Home {
                 this.insert_typed(event, cx);
             }))
             .child(header(self))
-            .when(self.screen == Screen::Terms, |root| {
-                root.child(terms_card(self, cx))
-            })
-            .when(self.screen == Screen::Legal, |root| {
-                root.child(legal_card(self, cx))
-            })
-            .when(self.screen == Screen::Restore, |root| {
-                root.child(locked_card(self, window, cx))
-            })
-            .when(self.screen == Screen::Settings, |root| {
-                root.child(settings_card(self, window, cx))
-            })
-            .when(self.opened && self.screen == Screen::Wallet, |root| {
-                root.child(opened_card(self, cx)).child(sync_card(self, cx))
-            })
-            .when(self.opened && self.screen == Screen::Receive, |root| {
-                root.child(receive_card(self, window, cx))
-            })
-            .when(self.opened && self.screen == Screen::Send, |root| {
-                root.child(send_card(self, window, cx))
-            })
-            .child(status_line(self))
-            .when(self.opened && self.screen == Screen::Wallet, |root| {
-                root.child(history(self))
-            })
+            .child(body)
+            .child(resize_handle())
     }
 }
 
 fn header(home: &Home) -> impl IntoElement {
     div()
+        .id("window-drag")
         .flex()
         .flex_row()
         .items_center()
         .justify_between()
+        .cursor(CursorStyle::Arrow)
+        .on_mouse_down(MouseButton::Left, |_, window, _| {
+            window.start_window_move();
+        })
+        .on_click(|event, window, _| {
+            if event.click_count() == 2 {
+                window.zoom_window();
+            }
+        })
         .child(
             div()
                 .text_xl()
@@ -2250,6 +2275,20 @@ fn header(home: &Home) -> impl IntoElement {
             std::env::consts::OS,
             std::env::consts::ARCH
         )))
+}
+
+fn resize_handle() -> impl IntoElement {
+    div()
+        .id("window-resize")
+        .absolute()
+        .right_0()
+        .bottom_0()
+        .size(px(20.))
+        .cursor(CursorStyle::ResizeUpLeftDownRight)
+        .on_mouse_down(MouseButton::Left, |_, window, _| {
+            window.start_window_resize(ResizeEdge::BottomRight);
+        })
+        .child("⌟")
 }
 
 fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoElement {
@@ -2647,6 +2686,17 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         sync.restore_height,
         remaining,
     );
+    let visible_rate = if home.scan_rate.recent_avg > 0.0 {
+        Some(home.scan_rate.recent_avg)
+    } else if home.scan_rate.avg > 0.0 {
+        Some(home.scan_rate.avg)
+    } else {
+        None
+    };
+    let detail = match visible_rate {
+        Some(rate) if running => format!("{detail} · {rate:.1} blk/s"),
+        _ => detail,
+    };
     let dot = if error.is_some() && !running {
         OUT
     } else if synced {
