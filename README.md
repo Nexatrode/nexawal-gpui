@@ -52,13 +52,17 @@ cargo build --release
 ```
 
 The release executable has the NexaWal icon embedded on Windows. On macOS,
-`cargo run` installs the same icon in the Dock and Cmd-Tab switcher. To create a
-normal signed-ready `.app` bundle with `nexawal.icns`:
+`cargo run` installs the native padded, rounded icon in the Dock and Cmd-Tab
+switcher. To create a normal signed-ready `.app` bundle with `nexawal.icns`:
 
 ```bash
 cargo install cargo-bundle
 cargo bundle --release
 ```
+
+After changing the source artwork, regenerate the macOS PNG and `.icns` on a
+Mac with `scripts/generate-macos-icon.sh`. The full-bleed source remains in use
+for Windows and Linux.
 
 Linux desktop integration is under `packaging/linux`. Its desktop filename and
 icon name match the GPUI window app ID (`com.nexatrode.nexawal`), so Wayland and

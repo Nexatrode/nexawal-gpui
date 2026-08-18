@@ -1,11 +1,15 @@
 use std::sync::Arc;
 
-const APP_ICON_PNG: &[u8] = include_bytes!("../assets/nexawal.png");
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+const WINDOW_ICON_PNG: &[u8] = include_bytes!("../assets/nexawal.png");
+
+#[cfg(target_os = "macos")]
+const MACOS_APP_ICON_PNG: &[u8] = include_bytes!("../assets/nexawal-macos.png");
 
 /// X11 accepts a per-window icon. Wayland associates the desktop icon by app ID.
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 pub fn window_icon() -> Option<Arc<image::RgbaImage>> {
-    image::load_from_memory(APP_ICON_PNG)
+    image::load_from_memory(WINDOW_ICON_PNG)
         .ok()
         .map(|image| Arc::new(image.into_rgba8()))
 }
@@ -27,7 +31,7 @@ pub fn install_process_icon() {
         return;
     };
     let data = unsafe {
-        NSData::dataWithBytes_length(APP_ICON_PNG.as_ptr().cast(), APP_ICON_PNG.len())
+        NSData::dataWithBytes_length(MACOS_APP_ICON_PNG.as_ptr().cast(), MACOS_APP_ICON_PNG.len())
     };
     let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) else {
         return;
