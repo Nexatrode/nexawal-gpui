@@ -3539,7 +3539,14 @@
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "You can use Face ID to secure your wallet.",
-    "Your recovery seed:": "Your recovery seed:"
+    "Your recovery seed:": "Your recovery seed:",
+    "Open the existing wallet from {}, or restore a different seed.": "Open the existing wallet from {}, or restore a different seed.",
+    "Click the seed box, paste with ⌘V, set restore height, then Open & sync.": "Click the seed box, paste with ⌘V, set restore height, then Open & sync.",
+    "Locked. Open the existing wallet from {}, or restore a different seed.": "Locked. Open the existing wallet from {}, or restore a different seed.",
+    "Use Open existing wallet to try again, or restore from seed.": "Use Open existing wallet to try again, or restore from seed.",
+    "Opening the wallet from secure storage.": "Opening the wallet from secure storage.",
+    "Paste here only to restore a different wallet.": "Paste here only to restore a different wallet.",
+    "Click this box, then ⌘V or Edit → Paste. Open is a separate button.": "Click this box, then ⌘V or Edit → Paste. Open is a separate button."
   },
   "eo": {
     "\nAmount %@": "\nSumo %@",
