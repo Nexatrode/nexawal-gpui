@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.nexatrode.nexawal</id>
+  <name>NexaWal</name>
+  <summary>Native Monero wallet</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>NexaWal is a native Monero wallet for macOS, Windows, and Linux.</p>
+  </description>
+  <launchable type="desktop-id">com.nexatrode.nexawal.desktop</launchable>
+  <url type="homepage">https://github.com/Nexatrode/nexawal-gpui</url>
+  <provides>
+    <binary>nexawal</binary>
+  </provides>
+  <categories>
+    <category>Finance</category>
+    <category>Network</category>
+  </categories>
+</component>

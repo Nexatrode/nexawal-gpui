@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=NexaWal
+Comment=Native Monero wallet
+Exec=nexawal
+Icon=com.nexatrode.nexawal
+Terminal=false
+Categories=Finance;Network;
+StartupWMClass=com.nexatrode.nexawal
+Keywords=Monero;XMR;Wallet;

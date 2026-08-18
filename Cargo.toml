@@ -1,0 +1,136 @@
+[package]
+name = "nexawal-gpui"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "nexawal desktop app for macOS, Windows, and Linux (GPUI)"
+repository = "https://github.com/nexatrode/nexawal-gpui"
+publish = false
+build = "build.rs"
+
+[package.metadata.bundle]
+name = "NexaWal"
+identifier = "com.nexatrode.nexawal"
+icon = ["assets/nexawal.icns", "assets/nexawal.png"]
+category = "Finance"
+short_description = "A native Monero wallet"
+long_description = "NexaWal is a native Monero wallet for macOS, Windows, and Linux."
+osx_minimum_system_version = "13.0"
+
+[package.metadata.winresource]
+FileDescription = "NexaWal Monero Wallet"
+ProductName = "NexaWal"
+OriginalFilename = "nexawal.exe"
+LegalCopyright = "Copyright © Nexatrode"
+
+[[bin]]
+name = "nexawal"
+path = "src/main.rs"
+
+[dependencies]
+# Pin matches a local Zed checkout that has the gpui_platform split
+# (macOS Metal, Windows DirectX, Linux Wayland/X11).
+# crates.io gpui 0.2.x is older and does not export gpui_platform.
+gpui = { git = "https://github.com/zed-industries/zed", rev = "0ad5441b5370428eaa353a36f63c50c5448eead5" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "0ad5441b5370428eaa353a36f63c50c5448eead5", features = [
+    "font-kit",
+    "wayland",
+    "x11",
+    # Compile Metal shaders at runtime so macOS 26 does not require
+    # `xcodebuild -downloadComponent MetalToolchain` just to `cargo run`.
+    "runtime_shaders",
+] }
+
+walletcore = { path = "../nexawal-android/MoneroWalletCoreFFI/monero-oxide-output" }
+dirs = "5"
+keyring = "3"
+qrcode = { version = "0.14", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "ico"] }
+smallvec = "1"
+ureq = { version = "2", default-features = false, features = ["tls"] }
+rqrr = "0.8"
+nokhwa = { version = "0.10", default-features = false, features = ["input-native"] }
+
+[build-dependencies]
+winresource = "0.1.31"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = [
+    "NSApplication",
+    "NSImage",
+] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = [
+    "NSData",
+    "NSError",
+    "NSString",
+] }
+objc2-local-authentication = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "LAContext",
+    "block2",
+] }
+block2 = "0.6"
+
+# Scan/decode is the hot path. Keep `cargo run` closer to Catalyst than a fully
+# unoptimized debug walletcore.
+[profile.dev.package.walletcore]
+opt-level = 3
+[profile.dev.package.monero-wallet]
+opt-level = 3
+[profile.dev.package.monero-oxide]
+opt-level = 3
+[profile.dev.package.monero-daemon-rpc]
+opt-level = 3
+[profile.dev.package.monero-simple-request-rpc]
+opt-level = 3
+[profile.dev.package.monero-epee]
+opt-level = 3
+[profile.dev.package.monero-interface]
+opt-level = 3
+[profile.dev.package.monero-io]
+opt-level = 3
+[profile.dev.package.monero-primitives]
+opt-level = 3
+[profile.dev.package.monero-ed25519]
+opt-level = 3
+[profile.dev.package.monero-address]
+opt-level = 3
+[profile.dev.package.monero-clsag]
+opt-level = 3
+[profile.dev.package.monero-mlsag]
+opt-level = 3
+[profile.dev.package.monero-borromean]
+opt-level = 3
+[profile.dev.package.monero-bulletproofs]
+opt-level = 3
+[profile.dev.package.monero-bulletproofs-generators]
+opt-level = 3
+[profile.dev.package.simple-request]
+opt-level = 3
+[profile.dev.package.ureq]
+opt-level = 3
+[profile.dev.package.hyper]
+opt-level = 3
+[profile.dev.package.hyper-rustls]
+opt-level = 3
+[profile.dev.package.tokio]
+opt-level = 3
+[profile.dev.package.rustls]
+opt-level = 3
+[profile.dev.package.bytes]
+opt-level = 3
+[profile.dev.package.serde]
+opt-level = 3
+[profile.dev.package.serde_json]
+opt-level = 3
+[profile.dev.package.cuprate-epee-encoding]
+opt-level = 3
+[profile.dev.package.curve25519-dalek]
+opt-level = 3
+[profile.dev.package.sha3]
+opt-level = 3
+[profile.dev.package.subtle]
+opt-level = 3
+[profile.dev.package.zeroize]
+opt-level = 3
