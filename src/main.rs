@@ -3,14 +3,14 @@ use std::fs;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use gpui::{
-    App, Bounds, ClickEvent, ClipboardEntry, Context, CursorStyle, FocusHandle, Focusable,
-    ImageSource, KeyBinding, KeyDownEvent, Menu, MenuItem, ObjectFit, OsAction, PathPromptOptions,
-    MouseButton, RenderImage, ResizeEdge, SharedString, TitlebarOptions, Window, WindowBounds,
-    WindowOptions, actions, div, img, prelude::*, px, rgb, relative, size,
-};
 #[cfg(target_os = "macos")]
 use gpui::SystemMenuType;
+use gpui::{
+    App, Bounds, ClickEvent, ClipboardEntry, Context, CursorStyle, FocusHandle, Focusable,
+    ImageSource, KeyBinding, KeyDownEvent, Menu, MenuItem, MouseButton, ObjectFit, OsAction,
+    PathPromptOptions, RenderImage, ResizeEdge, SharedString, TitlebarOptions, Window,
+    WindowBounds, WindowOptions, actions, div, img, prelude::*, px, relative, rgb, size,
+};
 use gpui_platform::application;
 use monerowalletcore::api::{self, RefreshJob, SyncStatus, Transfer};
 
@@ -20,6 +20,7 @@ mod daemon;
 mod device_auth;
 mod fiat;
 mod fiat_snapshot;
+mod l10n;
 mod legal;
 mod network;
 mod paths;
@@ -193,8 +194,8 @@ impl Home {
         let needs_terms = paths::terms_need_accept();
         let initial_seed = env_or("NEXAWAL_MNEMONIC", "");
         let saved_auth_preference = paths::load_device_auth_preference();
-        let require_device_auth = saved_auth_preference
-            .unwrap_or_else(|| has_stored && device_auth::is_available());
+        let require_device_auth =
+            saved_auth_preference.unwrap_or_else(|| has_stored && device_auth::is_available());
         let should_auto_unlock = has_stored && !needs_terms && initial_seed.is_empty();
         if has_stored && saved_auth_preference.is_none() && require_device_auth {
             let _ = paths::save_device_auth(true);
@@ -237,8 +238,11 @@ impl Home {
             status: if should_auto_unlock && require_device_auth {
                 "Waiting for Touch ID or your Mac login password…".into()
             } else if should_auto_unlock {
-                format!("Opening existing wallet from {}…", wallet_store::secure_store_name())
-                    .into()
+                format!(
+                    "Opening existing wallet from {}…",
+                    wallet_store::secure_store_name()
+                )
+                .into()
             } else if has_stored {
                 format!(
                     "Open the existing wallet from {}, or restore a different seed.",
@@ -419,20 +423,20 @@ impl Home {
                 self.send_max = false;
             }
             self.clear_send_preview();
-            self.status = "QR filled destination.".into();
+            self.status = l10n::t("QR filled destination.").into();
         } else if uri::looks_like_address(trimmed) {
             self.send_dest = trimmed.to_string();
             self.clear_send_preview();
-            self.status = "QR filled destination.".into();
+            self.status = l10n::t("QR filled destination.").into();
         } else {
-            self.status = "QR did not contain a Monero address.".into();
+            self.status = l10n::t("QR did not contain a Monero address.").into();
         }
         cx.notify();
     }
 
     fn paste_send_qr(&mut self, cx: &mut Context<Self>) {
         let Some(item) = cx.read_from_clipboard() else {
-            self.status = "Clipboard is empty.".into();
+            self.status = l10n::t("Clipboard is empty.").into();
             cx.notify();
             return;
         };
@@ -444,9 +448,9 @@ impl Home {
             .iter()
             .any(|entry| matches!(entry, ClipboardEntry::Image(_)));
         self.status = if saw_image {
-            "Clipboard image is not a readable QR code.".into()
+            l10n::t("Clipboard image is not a readable QR code.").into()
         } else {
-            "Clipboard has no image. Copy a QR screenshot first.".into()
+            l10n::t("Clipboard has no image. Copy a QR screenshot first.").into()
         };
         cx.notify();
     }
@@ -462,7 +466,7 @@ impl Home {
             prompt: Some("Open QR image".into()),
         });
         self.send_qr_busy = true;
-        self.status = "Choose a QR image…".into();
+        self.status = l10n::t("Choose a QR image…").into();
         cx.notify();
         cx.spawn(async move |this, cx| {
             let picked = receiver.await;
@@ -471,7 +475,7 @@ impl Home {
                 Ok(Ok(None)) => {
                     let _ = this.update(cx, |this, cx| {
                         this.send_qr_busy = false;
-                        this.status = "QR image cancelled.".into();
+                        this.status = l10n::t("QR image cancelled.").into();
                         cx.notify();
                     });
                     return;
@@ -479,7 +483,7 @@ impl Home {
                 _ => {
                     let _ = this.update(cx, |this, cx| {
                         this.send_qr_busy = false;
-                        this.status = "Could not open the file picker.".into();
+                        this.status = l10n::t("Could not open the file picker.").into();
                         cx.notify();
                     });
                     return;
@@ -501,7 +505,7 @@ impl Home {
                 match payload {
                     Some(payload) => this.apply_payment_payload(&payload, cx),
                     None => {
-                        this.status = "No QR code found in that image.".into();
+                        this.status = l10n::t("No QR code found in that image.").into();
                         cx.notify();
                     }
                 }
@@ -515,7 +519,7 @@ impl Home {
             return;
         }
         self.send_qr_busy = true;
-        self.status = "Looking for a QR with the camera…".into();
+        self.status = l10n::t("Looking for a QR with the camera…").into();
         cx.notify();
         cx.spawn(async move |this, cx| {
             let result = cx
@@ -538,12 +542,12 @@ impl Home {
 
     fn copy_seed(&mut self, cx: &mut Context<Self>) {
         if self.seed.trim().is_empty() {
-            self.status = "Seed field is empty.".into();
+            self.status = l10n::t("Seed field is empty.").into();
             cx.notify();
             return;
         }
         cx.write_to_clipboard(gpui::ClipboardItem::new_string(self.seed.clone()));
-        self.status = "Seed copied. Store it offline, then clear the clipboard.".into();
+        self.status = l10n::t("Seed copied. Store it offline, then clear the clipboard.").into();
         cx.notify();
     }
 
@@ -623,7 +627,7 @@ impl Home {
         scan_tuning::apply_stall_fallback();
         self.scan_stall_fallback_used = true;
         self.last_scan_progress_at = Some(Instant::now());
-        self.status = "Scan stalled · retrying with smaller batches…".into();
+        self.status = l10n::t("Scan stalled · retrying with smaller batches…").into();
         self.kick_refresh()
     }
 
@@ -637,7 +641,9 @@ impl Home {
     fn amount_piconero(&self, text: &str, mode: AmountMode) -> Option<u64> {
         match mode {
             AmountMode::Xmr => amount::parse_piconero(text),
-            AmountMode::Fiat => self.live_rate().and_then(|rate| fiat::piconero_from_fiat(text, rate)),
+            AmountMode::Fiat => self
+                .live_rate()
+                .and_then(|rate| fiat::piconero_from_fiat(text, rate)),
         }
     }
 
@@ -712,7 +718,7 @@ impl Home {
             )
             .into()
         } else {
-            "Spend from the whole wallet.".into()
+            l10n::t("Spend from the whole wallet.").into()
         };
         cx.notify();
     }
@@ -759,7 +765,7 @@ impl Home {
 
     fn swap_amount_mode(&mut self, send: bool, cx: &mut Context<Self>) {
         let Some(rate) = self.live_rate().cloned() else {
-            self.status = "Turn on fiat estimates first.".into();
+            self.status = l10n::t("Turn on fiat estimates first.").into();
             cx.notify();
             return;
         };
@@ -867,7 +873,11 @@ impl Home {
         if self.screen == Screen::Terms || self.screen == Screen::Legal {
             return;
         }
-        if self.opened && !matches!(self.screen, Screen::Send | Screen::Settings | Screen::Receive)
+        if self.opened
+            && !matches!(
+                self.screen,
+                Screen::Send | Screen::Settings | Screen::Receive
+            )
         {
             return;
         }
@@ -879,10 +889,7 @@ impl Home {
             };
         }
         if self.screen == Screen::Settings
-            && !matches!(
-                self.active,
-                Field::Node | Field::I2pNode | Field::I2pProxy
-            )
+            && !matches!(self.active, Field::Node | Field::I2pNode | Field::I2pProxy)
         {
             self.active = Field::Node;
         }
@@ -895,7 +902,7 @@ impl Home {
             self.active = Field::RecvAmount;
         }
         let Some(item) = cx.read_from_clipboard() else {
-            self.status = "Clipboard is empty.".into();
+            self.status = l10n::t("Clipboard is empty.").into();
             cx.notify();
             return;
         };
@@ -903,7 +910,7 @@ impl Home {
             return;
         }
         let Some(text) = item.text() else {
-            self.status = "Clipboard has no text.".into();
+            self.status = l10n::t("Clipboard has no text.").into();
             cx.notify();
             return;
         };
@@ -913,12 +920,12 @@ impl Home {
     fn paste_seed_button(&mut self, cx: &mut Context<Self>) {
         self.active = Field::Seed;
         let Some(item) = cx.read_from_clipboard() else {
-            self.status = "Clipboard is empty.".into();
+            self.status = l10n::t("Clipboard is empty.").into();
             cx.notify();
             return;
         };
         let Some(text) = item.text() else {
-            self.status = "Clipboard has no text.".into();
+            self.status = l10n::t("Clipboard has no text.").into();
             cx.notify();
             return;
         };
@@ -959,18 +966,18 @@ impl Home {
                         self.send_max = false;
                     }
                     self.clear_send_preview();
-                    self.status = "Payment URI filled destination.".into();
+                    self.status = l10n::t("Payment URI filled destination.").into();
                 } else {
                     self.send_dest = trimmed.to_string();
                     self.clear_send_preview();
-                    self.status = "Destination filled.".into();
+                    self.status = l10n::t("Destination filled.").into();
                 }
             }
             Field::Amount => {
                 self.send_amount = text.trim().replace(',', ".");
                 self.send_max = false;
                 self.clear_send_preview();
-                self.status = "Amount filled.".into();
+                self.status = l10n::t("Amount filled.").into();
             }
             Field::Node => {
                 self.node_url = text.trim().to_string();
@@ -979,38 +986,42 @@ impl Home {
             }
             Field::RecvAmount => {
                 self.recv_amount = text.trim().replace(',', ".");
-                self.status = "Receive amount updated.".into();
+                self.status = l10n::t("Receive amount updated.").into();
             }
             Field::RecvDesc => {
                 self.recv_desc = text;
-                self.status = "Receive description updated.".into();
+                self.status = l10n::t("Receive description updated.").into();
             }
             Field::RecvLabel => {
                 self.recv_label = text;
                 self.persist_recv_label();
-                self.status = "Receive label updated.".into();
+                self.status = l10n::t("Receive label updated.").into();
             }
             Field::Challenge => {
                 let slot = self.challenge_slot.min(2);
                 self.challenge_answers[slot] = text.trim().to_string();
-                self.status = "Seed confirmation updated.".into();
+                self.status = l10n::t("Seed confirmation updated.").into();
             }
             Field::I2pNode => {
                 self.i2p_rpc = text.trim().to_string();
                 let _ = paths::save_i2p_rpc(&self.i2p_rpc);
-                self.status = "I2P node updated.".into();
+                self.status = l10n::t("I2P node updated.").into();
             }
             Field::I2pProxy => {
                 self.i2p_proxy = text.trim().to_string();
                 let _ = paths::save_i2p_proxy(&self.i2p_proxy);
-                self.status = "I2P HTTP proxy updated.".into();
+                self.status = l10n::t("I2P HTTP proxy updated.").into();
             }
         }
         cx.notify();
     }
 
     fn copy_field(&mut self, _: &CopyField, _window: &mut Window, cx: &mut Context<Self>) {
-        if self.opened && !matches!(self.screen, Screen::Send | Screen::Settings | Screen::Receive)
+        if self.opened
+            && !matches!(
+                self.screen,
+                Screen::Send | Screen::Settings | Screen::Receive
+            )
         {
             self.copy_address(cx);
             return;
@@ -1047,7 +1058,7 @@ impl Home {
 
     fn copy_address(&mut self, cx: &mut Context<Self>) {
         if !self.opened {
-            self.status = "Open a wallet first.".into();
+            self.status = l10n::t("Open a wallet first.").into();
             cx.notify();
             return;
         }
@@ -1057,13 +1068,13 @@ impl Home {
             self.address.to_string()
         };
         if address.is_empty() {
-            self.status = "No address to copy.".into();
+            self.status = l10n::t("No address to copy.").into();
             cx.notify();
             return;
         }
         cx.write_to_clipboard(gpui::ClipboardItem::new_string(address));
         self.address_copied_at = Some(Instant::now());
-        self.status = "Address copied.".into();
+        self.status = l10n::t("Address copied.").into();
         cx.notify();
     }
 
@@ -1085,7 +1096,7 @@ impl Home {
             self.active = Field::RecvAmount;
             self.sync_recv_label_from_book();
             self.ensure_qr();
-            self.status = "Receive · QR encodes a monero: payment URI.".into();
+            self.status = l10n::t("Receive · QR encodes a monero: payment URI.").into();
             cx.notify();
         }
     }
@@ -1094,7 +1105,8 @@ impl Home {
         if self.opened {
             self.screen = Screen::Send;
             self.active = Field::Dest;
-            self.status = "Send · paste destination, amount or Send max, then Preview.".into();
+            self.status =
+                l10n::t("Send · paste destination, amount or Send max, then Preview.").into();
             self.refresh_send_source_balance();
             cx.notify();
         }
@@ -1105,14 +1117,14 @@ impl Home {
         self.active = Field::RecvAmount;
         self.sync_recv_label_from_book();
         self.ensure_qr();
-        self.status = "Receive · QR encodes a monero: payment URI.".into();
+        self.status = l10n::t("Receive · QR encodes a monero: payment URI.").into();
         cx.notify();
     }
 
     fn go_send(&mut self, cx: &mut Context<Self>) {
         self.screen = Screen::Send;
         self.active = Field::Dest;
-        self.status = "Send · paste destination, amount or Send max, then Preview.".into();
+        self.status = l10n::t("Send · paste destination, amount or Send max, then Preview.").into();
         self.refresh_send_source_balance();
         cx.notify();
     }
@@ -1139,19 +1151,19 @@ impl Home {
     fn go_settings(&mut self, cx: &mut Context<Self>) {
         if self.blocked_by_terms() {
             self.screen = Screen::Terms;
-            self.status = "Accept the Terms of Use first.".into();
+            self.status = l10n::t("Accept the Terms of Use first.").into();
             cx.notify();
             return;
         }
         self.screen = Screen::Settings;
         self.active = Field::Node;
-        self.status = "Settings · node URL is saved locally.".into();
+        self.status = l10n::t("Settings · node URL is saved locally.").into();
         cx.notify();
     }
 
     fn accept_terms(&mut self, cx: &mut Context<Self>) {
         if !self.terms_checked {
-            self.status = "Check the box to agree to the Terms of Use.".into();
+            self.status = l10n::t("Check the box to agree to the Terms of Use.").into();
             cx.notify();
             return;
         }
@@ -1161,7 +1173,7 @@ impl Home {
             return;
         }
         self.screen = Screen::Restore;
-        self.status = "Terms accepted. Paste your seed, then Open & sync.".into();
+        self.status = l10n::t("Terms accepted. Paste your seed, then Open & sync.").into();
         cx.notify();
         self.try_unlock_stored(cx);
     }
@@ -1186,7 +1198,7 @@ impl Home {
         self.send_amount_mode = AmountMode::Xmr;
         self.send_amount = amount::format_for_input(self.send_unlocked());
         self.clear_send_preview();
-        self.status = "Send max · Preview to see the sweep amount and fee.".into();
+        self.status = l10n::t("Send max · Preview to see the sweep amount and fee.").into();
         cx.notify();
     }
 
@@ -1196,7 +1208,7 @@ impl Home {
         }
         let dest = self.send_dest.trim().to_string();
         if !uri::looks_like_address(&dest) {
-            self.status = "Enter a valid mainnet address (or paste a monero: URI).".into();
+            self.status = l10n::t("Enter a valid mainnet address (or paste a monero: URI).").into();
             cx.notify();
             return;
         }
@@ -1207,7 +1219,7 @@ impl Home {
             match self.send_piconero() {
                 Some(v) if v > 0 => Some(v),
                 _ => {
-                    self.status = "Enter a valid amount, or Send max.".into();
+                    self.status = l10n::t("Enter a valid amount, or Send max.").into();
                     cx.notify();
                     return;
                 }
@@ -1215,13 +1227,13 @@ impl Home {
         };
         if let Some(amt) = amount {
             if amt > self.send_unlocked() {
-                self.status = "Amount is larger than unlocked balance.".into();
+                self.status = l10n::t("Amount is larger than unlocked balance.").into();
                 cx.notify();
                 return;
             }
         }
         self.send_busy = true;
-        self.status = "Estimating fee…".into();
+        self.status = l10n::t("Estimating fee…").into();
         cx.notify();
         self.apply_broadcast_proxy();
         let node = self.broadcast_node_url();
@@ -1276,12 +1288,12 @@ impl Home {
         }
         let dest = self.send_dest.trim().to_string();
         if !uri::looks_like_address(&dest) {
-            self.status = "Enter a valid mainnet address.".into();
+            self.status = l10n::t("Enter a valid mainnet address.").into();
             cx.notify();
             return;
         }
         let Some(fee) = self.send_fee else {
-            self.status = "Preview the fee before sending.".into();
+            self.status = l10n::t("Preview the fee before sending.").into();
             cx.notify();
             return;
         };
@@ -1292,14 +1304,14 @@ impl Home {
             match self.send_piconero() {
                 Some(v) if v > 0 => v,
                 _ => {
-                    self.status = "Enter a valid amount.".into();
+                    self.status = l10n::t("Enter a valid amount.").into();
                     cx.notify();
                     return;
                 }
             }
         };
         if !is_max && !api::has_unlocked_for_exact_send(amount, fee, self.send_unlocked()) {
-            self.status = "Unlocked balance cannot cover amount + fee.".into();
+            self.status = l10n::t("Unlocked balance cannot cover amount + fee.").into();
             cx.notify();
             return;
         }
@@ -1307,7 +1319,7 @@ impl Home {
             return;
         }
         self.send_busy = true;
-        self.status = "Sending…".into();
+        self.status = l10n::t("Sending…").into();
         cx.notify();
         self.apply_broadcast_proxy();
         let node = self.broadcast_node_url();
@@ -1362,7 +1374,11 @@ impl Home {
     }
 
     fn cut_field(&mut self, _: &CutField, window: &mut Window, cx: &mut Context<Self>) {
-        if self.opened && self.screen != Screen::Send && self.screen != Screen::Settings && self.screen != Screen::Receive {
+        if self.opened
+            && self.screen != Screen::Send
+            && self.screen != Screen::Settings
+            && self.screen != Screen::Receive
+        {
             return;
         }
         self.copy_field(&CopyField, window, cx);
@@ -1402,7 +1418,11 @@ impl Home {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.opened && self.screen != Screen::Send && self.screen != Screen::Settings && self.screen != Screen::Receive {
+        if self.opened
+            && self.screen != Screen::Send
+            && self.screen != Screen::Settings
+            && self.screen != Screen::Receive
+        {
             return;
         }
         match self.active {
@@ -1458,7 +1478,11 @@ impl Home {
         if matches!(self.screen, Screen::Terms | Screen::Legal) {
             return;
         }
-        if self.opened && self.screen != Screen::Send && self.screen != Screen::Settings && self.screen != Screen::Receive {
+        if self.opened
+            && self.screen != Screen::Send
+            && self.screen != Screen::Settings
+            && self.screen != Screen::Receive
+        {
             return;
         }
         if event.keystroke.modifiers.platform || event.keystroke.modifiers.control {
@@ -1551,8 +1575,10 @@ impl Home {
                 self.challenge_answers = Default::default();
                 self.challenge_slot = 0;
                 self.fetch_suggested_height(cx);
-                self.status = "Write this seed down on paper. Open is locked until you confirm three words."
-                    .into();
+                self.status = l10n::t(
+                    "Write this seed down on paper. Open is locked until you confirm three words.",
+                )
+                .into();
             }
             Err(err) => self.status = format!("Could not generate seed: {err}").into(),
         }
@@ -1566,20 +1592,22 @@ impl Home {
     fn open_from_form(&mut self, cx: &mut Context<Self>) {
         if self.blocked_by_terms() {
             self.screen = Screen::Terms;
-            self.status = "Accept the Terms of Use first.".into();
+            self.status = l10n::t("Accept the Terms of Use first.").into();
             cx.notify();
             return;
         }
         let mnemonic = normalize_seed(&self.seed);
         if mnemonic.is_empty() {
-            self.status = "Seed field is empty. Paste or type the 25-word phrase first.".into();
+            self.status =
+                l10n::t("Seed field is empty. Paste or type the 25-word phrase first.").into();
             cx.notify();
             return;
         }
         if self.created_seed && !self.seed_backup_passed() {
-            self.status =
-                "Check that you wrote the seed down and confirm the three words before opening."
-                    .into();
+            self.status = l10n::t(
+                "Check that you wrote the seed down and confirm the three words before opening.",
+            )
+            .into();
             cx.notify();
             return;
         }
@@ -1605,14 +1633,14 @@ impl Home {
 
         if let Some(cache) = paths::load_cache() {
             match api::import_cache(WALLET_ID, &cache) {
-                Ok(()) => self.status = "Opened with local cache. Syncing…".into(),
+                Ok(()) => self.status = l10n::t("Opened with local cache. Syncing…").into(),
                 Err(err) => {
                     self.status =
                         format!("Cache skipped ({err}). Syncing from restore height…").into()
                 }
             }
         } else {
-            self.status = "Opened. Syncing…".into();
+            self.status = l10n::t("Opened. Syncing…").into();
         }
 
         self.last_exported_scanned = None;
@@ -1639,9 +1667,7 @@ impl Home {
             Ok(()) => {
                 self.has_stored = true;
                 self.seed.clear();
-                if paths::load_device_auth_preference().is_none()
-                    && device_auth::is_available()
-                {
+                if paths::load_device_auth_preference().is_none() && device_auth::is_available() {
                     self.require_device_auth = true;
                     let _ = paths::save_device_auth(true);
                 }
@@ -1650,8 +1676,9 @@ impl Home {
             Err(err) => Some(err),
         };
         if let Some(err) = scan_error {
-            self.status = format!("Wallet opened, but refresh failed: {err}. Use Wallet → Retry sync.")
-                .into();
+            self.status =
+                format!("Wallet opened, but refresh failed: {err}. Use Wallet → Retry sync.")
+                    .into();
         }
         if let Some(err) = store_error {
             self.status = format!("{} Secure-store save skipped: {err}", self.status).into();
@@ -1669,7 +1696,7 @@ impl Home {
         }
         self.apply_broadcast_proxy();
         let node = self.broadcast_node_url();
-        self.status = "Relaying a pending send…".into();
+        self.status = l10n::t("Relaying a pending send…").into();
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
@@ -1690,7 +1717,8 @@ impl Home {
                     }
                     Ok(None) => {}
                     Err(err) => {
-                        this.status = format!("Pending send still on disk ({err}). Retry send later.").into();
+                        this.status =
+                            format!("Pending send still on disk ({err}). Retry send later.").into();
                     }
                 }
                 this.apply_scan_proxy();
@@ -1707,12 +1735,12 @@ impl Home {
 
     fn retry_refresh(&mut self, cx: &mut Context<Self>) {
         if !self.opened {
-            self.status = "Open the wallet before retrying sync.".into();
+            self.status = l10n::t("Open the wallet before retrying sync.").into();
             cx.notify();
             return;
         }
         if matches!(api::refresh_job(WALLET_ID), RefreshJob::Running) {
-            self.status = "Scan is already running.".into();
+            self.status = l10n::t("Scan is already running.").into();
             cx.notify();
             return;
         }
@@ -1724,7 +1752,7 @@ impl Home {
             return;
         }
         self.scan_needs_retry = false;
-        self.status = "Retrying sync…".into();
+        self.status = l10n::t("Retrying sync…").into();
         self.start_poll(cx);
         cx.notify();
     }
@@ -1784,7 +1812,7 @@ impl Home {
             )
             .into()
         } else {
-            "Session cleared.".into()
+            l10n::t("Session cleared.").into()
         };
         cx.notify();
     }
@@ -1803,7 +1831,7 @@ impl Home {
         self.receive_book = receive_book::Book::primary();
         self.has_stored = false;
         self.restore_height_text = "0".into();
-        self.status = "Removed the stored wallet from this computer.".into();
+        self.status = l10n::t("Removed the stored wallet from this computer.").into();
         cx.notify();
     }
 
@@ -1821,9 +1849,10 @@ impl Home {
         }
         if self.require_device_auth && !device_auth::is_available() {
             self.unlocking = false;
-            self.status =
-                "Device authentication is required, but Touch ID / password is not available."
-                    .into();
+            self.status = l10n::t(
+                "Device authentication is required, but Touch ID / password is not available.",
+            )
+            .into();
             cx.notify();
             return;
         }
@@ -1834,7 +1863,11 @@ impl Home {
         self.status = if require_device_auth {
             "Waiting for Touch ID or your Mac login password…".into()
         } else {
-            format!("Opening existing wallet from {}…", wallet_store::secure_store_name()).into()
+            format!(
+                "Opening existing wallet from {}…",
+                wallet_store::secure_store_name()
+            )
+            .into()
         };
         cx.notify();
 
@@ -1859,9 +1892,10 @@ impl Home {
                     }
                     Err(err) => {
                         this.has_stored = true;
-                        this.status =
-                            format!("{err}. Use Open existing wallet to try again, or restore from seed.")
-                                .into();
+                        this.status = format!(
+                            "{err}. Use Open existing wallet to try again, or restore from seed."
+                        )
+                        .into();
                         cx.notify();
                     }
                 }
@@ -1946,25 +1980,25 @@ impl Home {
         self.recv_label.clear();
         self.refresh_receive_address();
         self.ensure_qr();
-        self.status = format!("New receive address · subaddress {index}. Name it if you want.").into();
+        self.status =
+            format!("New receive address · subaddress {index}. Name it if you want.").into();
         cx.notify();
     }
 
     fn toggle_device_auth(&mut self, cx: &mut Context<Self>) {
         if self.require_device_auth {
-            if !self.authenticate_if_required(
-                "Authenticate to turn off device authentication",
-                cx,
-            ) {
+            if !self.authenticate_if_required("Authenticate to turn off device authentication", cx)
+            {
                 return;
             }
             self.require_device_auth = false;
             let _ = paths::save_device_auth(false);
-            self.status = "Device authentication off.".into();
+            self.status = l10n::t("Device authentication off.").into();
         } else {
             if !device_auth::is_available() {
                 self.status =
-                    "Touch ID or a login password is not available on this computer.".into();
+                    l10n::t("Touch ID or a login password is not available on this computer.")
+                        .into();
                 cx.notify();
                 return;
             }
@@ -1977,7 +2011,7 @@ impl Home {
             }
             self.require_device_auth = true;
             let _ = paths::save_device_auth(true);
-            self.status = "Device authentication on · required to unlock and send.".into();
+            self.status = l10n::t("Device authentication on · required to unlock and send.").into();
         }
         cx.notify();
     }
@@ -1986,7 +2020,7 @@ impl Home {
         let uri = self.receive_uri();
         cx.write_to_clipboard(gpui::ClipboardItem::new_string(uri));
         self.address_copied_at = Some(Instant::now());
-        self.status = "Payment URI copied.".into();
+        self.status = l10n::t("Payment URI copied.").into();
         cx.notify();
     }
 
@@ -2005,7 +2039,7 @@ impl Home {
             self.fiat_rate = None;
             paths::clear_fiat_rate();
             self.coerce_amount_modes();
-            self.status = "Fiat estimates off.".into();
+            self.status = l10n::t("Fiat estimates off.").into();
         }
         cx.notify();
     }
@@ -2060,8 +2094,8 @@ impl Home {
                         }
                     }
                     Err(_) => {
-                        this.fiat_rate = paths::load_fiat_rate()
-                            .filter(|r| r.currency == this.fiat_currency);
+                        this.fiat_rate =
+                            paths::load_fiat_rate().filter(|r| r.currency == this.fiat_currency);
                     }
                 }
                 cx.notify();
@@ -2148,18 +2182,16 @@ impl Home {
                         let recoverable = api::last_error()
                             .as_deref()
                             .is_some_and(scan_tuning::is_recoverable_fetch_error)
-                            && self.last_scan_progress_at.is_some_and(|t| {
-                                t.elapsed() >= Duration::from_secs(2)
-                            });
+                            && self
+                                .last_scan_progress_at
+                                .is_some_and(|t| t.elapsed() >= Duration::from_secs(2));
                         if remaining > 3 && (stalled || recoverable) {
                             if !self.scan_stall_fallback_used {
                                 if let Err(err) = self.start_stall_fallback_scan() {
                                     self.scan_needs_retry = true;
                                     self.last_scan_error = Some(err.to_string());
-                                    self.status = format!(
-                                        "Scan stalled: {err}. Wallet → Retry sync."
-                                    )
-                                    .into();
+                                    self.status =
+                                        format!("Scan stalled: {err}. Wallet → Retry sync.").into();
                                 }
                             } else if stalled {
                                 self.persist_scan_cache();
@@ -2381,12 +2413,7 @@ fn unlocking_card(home: &Home) -> impl IntoElement {
         .p_6()
         .rounded_lg()
         .bg(rgb(CARD))
-        .child(
-            div()
-                .text_3xl()
-                .text_color(rgb(ACCENT))
-                .child("◉"),
-        )
+        .child(div().text_3xl().text_color(rgb(ACCENT)).child("◉"))
         .child(
             div()
                 .text_xl()
@@ -2442,7 +2469,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         div()
                             .text_lg()
                             .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .child("Existing wallet"),
+                            .child(l10n::t("Existing wallet")),
                     )
                     .child(
                         div()
@@ -2455,7 +2482,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                     )
                     .child(action_button(
                         "open-existing-wallet",
-                        "Open existing wallet",
+                        l10n::t("Open existing wallet"),
                         cx.listener(|this, _: &ClickEvent, _, cx| this.try_unlock_stored(cx)),
                     )),
             )
@@ -2464,13 +2491,13 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                     .pt_2()
                     .text_xs()
                     .text_color(rgb(MUTED))
-                    .child("Restore a different wallet"),
+                    .child(l10n::t("Restore a different wallet")),
             )
         })
         .child(div().text_xs().text_color(rgb(MUTED)).child(if home.network_policy == network::Policy::I2p {
-            "Scan uses the I2P node from Settings"
+            l10n::t("Scan uses the I2P node from Settings")
         } else {
-            "Node URL"
+            l10n::t("Node URL")
         }))
         .when(home.network_policy != network::Policy::I2p, |card| {
             card.child(
@@ -2491,7 +2518,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                 .child(home.node_url.clone()),
             )
         })
-        .child(div().text_xs().text_color(rgb(MUTED)).child("Seed phrase"))
+        .child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("Seed phrase")))
         .child(
             div()
                 .id("seed-field")
@@ -2522,7 +2549,9 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                 div()
                     .text_xs()
                     .text_color(rgb(MUTED))
-                    .child("This is your recovery seed. Write it down on paper and store it somewhere safe. Anyone with these words can access your funds."),
+                    .child(l10n::t(
+                        "This is your recovery seed. Write it down on paper and store it somewhere safe. Anyone with these words can access your funds.",
+                    )),
             )
             .child(
                 div()
@@ -2533,8 +2562,9 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         cx.notify();
                     }))
                     .child(format!(
-                        "{}  I wrote down my recovery seed",
-                        if home.wrote_seed_down { "[x]" } else { "[ ]" }
+                        "{}  {}",
+                        if home.wrote_seed_down { "[x]" } else { "[ ]" },
+                        l10n::t("I wrote down my recovery seed")
                     )),
             )
         })
@@ -2543,7 +2573,9 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                 div()
                     .text_xs()
                     .text_color(rgb(MUTED))
-                    .child("Confirm you wrote it down: enter the requested words below."),
+                    .child(l10n::t(
+                        "Confirm you wrote it down: enter the requested words below.",
+                    )),
             )
             .when(!home.challenge_indices.is_empty(), |card| {
                 card.child(challenge_row(
@@ -2577,7 +2609,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                     div()
                         .text_xs()
                         .text_color(rgb(OUT))
-                        .child("Word(s) don't match yet."),
+                        .child(l10n::t("Word(s) don't match yet.")),
                 )
             })
         })
@@ -2586,11 +2618,11 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                 .text_xs()
                 .text_color(rgb(MUTED))
                 .child(if home.created_seed && home.height_fetching {
-                    "Fetching a fast restore height…"
+                    l10n::t("Fetching a fast restore height…")
                 } else if home.created_seed {
-                    "Starting height (fast)"
+                    l10n::t("Starting height (fast)")
                 } else {
-                    "Restore height (0 = scan from genesis)"
+                    l10n::t("Restore height (0 = scan from genesis)")
                 }),
         )
         .child(
@@ -2620,25 +2652,25 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                 .gap_2()
                 .child(action_button(
                     "paste-seed",
-                    "Paste clipboard into seed",
+                    l10n::t("Paste clipboard into seed"),
                     cx.listener(|this, _: &ClickEvent, _, cx| this.paste_seed_button(cx)),
                 ))
                 .child(action_button(
                     "create-seed",
-                    "Create seed",
+                    l10n::t("Create seed"),
                     cx.listener(|this, _: &ClickEvent, _, cx| this.create_seed(cx)),
                 ))
                 .when(home.created_seed, |row| {
                     row.child(action_button(
                         "copy-seed",
-                        "Copy seed",
+                        l10n::t("Copy seed"),
                         cx.listener(|this, _: &ClickEvent, _, cx| this.copy_seed(cx)),
                     ))
                 })
                 .when(home.seed_backup_passed(), |row| {
                     row.child(action_button(
                         "open-wallet",
-                        "Open & sync",
+                        l10n::t("Open & sync"),
                         cx.listener(|this, _: &ClickEvent, _, cx| this.open_from_form(cx)),
                     ))
                 })
@@ -2651,12 +2683,12 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                             .rounded_md()
                             .bg(rgb(0x2A332A))
                             .text_color(rgb(MUTED))
-                            .child("Open & sync"),
+                            .child(l10n::t("Open & sync")),
                     )
                 })
                 .child(action_button(
                     "restore-settings",
-                    "Settings",
+                    l10n::t("Settings"),
                     cx.listener(|this, _: &ClickEvent, _, cx| this.go_settings(cx)),
                 )),
         )
@@ -2678,11 +2710,7 @@ fn challenge_row(
         .cloned()
         .unwrap_or_default();
     let muted = answer.trim().is_empty();
-    let shown = if muted {
-        String::new()
-    } else {
-        answer
-    };
+    let shown = if muted { String::new() } else { answer };
     div()
         .flex()
         .flex_row()
@@ -2736,20 +2764,15 @@ fn opened_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 .id("copy-address-row")
                 .cursor(CursorStyle::PointingHand)
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.copy_address(cx)))
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(rgb(MUTED))
-                        .child(format!(
-                            "{}  ·  {}",
-                            truncate_middle(&home.address, 12, 12),
-                            if home.address_copy_hint_active() {
-                                "copied"
-                            } else {
-                                "click to copy"
-                            }
-                        )),
-                ),
+                .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
+                    "{}  ·  {}",
+                    truncate_middle(&home.address, 12, 12),
+                    if home.address_copy_hint_active() {
+                        "copied"
+                    } else {
+                        "click to copy"
+                    }
+                ))),
         )
         .child(div().text_3xl().child(format_xmr(home.total_piconero)))
         .when(home.fiat_line(home.total_piconero).is_some(), |card| {
@@ -2768,34 +2791,34 @@ fn opened_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         )
         .child(action_button(
             "copy-address",
-            "Copy address",
+            l10n::t("Copy address"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.copy_address(cx)),
         ))
         .child(action_button(
             "go-receive",
-            "Receive",
+            l10n::t("Receive"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.go_receive(cx)),
         ))
         .child(action_button(
             "go-send",
-            "Send",
+            l10n::t("Send"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.go_send(cx)),
         ))
         .child(action_button(
             "go-settings",
-            "Settings",
+            l10n::t("Settings"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.go_settings(cx)),
         ))
         .when(home.scan_needs_retry, |card| {
             card.child(action_button(
                 "retry-sync",
-                "Retry sync",
+                l10n::t("Retry sync"),
                 cx.listener(|this, _: &ClickEvent, _, cx| this.retry_refresh(cx)),
             ))
         })
         .child(action_button(
             "forget",
-            "Lock",
+            l10n::t("Lock"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.forget(cx)),
         ))
 }
@@ -2810,7 +2833,7 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
             .p_5()
             .rounded_lg()
             .bg(rgb(CARD))
-            .child(div().text_sm().child("Connecting to node"))
+            .child(div().text_sm().child(l10n::t("Connecting to node")))
             .into_any_element();
     };
     let has_tip = sync_status::has_observed_tip(sync);
@@ -2877,12 +2900,7 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.toggle_sync_details(cx);
                 }))
-                .child(
-                    div()
-                        .size(px(10.))
-                        .rounded_full()
-                        .bg(rgb(dot)),
-                )
+                .child(div().size(px(10.)).rounded_full().bg(rgb(dot)))
                 .child(
                     div()
                         .flex_1()
@@ -2890,20 +2908,14 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                         .font_weight(gpui::FontWeight::SEMIBOLD)
                         .child(headline),
                 )
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(rgb(ACCENT))
-                        .child(if expanded { "v" } else { ">" }),
-                ),
+                .child(div().text_xs().text_color(rgb(ACCENT)).child(if expanded {
+                    "v"
+                } else {
+                    ">"
+                })),
         )
         .when(expanded, |card| {
-            card.child(
-                div()
-                    .text_xs()
-                    .text_color(rgb(MUTED))
-                    .child(detail.clone()),
-            )
+            card.child(div().text_xs().text_color(rgb(MUTED)).child(detail.clone()))
         })
         .when(show_progress, |card| {
             card.child(
@@ -2924,20 +2936,23 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         })
         .when(expanded, |card| {
             let mut rows = vec![
-                ("Node", home.scan_node_url()),
-                ("Scanned", sync.last_scanned.to_string()),
-                ("Network Height", sync.chain_height.to_string()),
-                ("Progress", format!("{:.1}%", progress * 100.0)),
+                (l10n::t("Node"), home.scan_node_url()),
+                (l10n::t("Scanned"), sync.last_scanned.to_string()),
+                (l10n::t("Network Height"), sync.chain_height.to_string()),
+                (l10n::t("Progress"), format!("{:.1}%", progress * 100.0)),
             ];
             if !synced {
-                rows.push(("Remaining", format!("{remaining} blocks")));
+                rows.push((l10n::t("Remaining"), format!("{remaining} blocks")));
             }
             if home.scan_rate.avg > 0.0 {
-                rows.push(("Avg throughput", format!("{:.1} blk/s", home.scan_rate.avg)));
+                rows.push((
+                    l10n::t("Avg throughput"),
+                    format!("{:.1} blk/s", home.scan_rate.avg),
+                ));
             }
             if home.scan_rate.recent_avg > 0.0 {
                 rows.push((
-                    "Recent throughput",
+                    l10n::t("Recent throughput"),
                     format!("{:.1} blk/s", home.scan_rate.recent_avg),
                 ));
             }
@@ -2946,18 +2961,13 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         .into_any_element()
 }
 
-fn sync_kv(label: &'static str, value: String) -> impl IntoElement {
+fn sync_kv(label: SharedString, value: String) -> impl IntoElement {
     div()
         .flex()
         .flex_row()
         .justify_between()
         .gap_3()
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(MUTED))
-                .child(label),
-        )
+        .child(div().text_xs().text_color(rgb(MUTED)).child(label))
         .child(div().text_xs().child(value))
 }
 
@@ -2999,7 +3009,12 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
         .p_5()
         .rounded_lg()
         .bg(rgb(CARD))
-        .child(div().text_sm().text_color(rgb(MUTED)).child("Receive"))
+        .child(
+            div()
+                .text_sm()
+                .text_color(rgb(MUTED))
+                .child(l10n::t("Receive")),
+        )
         .child(
             div()
                 .flex()
@@ -3007,33 +3022,33 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                 .gap_2()
                 .child(action_button(
                     "recv-prev",
-                    "Prev",
+                    l10n::t("Prev"),
                     cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.cycle_receive_address(false, cx);
                     }),
                 ))
-                .child(
-                    div()
-                        .px_3()
-                        .py_2()
-                        .child(home.receive_book.display_label()),
-                )
+                .child(div().px_3().py_2().child(home.receive_book.display_label()))
                 .child(action_button(
                     "recv-next",
-                    "Next",
+                    l10n::t("Next"),
                     cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.cycle_receive_address(true, cx);
                     }),
                 ))
                 .child(action_button(
                     "recv-new",
-                    "New address",
+                    l10n::t("New address"),
                     cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.create_receive_subaddress(cx);
                     }),
                 )),
         )
-        .child(div().text_xs().text_color(rgb(MUTED)).child("Label"))
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(MUTED))
+                .child(l10n::t("Label")),
+        )
         .child(
             div()
                 .id("recv-label")
@@ -3071,10 +3086,15 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.copy_address(cx)))
                 .child(home.receive_address.clone()),
         )
-        .child(div().text_xs().text_color(rgb(MUTED)).child(match home.recv_amount_mode {
-            AmountMode::Xmr => "Amount (optional, XMR)".to_string(),
-            AmountMode::Fiat => format!("Amount (optional, {})", home.fiat_currency),
-        }))
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(MUTED))
+                .child(match home.recv_amount_mode {
+                    AmountMode::Xmr => l10n::t("Amount (optional, XMR)").to_string(),
+                    AmountMode::Fiat => format!("Amount (optional, {})", home.fiat_currency),
+                }),
+        )
         .child(
             div()
                 .id("recv-amount")
@@ -3097,9 +3117,9 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
             card.child(action_button(
                 "recv-unit",
                 if home.recv_amount_mode == AmountMode::Xmr {
-                    "Type in fiat"
+                    l10n::t("Type in fiat")
                 } else {
-                    "Type in XMR"
+                    l10n::t("Type in XMR")
                 },
                 cx.listener(|this, _: &ClickEvent, _, cx| this.swap_amount_mode(false, cx)),
             ))
@@ -3112,7 +3132,12 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                     .child(recv_secondary.clone().unwrap_or_default()),
             )
         })
-        .child(div().text_xs().text_color(rgb(MUTED)).child("Description (optional)"))
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(MUTED))
+                .child(l10n::t("Description (optional)")),
+        )
         .child(
             div()
                 .id("recv-desc")
@@ -3143,17 +3168,17 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
         )
         .child(action_button(
             "receive-copy",
-            "Copy address",
+            l10n::t("Copy address"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.copy_address(cx)),
         ))
         .child(action_button(
             "receive-copy-uri",
-            "Copy payment URI",
+            l10n::t("Copy payment URI"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.copy_receive_uri(cx)),
         ))
         .child(action_button(
             "receive-back",
-            "Back",
+            l10n::t("Back"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.go_wallet(cx)),
         ))
 }
@@ -3219,8 +3244,18 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
         .p_5()
         .rounded_lg()
         .bg(rgb(CARD))
-        .child(div().text_sm().text_color(rgb(MUTED)).child("Send"))
-        .child(div().text_xs().text_color(rgb(MUTED)).child("Destination"))
+        .child(
+            div()
+                .text_sm()
+                .text_color(rgb(MUTED))
+                .child(l10n::t("Send")),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(MUTED))
+                .child(l10n::t("Destination")),
+        )
         .child(
             div()
                 .id("send-dest")
@@ -3242,29 +3277,29 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
         )
         .child(action_button(
             "send-paste-qr",
-            "Paste QR from clipboard",
+            l10n::t("Paste QR from clipboard"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.paste_send_qr(cx)),
         ))
         .child(action_button(
             "send-open-qr",
-            "Open QR image",
+            l10n::t("Open QR image"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.open_send_qr_image(cx)),
         ))
         .child(action_button(
             "send-scan-qr",
             if home.send_qr_busy {
-                "Looking for QR…"
+                l10n::t("Looking for QR…")
             } else {
-                "Scan QR with camera"
+                l10n::t("Scan QR with camera")
             },
             cx.listener(|this, _: &ClickEvent, _, cx| this.scan_send_qr_camera(cx)),
         ))
         .child(action_button(
             "send-from-toggle",
             if home.send_from_subaddress {
-                "Spend from selected address"
+                l10n::t("Spend from selected address")
             } else {
-                "Spend from whole wallet"
+                l10n::t("Spend from whole wallet")
             },
             cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_send_from_subaddress(cx)),
         ))
@@ -3276,7 +3311,7 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
                     .gap_2()
                     .child(action_button(
                         "send-from-prev",
-                        "Prev",
+                        l10n::t("Prev"),
                         cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.cycle_send_source(false, cx);
                         }),
@@ -3289,17 +3324,22 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
                     )
                     .child(action_button(
                         "send-from-next",
-                        "Next",
+                        l10n::t("Next"),
                         cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.cycle_send_source(true, cx);
                         }),
                     )),
             )
         })
-        .child(div().text_xs().text_color(rgb(MUTED)).child(match home.send_amount_mode {
-            AmountMode::Xmr => "Amount (XMR)".to_string(),
-            AmountMode::Fiat => format!("Amount ({})", home.fiat_currency),
-        }))
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(MUTED))
+                .child(match home.send_amount_mode {
+                    AmountMode::Xmr => l10n::t("Amount (XMR)").to_string(),
+                    AmountMode::Fiat => format!("Amount ({})", home.fiat_currency),
+                }),
+        )
         .child(
             div()
                 .id("send-amount")
@@ -3322,9 +3362,9 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
             card.child(action_button(
                 "send-unit",
                 if home.send_amount_mode == AmountMode::Xmr {
-                    "Type in fiat"
+                    l10n::t("Type in fiat")
                 } else {
-                    "Type in XMR"
+                    l10n::t("Type in XMR")
                 },
                 cx.listener(|this, _: &ClickEvent, _, cx| this.swap_amount_mode(true, cx)),
             ))
@@ -3346,26 +3386,26 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
         )
         .child(action_button(
             "send-max",
-            "Send max",
+            l10n::t("Send max"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.fill_send_max(cx)),
         ))
         .child(action_button(
             "send-preview",
             if home.send_busy {
-                "Working…"
+                l10n::t("Working…")
             } else {
-                "Preview fee"
+                l10n::t("Preview fee")
             },
             cx.listener(|this, _: &ClickEvent, _, cx| this.run_preview(cx)),
         ))
         .child(action_button(
             "send-broadcast",
-            "Send",
+            l10n::t("Send"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.run_send(cx)),
         ))
         .child(action_button(
             "send-back",
-            "Back",
+            l10n::t("Back"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.go_wallet(cx)),
         ))
 }
@@ -3382,17 +3422,16 @@ fn terms_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
             div()
                 .text_xl()
                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                .child("Terms of Use"),
+                .child(l10n::t("Terms of Use")),
         )
-        .children(legal::SUMMARY.iter().map(|line| {
-            div()
-                .text_sm()
-                .text_color(rgb(MUTED))
-                .child(*line)
-        }))
+        .children(
+            legal::SUMMARY
+                .iter()
+                .map(|line| div().text_sm().text_color(rgb(MUTED)).child(*line)),
+        )
         .child(action_button(
             "review-terms",
-            "Review full Terms of Use",
+            l10n::t("Review full Terms of Use"),
             cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.open_legal(legal::Document::Terms, cx);
             }),
@@ -3406,8 +3445,9 @@ fn terms_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                     cx.notify();
                 }))
                 .child(format!(
-                    "{}  I have read and agree to the Terms of Use",
-                    if home.terms_checked { "[x]" } else { "[ ]" }
+                    "{}  {}",
+                    if home.terms_checked { "[x]" } else { "[ ]" },
+                    l10n::t("I have read and agree to the Terms of Use")
                 )),
         )
         .when(!home.terms_checked, |card| {
@@ -3419,19 +3459,19 @@ fn terms_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                     .rounded_md()
                     .bg(rgb(0x2A332A))
                     .text_color(rgb(MUTED))
-                    .child("I Agree"),
+                    .child(l10n::t("I Agree")),
             )
         })
         .when(home.terms_checked, |card| {
             card.child(action_button(
                 "terms-agree",
-                "I Agree",
+                l10n::t("I Agree"),
                 cx.listener(|this, _: &ClickEvent, _, cx| this.accept_terms(cx)),
             ))
         })
         .child(action_button(
             "terms-quit",
-            "Quit",
+            l10n::t("Quit"),
             cx.listener(|_, _: &ClickEvent, _, cx| cx.quit()),
         ))
 }
@@ -3463,7 +3503,7 @@ fn legal_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         )
         .child(action_button(
             "legal-back",
-            "Back",
+            l10n::t("Back"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.close_legal(cx)),
         ))
 }
@@ -3479,15 +3519,15 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
         .p_5()
         .rounded_lg()
         .bg(rgb(CARD))
-        .child(div().text_sm().text_color(rgb(MUTED)).child("Settings"))
-        .child(div().text_xs().text_color(rgb(MUTED)).child("How to connect"))
+        .child(div().text_sm().text_color(rgb(MUTED)).child(l10n::t("Settings")))
+        .child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("How to connect")))
         .child(action_button(
             "net-policy",
             home.network_policy.label(),
             cx.listener(|this, _: &ClickEvent, _, cx| this.cycle_network_policy(cx)),
         ))
         .when(home.network_policy != network::Policy::I2p, |card| {
-            card.child(div().text_xs().text_color(rgb(MUTED)).child("Clearnet node"))
+            card.child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("Clearnet node")))
                 .child(
                     div()
                         .id("settings-node")
@@ -3507,7 +3547,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 )
         })
         .when(home.network_policy != network::Policy::Clearnet, |card| {
-            card.child(div().text_xs().text_color(rgb(MUTED)).child("I2P node (host:port)"))
+            card.child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("I2P node (host:port)")))
                 .child(
                     div()
                         .id("settings-i2p-node")
@@ -3529,7 +3569,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                             home.i2p_rpc.clone()
                         }),
                 )
-                .child(div().text_xs().text_color(rgb(MUTED)).child("I2P HTTP proxy (host:port)"))
+                .child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("I2P HTTP proxy (host:port)")))
                 .child(
                     div()
                         .id("settings-i2p-proxy")
@@ -3553,16 +3593,16 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 )
                 .child(action_button(
                     "apply-i2p",
-                    "Apply I2P settings",
+                    l10n::t("Apply I2P settings"),
                     cx.listener(|this, _: &ClickEvent, _, cx| this.apply_network(cx)),
                 ))
         })
         .child(action_button(
             "settings-auth",
             if home.require_device_auth {
-                "Device authentication: on"
+                l10n::t("Device authentication: on")
             } else {
-                "Device authentication: off"
+                l10n::t("Device authentication: off")
             },
             cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_device_auth(cx)),
         ))
@@ -3571,17 +3611,17 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 .text_xs()
                 .text_color(rgb(MUTED))
                 .child(if device_auth::is_available() {
-                    "When on, Touch ID or your login password is required to unlock and send."
+                    l10n::t("When on, Touch ID or your login password is required to unlock and send.")
                 } else {
-                    "Touch ID / password is not available on this computer."
+                    l10n::t("Touch ID / password is not available on this computer.")
                 }),
         )
         .child(action_button(
             "settings-fiat",
             if home.fiat_enabled {
-                "Fiat estimates: on"
+                l10n::t("Fiat estimates: on")
             } else {
-                "Fiat estimates: off"
+                l10n::t("Fiat estimates: off")
             },
             cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_fiat(cx)),
         ))
@@ -3593,7 +3633,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                     .gap_2()
                     .child(action_button(
                         "fiat-prev",
-                        "Prev currency",
+                        l10n::t("Prev currency"),
                         cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.cycle_fiat_currency(false, cx);
                         }),
@@ -3606,7 +3646,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                     )
                     .child(action_button(
                         "fiat-next",
-                        "Next currency",
+                        l10n::t("Next currency"),
                         cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.cycle_fiat_currency(true, cx);
                         }),
@@ -3621,33 +3661,37 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
         })
         .child(action_button(
             "settings-terms",
-            "Terms of Use",
+            l10n::t("Terms of Use"),
             cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.open_legal(legal::Document::Terms, cx);
             }),
         ))
         .child(action_button(
             "settings-privacy",
-            "Privacy Policy",
+            l10n::t("Privacy Policy"),
             cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.open_legal(legal::Document::Privacy, cx);
             }),
         ))
         .child(action_button(
             "settings-license",
-            "License",
+            l10n::t("License"),
             cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.open_legal(legal::Document::License, cx);
             }),
         ))
         .child(action_button(
             "settings-remove",
-            "Remove wallet from this computer",
+            l10n::t("Remove wallet from this computer"),
             cx.listener(|this, _: &ClickEvent, _, cx| this.remove_stored_wallet(cx)),
         ))
         .child(action_button(
             "settings-back",
-            if home.opened { "Back" } else { "Back to restore" },
+            if home.opened {
+                l10n::t("Back")
+            } else {
+                l10n::t("Back to restore")
+            },
             cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.screen = if this.opened {
                     Screen::Wallet
@@ -3729,9 +3773,7 @@ fn history(home: &Home) -> impl IntoElement {
                                 fiat::recorded_approx(row.amount, snap.fiat_per_xmr, &snap.currency)
                             }),
                             |col, line| {
-                                col.child(
-                                    div().text_xs().text_color(rgb(MUTED)).child(line),
-                                )
+                                col.child(div().text_xs().text_color(rgb(MUTED)).child(line))
                             },
                         ),
                 )
@@ -3740,7 +3782,7 @@ fn history(home: &Home) -> impl IntoElement {
 
 fn action_button(
     id: &'static str,
-    label: &'static str,
+    label: impl Into<SharedString>,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
     div()
@@ -3751,7 +3793,7 @@ fn action_button(
         .bg(rgb(ACCENT))
         .text_color(rgb(0xffffff))
         .on_click(listener)
-        .child(label)
+        .child(label.into())
 }
 
 fn env_or(key: &str, fallback: &str) -> String {
@@ -3915,8 +3957,7 @@ fn main() {
                 ..Default::default()
             },
             |window, cx| {
-                let should_unlock =
-                    !paths::terms_need_accept() && wallet_store::is_marked_stored();
+                let should_unlock = !paths::terms_need_accept() && wallet_store::is_marked_stored();
                 let home = cx.new(|cx| {
                     let mut home = Home::new(cx);
                     if !should_unlock {

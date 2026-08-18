@@ -3,9 +3,9 @@
 //! GPUI has no live camera widget, so this opens the default camera, reads a
 //! short burst of frames, and returns the first payload `rqrr` can decode.
 
+use nokhwa::Camera;
 use nokhwa::pixel_format::RgbFormat;
 use nokhwa::utils::{CameraIndex, RequestedFormat, RequestedFormatType};
-use nokhwa::Camera;
 
 use crate::qr;
 
@@ -19,7 +19,8 @@ pub fn scan_qr() -> Result<String, String> {
     if let Err(err) = camera.open_stream() {
         return Err(format!("Could not start camera: {err}"));
     }
-    let mut last_err = "No QR code found. Hold a Monero payment QR in front of the camera.".to_string();
+    let mut last_err =
+        "No QR code found. Hold a Monero payment QR in front of the camera.".to_string();
     for _ in 0..MAX_FRAMES {
         match camera.frame() {
             Ok(frame) => match frame.decode_image::<RgbFormat>() {

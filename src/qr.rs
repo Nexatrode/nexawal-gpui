@@ -49,7 +49,9 @@ pub fn decode_rgb8(width: u32, height: u32, rgb: &[u8]) -> Option<String> {
     if width == 0 || height == 0 {
         return None;
     }
-    let expected = (width as usize).checked_mul(height as usize)?.checked_mul(3)?;
+    let expected = (width as usize)
+        .checked_mul(height as usize)?
+        .checked_mul(3)?;
     if rgb.len() < expected {
         return None;
     }

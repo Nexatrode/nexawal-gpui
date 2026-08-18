@@ -1,9 +1,6 @@
 //! Daemon helpers: fast restore height from `/get_info`, matching iOS/Android.
 
-pub fn fetch_suggested_restore_height(
-    node_url: &str,
-    proxy: Option<&str>,
-) -> Result<u64, String> {
+pub fn fetch_suggested_restore_height(node_url: &str, proxy: Option<&str>) -> Result<u64, String> {
     let base = node_url.trim().trim_end_matches('/');
     if base.is_empty() {
         return Err("node URL is empty".into());

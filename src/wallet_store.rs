@@ -44,9 +44,7 @@ pub fn load() -> Result<(String, u64), String> {
     if !is_marked_stored() {
         return Err("no stored wallet".into());
     }
-    let mnemonic = entry()?
-        .get_password()
-        .map_err(|err| load_error(&err))?;
+    let mnemonic = entry()?.get_password().map_err(|err| load_error(&err))?;
     let phrase = mnemonic.split_whitespace().collect::<Vec<_>>().join(" ");
     if phrase.is_empty() {
         return Err("stored mnemonic was empty".into());

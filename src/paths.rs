@@ -104,10 +104,7 @@ pub fn terms_need_accept() -> bool {
 }
 
 pub fn accept_terms() -> std::io::Result<()> {
-    write_bytes(
-        terms_path(),
-        CURRENT_TERMS_VERSION.to_string().as_bytes(),
-    )
+    write_bytes(terms_path(), CURRENT_TERMS_VERSION.to_string().as_bytes())
 }
 
 pub fn load_node_url() -> String {
@@ -226,9 +223,7 @@ fn parse_bool_preference(value: &str) -> Option<bool> {
 }
 
 pub fn load_network_policy() -> crate::network::Policy {
-    crate::network::Policy::from_raw(
-        &fs::read_to_string(network_policy_path()).unwrap_or_default(),
-    )
+    crate::network::Policy::from_raw(&fs::read_to_string(network_policy_path()).unwrap_or_default())
 }
 
 pub fn save_network_policy(policy: crate::network::Policy) -> std::io::Result<()> {

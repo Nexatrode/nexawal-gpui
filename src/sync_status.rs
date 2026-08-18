@@ -97,7 +97,8 @@ pub fn progress(sync: &SyncStatus) -> f64 {
     if !has_observed_tip(sync) {
         return 0.0;
     }
-    if sync.chain_height > 0 && sync.last_scanned.saturating_add(TIP_TOLERANCE) >= sync.chain_height {
+    if sync.chain_height > 0 && sync.last_scanned.saturating_add(TIP_TOLERANCE) >= sync.chain_height
+    {
         return 1.0;
     }
     if sync.chain_height <= sync.restore_height {
@@ -220,7 +221,10 @@ mod tests {
     fn no_tip_yet() {
         let st = sync(80, 80, 80, 0);
         assert_eq!(progress(&st), 0.0);
-        assert_eq!(headline(false, true, false, None, false, true), "Connecting to node");
+        assert_eq!(
+            headline(false, true, false, None, false, true),
+            "Connecting to node"
+        );
         assert_eq!(
             detail(false, true, false, None, false, 80, 80, 0),
             "Waiting for network height"

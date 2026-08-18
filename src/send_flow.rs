@@ -43,7 +43,8 @@ pub fn send_exact(
             fee: recovered.fee,
         });
     }
-    let json = api::prepare_send_filtered(WALLET_ID, node_url, to_address, amount, from_subaddress)?;
+    let json =
+        api::prepare_send_filtered(WALLET_ID, node_url, to_address, amount, from_subaddress)?;
     let prepared = api::parse_prepared(&json)?;
     persist_and_relay(node_url, &json, prepared.fee)
 }

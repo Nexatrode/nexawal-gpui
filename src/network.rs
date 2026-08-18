@@ -77,7 +77,11 @@ pub fn broadcast_node_url(policy: Policy, clearnet: &str, i2p_rpc: &str) -> Stri
     }
 }
 
-pub fn should_use_i2p_http_proxy(policy: Policy, proxy_configured: bool, for_broadcast: bool) -> bool {
+pub fn should_use_i2p_http_proxy(
+    policy: Policy,
+    proxy_configured: bool,
+    for_broadcast: bool,
+) -> bool {
     if !proxy_configured {
         return false;
     }
@@ -129,7 +133,10 @@ mod tests {
     fn scan_uses_clearnet_except_i2p_only() {
         assert_eq!(scan_node_url(Policy::Clearnet, CLEARNET, I2P), CLEARNET);
         assert_eq!(scan_node_url(Policy::Hybrid, CLEARNET, I2P), CLEARNET);
-        assert_eq!(scan_node_url(Policy::I2p, CLEARNET, I2P), normalize_url(I2P));
+        assert_eq!(
+            scan_node_url(Policy::I2p, CLEARNET, I2P),
+            normalize_url(I2P)
+        );
     }
 
     #[test]
@@ -137,7 +144,10 @@ mod tests {
         let expected = normalize_url(I2P);
         assert_eq!(broadcast_node_url(Policy::I2p, CLEARNET, I2P), expected);
         assert_eq!(broadcast_node_url(Policy::Hybrid, CLEARNET, I2P), expected);
-        assert_eq!(broadcast_node_url(Policy::Clearnet, CLEARNET, I2P), CLEARNET);
+        assert_eq!(
+            broadcast_node_url(Policy::Clearnet, CLEARNET, I2P),
+            CLEARNET
+        );
     }
 
     #[test]

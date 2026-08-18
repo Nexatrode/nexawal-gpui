@@ -4012,6 +4012,7 @@ dependencies = [
  "objc2-local-authentication",
  "qrcode",
  "rqrr",
+ "serde_json",
  "smallvec",
  "ureq",
  "walletcore",

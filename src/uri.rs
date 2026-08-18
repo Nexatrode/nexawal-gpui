@@ -40,7 +40,10 @@ pub fn parse(raw: &str) -> Option<PaymentUri> {
             }
         }
     }
-    Some(PaymentUri { address, amount_xmr })
+    Some(PaymentUri {
+        address,
+        amount_xmr,
+    })
 }
 
 fn percent_decode(value: &str) -> String {
@@ -109,8 +112,7 @@ fn percent_encode(value: &str) -> String {
 mod tests {
     use super::*;
 
-    const PRIMARY: &str =
-        "4B33mFPMq6mKi7Eiyd5XuyKRVMGVZz1Rqb9ZTyGApXW5d1aT7UBDZ89ewmnWFkzJ5wPd2SFbn313vCT8a4E2Qf4KQH4pNey";
+    const PRIMARY: &str = "4B33mFPMq6mKi7Eiyd5XuyKRVMGVZz1Rqb9ZTyGApXW5d1aT7UBDZ89ewmnWFkzJ5wPd2SFbn313vCT8a4E2Qf4KQH4pNey";
 
     #[test]
     fn address_extracted() {
