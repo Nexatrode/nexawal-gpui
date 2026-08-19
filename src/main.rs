@@ -90,6 +90,7 @@ enum Field {
     RecvAmount,
     RecvDesc,
     RecvLabel,
+    TransferSearch,
     Challenge,
     I2pNode,
     I2pProxy,
@@ -166,6 +167,8 @@ struct Home {
     transfers: Vec<Transfer>,
     selected_transfer: Option<usize>,
     transfer_filter: TransferFilter,
+    transfer_search: String,
+    transfer_search_focus: FocusHandle,
     last_exported_scanned: Option<u64>,
     last_cache_persist_at: Option<Instant>,
     last_balance_poll_at: Option<Instant>,
@@ -262,6 +265,7 @@ impl Home {
             recv_amount_focus: cx.focus_handle(),
             recv_desc_focus: cx.focus_handle(),
             recv_label_focus: cx.focus_handle(),
+            transfer_search_focus: cx.focus_handle(),
             challenge_focus: cx.focus_handle(),
             i2p_rpc_focus: cx.focus_handle(),
             i2p_proxy_focus: cx.focus_handle(),
@@ -299,6 +303,7 @@ impl Home {
             transfers: Vec::new(),
             selected_transfer: None,
             transfer_filter: TransferFilter::All,
+            transfer_search: String::new(),
             last_exported_scanned: None,
             last_cache_persist_at: None,
             last_balance_poll_at: None,
@@ -1021,6 +1026,7 @@ impl Home {
             Field::RecvAmount => self.recv_amount_focus.focus(window, cx),
             Field::RecvDesc => self.recv_desc_focus.focus(window, cx),
             Field::RecvLabel => self.recv_label_focus.focus(window, cx),
+            Field::TransferSearch => self.transfer_search_focus.focus(window, cx),
             Field::Challenge => self.challenge_focus.focus(window, cx),
             Field::I2pNode => self.i2p_rpc_focus.focus(window, cx),
             Field::I2pProxy => self.i2p_proxy_focus.focus(window, cx),
@@ -1039,6 +1045,7 @@ impl Home {
             Field::RecvAmount => &mut self.recv_amount,
             Field::RecvDesc => &mut self.recv_desc,
             Field::RecvLabel => &mut self.recv_label,
+            Field::TransferSearch => &mut self.transfer_search,
             Field::Challenge => {
                 let slot = self.challenge_slot.min(2);
                 &mut self.challenge_answers[slot]
@@ -1057,6 +1064,7 @@ impl Home {
                 self.screen,
                 Screen::Send | Screen::Settings | Screen::Receive
             )
+            && !(self.screen == Screen::Wallet && self.active == Field::TransferSearch)
         {
             return;
         }
@@ -1186,6 +1194,10 @@ impl Home {
                 self.persist_recv_label();
                 self.status = l10n::t("Receive label updated.").into();
             }
+            Field::TransferSearch => {
+                self.transfer_search = text.trim().to_lowercase();
+                self.selected_transfer = None;
+            }
             Field::Challenge => {
                 let slot = self.challenge_slot.min(2);
                 self.challenge_answers[slot] = text.trim().to_string();
@@ -1211,6 +1223,7 @@ impl Home {
                 self.screen,
                 Screen::Send | Screen::Settings | Screen::Receive
             )
+            && !(self.screen == Screen::Wallet && self.active == Field::TransferSearch)
         {
             self.copy_address(cx);
             return;
@@ -1225,11 +1238,12 @@ impl Home {
             Field::RecvAmount => self.recv_amount.clone(),
             Field::RecvDesc => self.recv_desc.clone(),
             Field::RecvLabel => self.recv_label.clone(),
+            Field::TransferSearch => self.transfer_search.clone(),
             Field::Challenge => self.challenge_answers[self.challenge_slot.min(2)].clone(),
             Field::I2pNode => self.i2p_rpc.clone(),
             Field::I2pProxy => self.i2p_proxy.clone(),
         };
-        if text.is_empty() && self.opened {
+        if text.is_empty() && self.opened && self.active != Field::TransferSearch {
             self.copy_address(cx);
             return;
         }
@@ -1568,6 +1582,7 @@ impl Home {
             && self.screen != Screen::Send
             && self.screen != Screen::Settings
             && self.screen != Screen::Receive
+            && !(self.screen == Screen::Wallet && self.active == Field::TransferSearch)
         {
             return;
         }
@@ -1615,6 +1630,7 @@ impl Home {
             && self.screen != Screen::Send
             && self.screen != Screen::Settings
             && self.screen != Screen::Receive
+            && !(self.screen == Screen::Wallet && self.active == Field::TransferSearch)
         {
             return;
         }
@@ -1657,6 +1673,10 @@ impl Home {
                 self.recv_label.pop();
                 self.persist_recv_label();
             }
+            Field::TransferSearch => {
+                self.transfer_search.pop();
+                self.selected_transfer = None;
+            }
             Field::Challenge => {
                 let slot = self.challenge_slot.min(2);
                 self.challenge_answers[slot].pop();
@@ -1681,6 +1701,7 @@ impl Home {
             && self.screen != Screen::Send
             && self.screen != Screen::Settings
             && self.screen != Screen::Receive
+            && !(self.screen == Screen::Wallet && self.active == Field::TransferSearch)
         {
             return;
         }
@@ -1751,6 +1772,10 @@ impl Home {
             Field::RecvLabel => {
                 self.recv_label.push_str(ch);
                 self.persist_recv_label();
+            }
+            Field::TransferSearch => {
+                self.transfer_search.push_str(&ch.to_lowercase());
+                self.selected_transfer = None;
             }
             Field::Challenge => {
                 let filtered: String = ch
@@ -4132,18 +4157,23 @@ fn status_line(home: &Home) -> impl IntoElement {
 
 fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
     let filter = home.transfer_filter;
+    let search = home.transfer_search.trim().to_lowercase();
     let visible_transfers: Vec<_> = home
         .transfers
         .iter()
         .enumerate()
-        .filter(|(_, row)| transfer_matches_filter(row, filter))
+        .filter(|(_, row)| {
+            transfer_matches_filter(row, filter) && transfer_matches_search(row, &search)
+        })
         .collect();
     let no_transfers = home.transfers.is_empty();
     let no_matches = !no_transfers && visible_transfers.is_empty();
     let selected = home.selected_transfer.and_then(|index| {
         home.transfers
             .get(index)
-            .filter(|row| transfer_matches_filter(row, filter))
+            .filter(|row| {
+                transfer_matches_filter(row, filter) && transfer_matches_search(row, &search)
+            })
             .cloned()
             .map(|row| (index, row))
     });
@@ -4161,6 +4191,39 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 .text_sm()
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .child(l10n::t("History")),
+        )
+        .child(
+            div()
+                .id("history-search")
+                .key_context("Field")
+                .track_focus(&home.transfer_search_focus)
+                .cursor(CursorStyle::IBeam)
+                .h(px(36.))
+                .px_3()
+                .rounded_md()
+                .bg(rgb(FIELD))
+                .border_1()
+                .border_color(rgb(if home.active == Field::TransferSearch {
+                    ACCENT
+                } else {
+                    0x2A3A2A
+                }))
+                .flex()
+                .items_center()
+                .text_sm()
+                .text_color(rgb(if home.transfer_search.is_empty() {
+                    MUTED
+                } else {
+                    TEXT
+                }))
+                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                    this.focus_field(Field::TransferSearch, window, cx);
+                }))
+                .child(if home.transfer_search.is_empty() {
+                    l10n::t("Search transaction ID")
+                } else {
+                    home.transfer_search.clone().into()
+                }),
         )
         .child(
             div()
@@ -4192,6 +4255,17 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                     }),
                 )),
         )
+        .when(!home.transfer_search.is_empty(), |list| {
+            list.child(action_button(
+                "history-clear-search",
+                l10n::t("Clear search"),
+                cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.transfer_search.clear();
+                    this.selected_transfer = None;
+                    cx.notify();
+                }),
+            ))
+        })
         .when(no_transfers, |list| {
             list.child(
                 div()
@@ -4311,6 +4385,10 @@ fn transfer_matches_filter(row: &Transfer, filter: TransferFilter) -> bool {
         TransferFilter::Received => row.direction == "in",
         TransferFilter::Sent => row.direction == "out",
     }
+}
+
+fn transfer_matches_search(row: &Transfer, search: &str) -> bool {
+    search.is_empty() || row.txid.to_lowercase().contains(search)
 }
 
 fn history_filter_button(
