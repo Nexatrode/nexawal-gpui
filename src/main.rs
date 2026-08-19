@@ -118,6 +118,13 @@ enum MaintenanceAction {
     Rescan,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TransferFilter {
+    All,
+    Received,
+    Sent,
+}
+
 struct Home {
     core_version: SharedString,
     node_url: String,
@@ -158,6 +165,7 @@ struct Home {
     sync: Option<SyncStatus>,
     transfers: Vec<Transfer>,
     selected_transfer: Option<usize>,
+    transfer_filter: TransferFilter,
     last_exported_scanned: Option<u64>,
     last_cache_persist_at: Option<Instant>,
     last_balance_poll_at: Option<Instant>,
@@ -290,6 +298,7 @@ impl Home {
             sync: None,
             transfers: Vec::new(),
             selected_transfer: None,
+            transfer_filter: TransferFilter::All,
             last_exported_scanned: None,
             last_cache_persist_at: None,
             last_balance_poll_at: None,
@@ -723,6 +732,20 @@ impl Home {
             return;
         }
         self.selected_transfer = (self.selected_transfer != Some(index)).then_some(index);
+        cx.notify();
+    }
+
+    fn set_transfer_filter(&mut self, filter: TransferFilter, cx: &mut Context<Self>) {
+        self.transfer_filter = filter;
+        if let Some(index) = self.selected_transfer {
+            let matches = self
+                .transfers
+                .get(index)
+                .is_some_and(|row| transfer_matches_filter(row, filter));
+            if !matches {
+                self.selected_transfer = None;
+            }
+        }
         cx.notify();
     }
 
@@ -4108,9 +4131,22 @@ fn status_line(home: &Home) -> impl IntoElement {
 }
 
 fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
-    let selected = home
-        .selected_transfer
-        .and_then(|index| home.transfers.get(index).cloned().map(|row| (index, row)));
+    let filter = home.transfer_filter;
+    let visible_transfers: Vec<_> = home
+        .transfers
+        .iter()
+        .enumerate()
+        .filter(|(_, row)| transfer_matches_filter(row, filter))
+        .collect();
+    let no_transfers = home.transfers.is_empty();
+    let no_matches = !no_transfers && visible_transfers.is_empty();
+    let selected = home.selected_transfer.and_then(|index| {
+        home.transfers
+            .get(index)
+            .filter(|row| transfer_matches_filter(row, filter))
+            .cloned()
+            .map(|row| (index, row))
+    });
 
     div()
         .id("history")
@@ -4126,7 +4162,37 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .child(l10n::t("History")),
         )
-        .when(home.transfers.is_empty(), |list| {
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .gap_1()
+                .child(history_filter_button(
+                    "history-filter-all",
+                    l10n::t("All"),
+                    filter == TransferFilter::All,
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.set_transfer_filter(TransferFilter::All, cx);
+                    }),
+                ))
+                .child(history_filter_button(
+                    "history-filter-received",
+                    l10n::t("Received"),
+                    filter == TransferFilter::Received,
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.set_transfer_filter(TransferFilter::Received, cx);
+                    }),
+                ))
+                .child(history_filter_button(
+                    "history-filter-sent",
+                    l10n::t("Sent"),
+                    filter == TransferFilter::Sent,
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.set_transfer_filter(TransferFilter::Sent, cx);
+                    }),
+                )),
+        )
+        .when(no_transfers, |list| {
             list.child(
                 div()
                     .p_4()
@@ -4150,7 +4216,18 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                     )),
             )
         })
-        .children(home.transfers.iter().enumerate().map(|(idx, row)| {
+        .when(no_matches, |list| {
+            list.child(
+                div()
+                    .p_4()
+                    .rounded_md()
+                    .bg(rgb(ROW))
+                    .text_sm()
+                    .text_color(rgb(MUTED))
+                    .child(l10n::t("No transfers match this filter.")),
+            )
+        })
+        .children(visible_transfers.into_iter().map(|(idx, row)| {
             let color = match row.direction.as_str() {
                 "in" => IN,
                 "out" => OUT,
@@ -4226,6 +4303,33 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         .when_some(selected, |list, (index, row)| {
             list.child(transfer_detail(&row, index, cx))
         })
+}
+
+fn transfer_matches_filter(row: &Transfer, filter: TransferFilter) -> bool {
+    match filter {
+        TransferFilter::All => true,
+        TransferFilter::Received => row.direction == "in",
+        TransferFilter::Sent => row.direction == "out",
+    }
+}
+
+fn history_filter_button(
+    id: &'static str,
+    label: impl Into<SharedString>,
+    selected: bool,
+    listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    div()
+        .id(id)
+        .px_2()
+        .py_1()
+        .rounded_md()
+        .bg(rgb(if selected { ACCENT } else { FIELD }))
+        .text_xs()
+        .text_color(rgb(if selected { 0xffffff } else { MUTED }))
+        .cursor(CursorStyle::PointingHand)
+        .on_click(listener)
+        .child(label.into())
 }
 
 fn transfer_detail(row: &Transfer, index: usize, cx: &mut Context<Home>) -> impl IntoElement {
