@@ -3,6 +3,7 @@
 //! Each profile gets a fresh in-memory wallet ID derived from the currently opened
 //! wallet. The real wallet's checkpoint is never advanced by this diagnostic.
 
+use std::collections::BTreeMap;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -12,7 +13,8 @@ use serde_json::json;
 use crate::{paths, scan_tuning};
 
 const PROFILE_NAMES: [&str; 3] = ["fast", "cuprate", "stall"];
-const PROFILE_WINDOW: Duration = Duration::from_secs(10);
+const DEFAULT_REPETITIONS: usize = 3;
+const DEFAULT_WINDOW_SECS: u64 = 6;
 const CANCEL_WAIT: Duration = Duration::from_secs(3);
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -60,6 +62,8 @@ struct ProfileResult {
     node_label: String,
     profile: &'static str,
     batch: &'static str,
+    repetition: usize,
+    order: usize,
     started_at_ms: u128,
     start_height: u64,
     end_height: u64,
@@ -73,45 +77,70 @@ struct ProfileResult {
 pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -> BenchmarkReport {
     let results_path = paths::scan_benchmark_path().display().to_string();
     let nodes = targets_for(&node_url);
-    let mut results = Vec::with_capacity(PROFILE_NAMES.len() * nodes.len());
+    let (repetitions, profile_window) = benchmark_config();
+    let mut results = Vec::with_capacity(PROFILE_NAMES.len() * nodes.len() * repetitions);
 
     // The caller has already requested cancellation. Give WalletCore a short grace
     // period so the benchmark does not compete with the user's prior scan.
     wait_for_idle("main_wallet", CANCEL_WAIT);
 
     for (node_index, target) in nodes.iter().enumerate() {
-        for (profile_index, profile_name) in PROFILE_NAMES.iter().enumerate() {
-            let wallet_id = format!("nexawal-benchmark-{run_id}-{node_index}-{profile_index}");
-            let result = run_profile(&wallet_id, profile_name, target, &mnemonic, start_height);
-            let line = json!({
-                "timestamp_ms": result.started_at_ms,
-                "node": target,
-                "profile": result.profile,
-                "batch": result.batch,
-                "start_height": result.start_height,
-                "end_height": result.end_height,
-                "chain_height": result.chain_height,
-                "elapsed_ms": result.elapsed_ms,
-                "blocks": result.end_height.saturating_sub(result.start_height),
-                "blocks_per_second": result.blocks_per_second,
-                "outcome": result.outcome,
-                "error": result.error,
-            });
-            let _ = paths::append_scan_benchmark(&line.to_string());
-            results.push(result);
+        for repetition in 0..repetitions {
+            let profile_order = shuffled_profiles(run_id, node_index, repetition);
+            for (order, profile_name) in profile_order.iter().enumerate() {
+                let sample_index = results.len();
+                let wallet_id = format!("nexawal-benchmark-{run_id}-{sample_index}");
+                let result = run_profile(
+                    &wallet_id,
+                    profile_name,
+                    target,
+                    &mnemonic,
+                    start_height,
+                    profile_window,
+                    repetition + 1,
+                    order + 1,
+                );
+                let line = json!({
+                    "timestamp_ms": result.started_at_ms,
+                    "node": target,
+                    "profile": result.profile,
+                    "batch": result.batch,
+                    "repetition": result.repetition,
+                    "order": result.order,
+                    "start_height": result.start_height,
+                    "end_height": result.end_height,
+                    "chain_height": result.chain_height,
+                    "elapsed_ms": result.elapsed_ms,
+                    "blocks": result.end_height.saturating_sub(result.start_height),
+                    "blocks_per_second": result.blocks_per_second,
+                    "outcome": result.outcome,
+                    "error": result.error,
+                });
+                let _ = paths::append_scan_benchmark(&line.to_string());
+                results.push(result);
+            }
         }
     }
 
-    let summary = results
-        .iter()
-        .map(|result| {
-            format!(
-                "{} {} ({}) {:.1} blocks/s",
-                result.node_label, result.profile, result.batch, result.blocks_per_second
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(" · ");
+    let mut averages = BTreeMap::<String, (usize, f64)>::new();
+    for result in &results {
+        let key = format!(
+            "{} {} ({})",
+            result.node_label, result.profile, result.batch
+        );
+        let entry = averages.entry(key).or_default();
+        entry.0 += 1;
+        entry.1 += result.blocks_per_second;
+    }
+    let summary = format!(
+        "{} samples · {}",
+        results.len(),
+        averages
+            .into_iter()
+            .map(|(key, (count, total))| format!("{key} {:.1} avg", total / count as f64))
+            .collect::<Vec<_>>()
+            .join(" · ")
+    );
 
     BenchmarkReport {
         results_path,
@@ -125,6 +154,9 @@ fn run_profile(
     node_url: &str,
     mnemonic: &str,
     start_height: u64,
+    profile_window: Duration,
+    repetition: usize,
+    order: usize,
 ) -> ProfileResult {
     let started_at_ms = now_ms();
     let started = Instant::now();
@@ -138,6 +170,8 @@ fn run_profile(
             node_label,
             profile: profile_name,
             batch,
+            repetition,
+            order,
             started_at_ms,
             start_height,
             end_height: start_height,
@@ -155,6 +189,8 @@ fn run_profile(
             node_label,
             profile: profile_name,
             batch,
+            repetition,
+            order,
             started_at_ms,
             start_height,
             end_height: start_height,
@@ -167,7 +203,7 @@ fn run_profile(
     }
 
     let sample_started = Instant::now();
-    let deadline = sample_started + PROFILE_WINDOW;
+    let deadline = sample_started + profile_window;
     let mut last_scanned = start_height;
     let mut chain_height = start_height;
     let mut outcome = "window-complete";
@@ -212,6 +248,8 @@ fn run_profile(
         node_label,
         profile: profile_name,
         batch,
+        repetition,
+        order,
         started_at_ms,
         start_height,
         end_height: last_scanned,
@@ -221,6 +259,36 @@ fn run_profile(
         outcome,
         error,
     }
+}
+
+fn benchmark_config() -> (usize, Duration) {
+    let repetitions = std::env::var("NEXAWAL_BENCHMARK_REPETITIONS")
+        .ok()
+        .and_then(|value| value.trim().parse().ok())
+        .unwrap_or(DEFAULT_REPETITIONS)
+        .clamp(1, 10);
+    let seconds = std::env::var("NEXAWAL_BENCHMARK_SECONDS")
+        .ok()
+        .and_then(|value| value.trim().parse().ok())
+        .unwrap_or(DEFAULT_WINDOW_SECS)
+        .clamp(2, 60);
+    (repetitions, Duration::from_secs(seconds))
+}
+
+fn shuffled_profiles(run_id: u64, node_index: usize, repetition: usize) -> [&'static str; 3] {
+    let mut profiles = PROFILE_NAMES;
+    let mut state = run_id
+        .wrapping_add(node_index as u64)
+        .wrapping_mul(31)
+        .wrapping_add(repetition as u64);
+    for index in (1..profiles.len()).rev() {
+        state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        let swap = (state % (index as u64 + 1)) as usize;
+        profiles.swap(index, swap);
+    }
+    profiles
 }
 
 fn node_label(url: &str) -> String {
@@ -248,4 +316,35 @@ fn now_ms() -> u128 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis())
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn production_targets_include_both_nodes() {
+        let targets = targets_for("https://rpc.nexatrode.com");
+        assert_eq!(targets.len(), 2);
+        assert!(
+            targets
+                .iter()
+                .any(|node| node.contains("rpc.nexatrode.com"))
+        );
+        assert!(
+            targets
+                .iter()
+                .any(|node| node.contains("monero.nexatrode.com"))
+        );
+    }
+
+    #[test]
+    fn shuffled_order_keeps_all_profiles() {
+        for repetition in 0..10 {
+            let profiles = shuffled_profiles(42, 0, repetition);
+            assert!(profiles.contains(&"fast"));
+            assert!(profiles.contains(&"cuprate"));
+            assert!(profiles.contains(&"stall"));
+        }
+    }
 }

@@ -67,12 +67,14 @@ cargo build --release
 ### Scan benchmark
 
 With an opened wallet, use **Settings → Run scan benchmark** to stop the current
-sync and run bounded ten-second samples for the `fast`, `cuprate`, and `stall`
-profiles. When the configured endpoint is one of the Nexatrode production hosts,
-the benchmark tests both `rpc.nexatrode.com` and `monero.nexatrode.com`; custom
-endpoints are tested by themselves. Results are appended to
+sync and run three shuffled six-second samples for each of the `fast`, `cuprate`,
+and `stall` profiles. When the configured endpoint is one of the Nexatrode
+production hosts, the benchmark tests both `rpc.nexatrode.com` and
+`monero.nexatrode.com`; custom endpoints are tested by themselves. Results are appended to
 `scan_benchmarks.jsonl` in the platform's NexaWal data directory. Set
 `NEXAWAL_BENCHMARK_NODES` to a comma-separated list to override the endpoints.
+`NEXAWAL_BENCHMARK_REPETITIONS` and `NEXAWAL_BENCHMARK_SECONDS` can override the
+default repetition count and sample duration.
 
 The release executable has the NexaWal icon embedded on Windows. On macOS,
 `cargo run` installs the native padded, rounded icon in the Dock and Cmd-Tab
