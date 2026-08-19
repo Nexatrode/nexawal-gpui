@@ -82,6 +82,22 @@ pub fn sync_details_expanded_path() -> PathBuf {
     data_dir().join("ui_sync_details_expanded")
 }
 
+pub fn scan_benchmark_path() -> PathBuf {
+    data_dir().join("scan_benchmarks.jsonl")
+}
+
+pub fn append_scan_benchmark(line: &str) -> std::io::Result<()> {
+    use std::io::Write;
+
+    fs::create_dir_all(data_dir())?;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(scan_benchmark_path())?;
+    file.write_all(line.as_bytes())?;
+    file.write_all(b"\n")
+}
+
 pub fn load_cache() -> Option<Vec<u8>> {
     fs::read(cache_path())
         .ok()

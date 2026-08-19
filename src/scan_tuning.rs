@@ -35,7 +35,11 @@ impl ScanProfile {
 
 fn profile_from_env() -> Option<ScanProfile> {
     let raw = env::var("NEXAWAL_SCAN_PROFILE").ok()?;
-    match raw.to_ascii_lowercase().as_str() {
+    profile_from_name(&raw)
+}
+
+fn profile_from_name(name: &str) -> Option<ScanProfile> {
+    match name.to_ascii_lowercase().as_str() {
         "fast" => Some(ScanProfile::Fast),
         "cuprate" | "cuprate_safe" | "cuprate-safe" => Some(ScanProfile::CuprateSafe),
         "stall" | "fallback" | "stall_fallback" | "stall-fallback" => {
@@ -98,6 +102,17 @@ pub fn apply() {
 /// Fast-sync path with optional Cuprate-safe heuristic.
 pub fn apply_for_node(node_url: &str) {
     apply_profile(profile_for_node(node_url));
+}
+
+/// Apply an explicitly named profile for diagnostics and benchmarks.
+pub fn apply_named(name: &str) -> Option<&'static str> {
+    let profile = profile_from_name(name)?;
+    apply_profile(profile);
+    Some(profile.label())
+}
+
+pub fn batch_for(name: &str) -> Option<&'static str> {
+    profile_from_name(name).map(ScanProfile::batch)
 }
 
 /// After a stall or truncated fetch, shrink to 150 like iOS/Android.

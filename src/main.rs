@@ -15,6 +15,7 @@ use gpui_platform::application;
 use monerowalletcore::api::{self, RefreshJob, SyncStatus, Transfer};
 
 mod amount;
+mod benchmark;
 mod camera;
 mod daemon;
 mod device_auth;
@@ -160,6 +161,8 @@ struct Home {
     scan_stall_fallback_used: bool,
     last_scan_progress_at: Option<Instant>,
     last_scanned_for_stall: u64,
+    benchmark_running: bool,
+    benchmark_status: Option<SharedString>,
     address_copied_at: Option<Instant>,
     send_dest: String,
     send_amount: String,
@@ -287,6 +290,8 @@ impl Home {
             scan_stall_fallback_used: false,
             last_scan_progress_at: None,
             last_scanned_for_stall: 0,
+            benchmark_running: false,
+            benchmark_status: None,
             address_copied_at: None,
             send_dest: String::new(),
             send_amount: String::new(),
@@ -598,6 +603,7 @@ impl Home {
     }
 
     fn start_fast_scan(&mut self) -> api::Result<()> {
+        self.benchmark_status = None;
         scan_tuning::apply_for_node(&self.scan_node_url());
         self.scan_stall_fallback_used = false;
         self.last_scan_progress_at = Some(Instant::now());
@@ -1763,6 +1769,57 @@ impl Home {
         cx.notify();
     }
 
+    fn run_scan_benchmark(&mut self, cx: &mut Context<Self>) {
+        if !self.opened || self.mnemonic.is_empty() {
+            self.status = l10n::t("Open the wallet before running a scan benchmark.").into();
+            cx.notify();
+            return;
+        }
+        if self.benchmark_running {
+            self.status = l10n::t("Scan benchmark is already running.").into();
+            cx.notify();
+            return;
+        }
+
+        let baseline = api::sync_status(WALLET_ID).ok();
+        let start_height = baseline
+            .map(|sync| sync.last_scanned.saturating_sub(10_000))
+            .unwrap_or_default();
+        let node = self.scan_node_url();
+        let mnemonic = self.mnemonic.clone();
+        let run_id = benchmark::run_id();
+
+        let _ = api::refresh_cancel(WALLET_ID);
+        self.benchmark_running = true;
+        self.benchmark_status = None;
+        self.scan_needs_retry = false;
+        self.status = format!(
+            "Stopping the current sync · testing 10,000 recent blocks on {}…",
+            node
+        )
+        .into();
+        cx.notify();
+
+        cx.spawn(async move |this, cx| {
+            let report = cx
+                .background_executor()
+                .spawn(async move { benchmark::run(node, mnemonic, start_height, run_id) })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.benchmark_running = false;
+                let status = format!(
+                    "Benchmark complete · {}. Results saved to {}",
+                    report.summary, report.results_path
+                );
+                this.benchmark_status = Some(status.clone().into());
+                this.status = status.into();
+                this.poll_core();
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     fn forget(&mut self, cx: &mut Context<Self>) {
         let _ = api::refresh_cancel(WALLET_ID);
         let _ = api::reset_tracked_outputs(WALLET_ID);
@@ -2147,6 +2204,13 @@ impl Home {
     }
 
     fn poll_core(&mut self) {
+        if self.benchmark_running {
+            return;
+        }
+        if let Some(status) = self.benchmark_status.clone() {
+            self.status = status;
+            return;
+        }
         match api::sync_status(WALLET_ID) {
             Ok(sync) => {
                 let now = Instant::now();
@@ -3657,6 +3721,23 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 } else {
                     l10n::t("Touch ID / password is not available on this computer.")
                 }),
+        )
+        .child(action_button(
+            "settings-scan-benchmark",
+            if home.benchmark_running {
+                l10n::t("Scan benchmark running…")
+            } else {
+                l10n::t("Run scan benchmark")
+            },
+            cx.listener(|this, _: &ClickEvent, _, cx| this.run_scan_benchmark(cx)),
+        ))
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(MUTED))
+                .child(l10n::t(
+                    "Stops the current sync, compares fast, Cuprate, and fallback batches for 10 seconds each, then saves JSON results.",
+                )),
         )
         .child(action_button(
             "settings-fiat",
