@@ -12,7 +12,7 @@ use serde_json::json;
 
 use crate::{paths, scan_tuning};
 
-const PROFILE_NAMES: [&str; 5] = ["fast", "cuprate", "stall", "batch-250", "batch-350"];
+const PROFILE_NAMES: [&str; 5] = ["fast", "cuprate", "stall", "batch-100", "batch-125"];
 const DEFAULT_REPETITIONS: usize = 3;
 const DEFAULT_WINDOW_SECS: u64 = 6;
 const CANCEL_WAIT: Duration = Duration::from_secs(3);
@@ -345,8 +345,8 @@ mod tests {
             assert!(profiles.contains(&"fast"));
             assert!(profiles.contains(&"cuprate"));
             assert!(profiles.contains(&"stall"));
-            assert!(profiles.contains(&"batch-250"));
-            assert!(profiles.contains(&"batch-350"));
+            assert!(profiles.contains(&"batch-100"));
+            assert!(profiles.contains(&"batch-125"));
         }
     }
 }

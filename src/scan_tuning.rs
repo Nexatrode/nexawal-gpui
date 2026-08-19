@@ -4,8 +4,8 @@ use std::env;
 
 const FAST_BATCH: &str = "500";
 const STALL_BATCH: &str = "150";
-const BATCH_250: &str = "250";
-const BATCH_350: &str = "350";
+const BATCH_100: &str = "100";
+const BATCH_125: &str = "125";
 const CUPRATE_BATCH: &str = "500";
 const REFRESH_TELEMETRY_DEFAULT: u8 = 0;
 pub const STALL_SECS: u64 = 125;
@@ -15,8 +15,8 @@ enum ScanProfile {
     Fast,
     CuprateSafe,
     StallFallback,
-    Batch250,
-    Batch350,
+    Batch100,
+    Batch125,
 }
 
 impl ScanProfile {
@@ -25,8 +25,8 @@ impl ScanProfile {
             Self::Fast => FAST_BATCH,
             Self::CuprateSafe => CUPRATE_BATCH,
             Self::StallFallback => STALL_BATCH,
-            Self::Batch250 => BATCH_250,
-            Self::Batch350 => BATCH_350,
+            Self::Batch100 => BATCH_100,
+            Self::Batch125 => BATCH_125,
         }
     }
 
@@ -35,8 +35,8 @@ impl ScanProfile {
             Self::Fast => "fast",
             Self::CuprateSafe => "cuprate",
             Self::StallFallback => "stall-fallback",
-            Self::Batch250 => "batch-250",
-            Self::Batch350 => "batch-350",
+            Self::Batch100 => "batch-100",
+            Self::Batch125 => "batch-125",
         }
     }
 }
@@ -53,8 +53,8 @@ fn profile_from_name(name: &str) -> Option<ScanProfile> {
         "stall" | "fallback" | "stall_fallback" | "stall-fallback" => {
             Some(ScanProfile::StallFallback)
         }
-        "batch-250" | "batch_250" | "250" => Some(ScanProfile::Batch250),
-        "batch-350" | "batch_350" | "350" => Some(ScanProfile::Batch350),
+        "batch-100" | "batch_100" | "100" => Some(ScanProfile::Batch100),
+        "batch-125" | "batch_125" | "125" => Some(ScanProfile::Batch125),
         _ => None,
     }
 }

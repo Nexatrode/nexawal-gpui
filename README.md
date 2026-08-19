@@ -67,7 +67,7 @@ cargo build --release
 ### Scan benchmark
 
 With an opened wallet, use **Settings → Run scan benchmark** to stop the current
-sync and run three shuffled six-second samples for each of the 150, 250, 350, and
+sync and run three shuffled six-second samples for each of the 100, 125, 150, and
 500-block profiles. The `fast` and `cuprate` labels both represent the current
 500-block setting. When the configured endpoint is one of the Nexatrode production
 hosts, the benchmark tests both `rpc.nexatrode.com` and `monero.nexatrode.com`; custom endpoints are tested by themselves. Results are appended to
