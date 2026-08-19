@@ -4214,10 +4214,7 @@ fn transfer_detail(row: &Transfer, index: usize, cx: &mut Context<Home>) -> impl
         .height
         .map(|height| height.to_string())
         .unwrap_or_else(|| l10n::t("Not available").to_string());
-    let timestamp = row
-        .timestamp
-        .map(|timestamp| timestamp.to_string())
-        .unwrap_or_else(|| l10n::t("Not available").to_string());
+    let timestamp = format_timestamp(row.timestamp);
 
     div()
         .id(("transfer-detail", index))
@@ -4245,11 +4242,12 @@ fn transfer_detail(row: &Transfer, index: usize, cx: &mut Context<Home>) -> impl
             l10n::t("Amount"),
             format_xmr(row.amount)
         )))
-        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
-            "{}: {} XMR",
-            l10n::t("Fee"),
-            fee
-        )))
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(MUTED))
+                .child(format!("{}: {}", l10n::t("Fee"), fee)),
+        )
         .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
             "{}: {}",
             l10n::t("Block"),
@@ -4277,6 +4275,57 @@ fn transfer_detail(row: &Transfer, index: usize, cx: &mut Context<Home>) -> impl
                 this.copy_transfer_txid(index, cx);
             }),
         ))
+}
+
+fn format_timestamp(timestamp: Option<u64>) -> String {
+    let Some(timestamp) = timestamp.filter(|timestamp| *timestamp > 0) else {
+        return l10n::t("Not available").to_string();
+    };
+
+    let seconds_per_day = 86_400;
+    let days = (timestamp / seconds_per_day).min(i64::MAX as u64) as i64;
+    let seconds_today = timestamp % seconds_per_day;
+    let hour = seconds_today / 3_600;
+    let minute = (seconds_today % 3_600) / 60;
+    let second = seconds_today % 60;
+    let (year, month, day) = civil_date_from_days(days);
+
+    format!("{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02} UTC")
+}
+
+// Proleptic Gregorian UTC date conversion without adding a runtime dependency just for display.
+fn civil_date_from_days(days_since_unix_epoch: i64) -> (i32, u32, u32) {
+    let shifted = days_since_unix_epoch + 719_468;
+    let era = if shifted >= 0 {
+        shifted / 146_097
+    } else {
+        (shifted - 146_096) / 146_097
+    };
+    let day_of_era = shifted - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_part = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_part + 2) / 5 + 1;
+    let month = month_part + if month_part < 10 { 3 } else { -9 };
+    let year = year + if month <= 2 { 1 } else { 0 };
+
+    (year as i32, month as u32, day as u32)
+}
+
+#[cfg(test)]
+mod transfer_detail_tests {
+    use super::format_timestamp;
+
+    #[test]
+    fn formats_unix_epoch_and_known_block_time() {
+        assert_eq!(format_timestamp(Some(0)), "Not available");
+        assert_eq!(
+            format_timestamp(Some(1_735_689_600)),
+            "2025-01-01 00:00:00 UTC"
+        );
+    }
 }
 
 fn action_button(
