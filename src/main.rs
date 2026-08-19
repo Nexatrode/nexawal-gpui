@@ -157,6 +157,7 @@ struct Home {
     unlocked_piconero: u64,
     sync: Option<SyncStatus>,
     transfers: Vec<Transfer>,
+    selected_transfer: Option<usize>,
     last_exported_scanned: Option<u64>,
     last_cache_persist_at: Option<Instant>,
     last_balance_poll_at: Option<Instant>,
@@ -288,6 +289,7 @@ impl Home {
             unlocked_piconero: 0,
             sync: None,
             transfers: Vec::new(),
+            selected_transfer: None,
             last_exported_scanned: None,
             last_cache_persist_at: None,
             last_balance_poll_at: None,
@@ -707,7 +709,30 @@ impl Home {
                 opted_in,
             );
         }
+        if self
+            .selected_transfer
+            .is_some_and(|index| index >= rows.len())
+        {
+            self.selected_transfer = None;
+        }
         self.transfers = rows;
+    }
+
+    fn select_transfer(&mut self, index: usize, cx: &mut Context<Self>) {
+        if index >= self.transfers.len() {
+            return;
+        }
+        self.selected_transfer = (self.selected_transfer != Some(index)).then_some(index);
+        cx.notify();
+    }
+
+    fn copy_transfer_txid(&mut self, index: usize, cx: &mut Context<Self>) {
+        let Some(row) = self.transfers.get(index) else {
+            return;
+        };
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string(row.txid.clone()));
+        self.status = l10n::t("Transaction ID copied.").into();
+        cx.notify();
     }
 
     fn toggle_send_from_subaddress(&mut self, cx: &mut Context<Self>) {
@@ -938,6 +963,7 @@ impl Home {
         self.total_piconero = 0;
         self.unlocked_piconero = 0;
         self.transfers.clear();
+        self.selected_transfer = None;
         self.last_exported_scanned = None;
         self.last_cache_persist_at = None;
         self.last_balance_poll_at = None;
@@ -1991,6 +2017,7 @@ impl Home {
         self.unlocked_piconero = 0;
         self.sync = None;
         self.transfers.clear();
+        self.selected_transfer = None;
         self.last_exported_scanned = None;
         self.last_cache_persist_at = None;
         self.last_balance_poll_at = None;
@@ -2550,7 +2577,7 @@ impl Render for Home {
             })
             .child(status_line(self))
             .when(self.opened && self.screen == Screen::Wallet, |body| {
-                body.child(history(self))
+                body.child(history(self, cx))
             });
 
         div()
@@ -4080,7 +4107,11 @@ fn status_line(home: &Home) -> impl IntoElement {
         .child(home.status.clone())
 }
 
-fn history(home: &Home) -> impl IntoElement {
+fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
+    let selected = home
+        .selected_transfer
+        .and_then(|index| home.transfers.get(index).cloned().map(|row| (index, row)));
+
     div()
         .id("history")
         .flex_1()
@@ -4117,10 +4148,20 @@ fn history(home: &Home) -> impl IntoElement {
                 .py_2()
                 .rounded_md()
                 .bg(rgb(ROW))
+                .border_1()
+                .border_color(rgb(if home.selected_transfer == Some(idx) {
+                    ACCENT
+                } else {
+                    ROW
+                }))
+                .cursor(CursorStyle::PointingHand)
                 .flex()
                 .flex_row()
                 .items_center()
                 .justify_between()
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    this.select_transfer(idx, cx);
+                }))
                 .child(
                     div()
                         .flex()
@@ -4148,6 +4189,94 @@ fn history(home: &Home) -> impl IntoElement {
                         ),
                 )
         }))
+        .when_some(selected, |list, (index, row)| {
+            list.child(transfer_detail(&row, index, cx))
+        })
+}
+
+fn transfer_detail(row: &Transfer, index: usize, cx: &mut Context<Home>) -> impl IntoElement {
+    let direction = match row.direction.as_str() {
+        "in" => l10n::t("Received").to_string(),
+        "out" => l10n::t("Sent").to_string(),
+        "self" => l10n::t("Self").to_string(),
+        other => other.to_string(),
+    };
+    let status = if row.is_pending || row.confirmations == 0 {
+        l10n::t("Pending").to_string()
+    } else {
+        format!("{} confirmations", row.confirmations)
+    };
+    let fee = row
+        .fee
+        .map(format_xmr)
+        .unwrap_or_else(|| l10n::t("Not available").to_string());
+    let height = row
+        .height
+        .map(|height| height.to_string())
+        .unwrap_or_else(|| l10n::t("Not available").to_string());
+    let timestamp = row
+        .timestamp
+        .map(|timestamp| timestamp.to_string())
+        .unwrap_or_else(|| l10n::t("Not available").to_string());
+
+    div()
+        .id(("transfer-detail", index))
+        .p_3()
+        .rounded_md()
+        .bg(rgb(CARD))
+        .border_1()
+        .border_color(rgb(ACCENT))
+        .flex()
+        .flex_col()
+        .gap_1()
+        .child(
+            div()
+                .text_sm()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .child(l10n::t("Transaction details")),
+        )
+        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
+            "{}: {}",
+            l10n::t("Direction"),
+            direction
+        )))
+        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
+            "{}: {}",
+            l10n::t("Amount"),
+            format_xmr(row.amount)
+        )))
+        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
+            "{}: {} XMR",
+            l10n::t("Fee"),
+            fee
+        )))
+        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
+            "{}: {}",
+            l10n::t("Block"),
+            height
+        )))
+        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
+            "{}: {}",
+            l10n::t("Timestamp"),
+            timestamp
+        )))
+        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
+            "{}: {}",
+            l10n::t("Status"),
+            status
+        )))
+        .child(div().text_xs().text_color(rgb(TEXT)).child(format!(
+            "{}: {}",
+            l10n::t("Transaction ID"),
+            row.txid
+        )))
+        .child(action_button(
+            "copy-transfer-txid",
+            l10n::t("Copy transaction ID"),
+            cx.listener(move |this, _: &ClickEvent, _, cx| {
+                this.copy_transfer_txid(index, cx);
+            }),
+        ))
 }
 
 fn action_button(
