@@ -3736,7 +3736,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 .text_xs()
                 .text_color(rgb(MUTED))
                 .child(l10n::t(
-                    "Stops the current sync, compares 100, 125, 150, and 500-block batches in shuffled repeated samples, then saves JSON results.",
+                    "Stops the current sync, compares 25, 50, 75, 100, 125, 150, and 500-block batches in shuffled repeated samples, then saves JSON results.",
                 )),
         )
         .child(action_button(

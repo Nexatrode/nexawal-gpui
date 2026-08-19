@@ -13,7 +13,16 @@ use serde_json::{Value, json};
 
 use crate::{paths, scan_tuning};
 
-const PROFILE_NAMES: [&str; 5] = ["fast", "cuprate", "stall", "batch-100", "batch-125"];
+const PROFILE_NAMES: [&str; 8] = [
+    "fast",
+    "cuprate",
+    "stall",
+    "batch-25",
+    "batch-50",
+    "batch-75",
+    "batch-100",
+    "batch-125",
+];
 const DEFAULT_REPETITIONS: usize = 3;
 const DEFAULT_WINDOW_SECS: u64 = 6;
 const CANCEL_WAIT: Duration = Duration::from_secs(3);
@@ -507,7 +516,7 @@ fn benchmark_config() -> (usize, Duration) {
     (repetitions, Duration::from_secs(seconds))
 }
 
-fn shuffled_profiles(run_id: u64, node_index: usize, repetition: usize) -> [&'static str; 5] {
+fn shuffled_profiles(run_id: u64, node_index: usize, repetition: usize) -> [&'static str; 8] {
     let mut profiles = PROFILE_NAMES;
     let mut state = run_id
         .wrapping_add(node_index as u64)
@@ -577,6 +586,9 @@ mod tests {
             assert!(profiles.contains(&"fast"));
             assert!(profiles.contains(&"cuprate"));
             assert!(profiles.contains(&"stall"));
+            assert!(profiles.contains(&"batch-25"));
+            assert!(profiles.contains(&"batch-50"));
+            assert!(profiles.contains(&"batch-75"));
             assert!(profiles.contains(&"batch-100"));
             assert!(profiles.contains(&"batch-125"));
         }
