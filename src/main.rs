@@ -135,6 +135,7 @@ struct Home {
     legal_return: Screen,
     terms_checked: bool,
     has_stored: bool,
+    show_restore_form: bool,
     unlocking: bool,
     unlock_started: bool,
     mnemonic: String,
@@ -198,6 +199,7 @@ impl Home {
         let has_stored = wallet_store::is_marked_stored();
         let needs_terms = paths::terms_need_accept();
         let initial_seed = env_or("NEXAWAL_MNEMONIC", "");
+        let show_restore_form = !has_stored || !initial_seed.trim().is_empty();
         let should_auto_unlock = should_auto_unlock_stored();
         let saved_auth_preference = paths::load_device_auth_preference();
         let require_device_auth =
@@ -213,7 +215,7 @@ impl Home {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .unwrap_or_else(paths::load_node_url),
-            seed: initial_seed,
+            seed: initial_seed.clone(),
             restore_height_text: {
                 let from_env = std::env::var("NEXAWAL_RESTORE_HEIGHT")
                     .ok()
@@ -260,6 +262,7 @@ impl Home {
             legal_return: Screen::Restore,
             terms_checked: false,
             has_stored,
+            show_restore_form,
             unlocking: should_auto_unlock,
             unlock_started: false,
             mnemonic: String::new(),
@@ -595,7 +598,7 @@ impl Home {
     }
 
     fn start_fast_scan(&mut self) -> api::Result<()> {
-        scan_tuning::apply();
+        scan_tuning::apply_for_node(&self.scan_node_url());
         self.scan_stall_fallback_used = false;
         self.last_scan_progress_at = Some(Instant::now());
         self.last_scanned_for_stall = 0;
@@ -1584,6 +1587,10 @@ impl Home {
     }
 
     fn open_wallet(&mut self, _: &OpenWallet, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.has_stored && !self.show_restore_form {
+            self.try_unlock_stored(cx);
+            return;
+        }
         self.open_from_form(cx);
     }
 
@@ -1664,6 +1671,7 @@ impl Home {
         let store_error = match wallet_store::save(mnemonic, restore_height) {
             Ok(()) => {
                 self.has_stored = true;
+                self.show_restore_form = false;
                 self.seed.clear();
                 if paths::load_device_auth_preference().is_none() && device_auth::is_available() {
                     self.require_device_auth = true;
@@ -1802,6 +1810,7 @@ impl Home {
         self.challenge_slot = 0;
         self.receive_address = "".into();
         self.has_stored = wallet_store::is_marked_stored();
+        self.show_restore_form = !self.has_stored;
         self.active = Field::Seed;
         self.status = if self.has_stored {
             l10n::t("Locked. Open the existing wallet from {}, or restore a different seed.")
@@ -1817,6 +1826,7 @@ impl Home {
         self.forget(cx);
         if let Err(err) = wallet_store::delete() {
             self.has_stored = wallet_store::is_marked_stored();
+            self.show_restore_form = !self.has_stored;
             self.status = err.into();
             cx.notify();
             return;
@@ -1826,6 +1836,7 @@ impl Home {
         receive_book::clear();
         self.receive_book = receive_book::Book::primary();
         self.has_stored = false;
+        self.show_restore_form = true;
         self.restore_height_text = "0".into();
         self.status = l10n::t("Removed the stored wallet from this computer.").into();
         cx.notify();
@@ -1880,11 +1891,13 @@ impl Home {
                 match result {
                     Ok((mnemonic, height)) => {
                         this.restore_height_text = height.to_string();
+                        this.show_restore_form = false;
                         this.open_with_mnemonic(&mnemonic, height, cx);
                         this.seed.clear();
                     }
                     Err(err) => {
                         this.has_stored = true;
+                        this.show_restore_form = false;
                         this.status = format!(
                             "{err}. {}",
                             l10n::t("Use Open existing wallet to try again, or restore from seed.")
@@ -2428,6 +2441,7 @@ fn unlocking_card(home: &Home) -> impl IntoElement {
 }
 
 fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoElement {
+    let show_restore_form = !home.has_stored || home.show_restore_form;
     let seed_focused = home.seed_focus.is_focused(window);
     let height_focused = home.height_focus.is_focused(window);
     let node_focused = home.node_focus.is_focused(window);
@@ -2461,11 +2475,11 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                     .border_1()
                     .border_color(rgb(ACCENT))
                     .bg(rgb(FIELD))
-                    .child(
-                        div()
-                            .text_lg()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .child(l10n::t("Existing wallet")),
+                .child(
+                    div()
+                        .text_lg()
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .child(l10n::t("Existing wallet")),
                     )
                     .child(
                         div()
@@ -2476,218 +2490,250 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                                 wallet_store::secure_store_name()
                             )),
                     )
-                    .child(action_button(
-                        "open-existing-wallet",
-                        l10n::t("Unlock Existing Wallet"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| this.try_unlock_stored(cx)),
-                    )),
-            )
-            .child(
-                div()
-                    .pt_2()
-                    .text_xs()
-                    .text_color(rgb(MUTED))
-                    .child(l10n::t("Restore a different wallet")),
-            )
-        })
-        .child(div().text_xs().text_color(rgb(MUTED)).child(if home.network_policy == network::Policy::I2p {
-            l10n::t("Scan uses the I2P node from Settings")
-        } else {
-            l10n::t("Node URL")
-        }))
-        .when(home.network_policy != network::Policy::I2p, |card| {
-            card.child(
-            div()
-                .id("node-field")
-                .key_context("Field")
-                .track_focus(&home.node_focus)
-                .cursor(CursorStyle::IBeam)
-                .p_3()
-                .rounded_md()
-                .bg(rgb(FIELD))
-                .border_1()
-                .border_color(rgb(if node_focused { ACCENT } else { 0x2A3A2A }))
-                .text_sm()
-                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                    this.focus_field(Field::Node, window, cx);
-                }))
-                .child(home.node_url.clone()),
-            )
-        })
-        .child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("Seed phrase")))
-        .child(
-            div()
-                .id("seed-field")
-                .key_context("Field")
-                .track_focus(&home.seed_focus)
-                .cursor(CursorStyle::IBeam)
-                .min_h(px(88.))
-                .p_3()
-                .rounded_md()
-                .bg(rgb(FIELD))
-                .border_1()
-                .border_color(rgb(if seed_focused { ACCENT } else { 0x2A3A2A }))
-                .text_sm()
-                .text_color(rgb(if seed_muted { MUTED } else { TEXT }))
-                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                    this.focus_field(Field::Seed, window, cx);
-                }))
-                .child(seed_label),
-        )
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(MUTED))
-                .child(format!("{} words", home.word_count())),
-        )
-        .when(home.created_seed, |card| {
-            card.child(
-                div()
-                    .text_xs()
-                    .text_color(rgb(MUTED))
-                    .child(l10n::t(
-                        "This is your recovery seed. Write it down on paper and store it somewhere safe. Anyone with these words can access your funds.",
-                    )),
-            )
-            .child(
-                div()
-                    .id("wrote-seed")
-                    .cursor(CursorStyle::PointingHand)
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.wrote_seed_down = !this.wrote_seed_down;
-                        cx.notify();
-                    }))
-                    .child(format!(
-                        "{}  {}",
-                        if home.wrote_seed_down { "[x]" } else { "[ ]" },
-                        l10n::t("I wrote down my recovery seed")
-                    )),
-            )
-        })
-        .when(home.created_seed && home.wrote_seed_down, |card| {
-            card            .child(
-                div()
-                    .text_xs()
-                    .text_color(rgb(MUTED))
-                    .child(l10n::t(
-                        "Confirm you wrote it down: enter the requested words below.",
-                    )),
-            )
-            .when(!home.challenge_indices.is_empty(), |card| {
-                card.child(challenge_row(
-                    home,
-                    window,
-                    cx,
-                    0,
-                    home.challenge_indices[0],
-                ))
-            })
-            .when(home.challenge_indices.len() > 1, |card| {
-                card.child(challenge_row(
-                    home,
-                    window,
-                    cx,
-                    1,
-                    home.challenge_indices[1],
-                ))
-            })
-            .when(home.challenge_indices.len() > 2, |card| {
-                card.child(challenge_row(
-                    home,
-                    window,
-                    cx,
-                    2,
-                    home.challenge_indices[2],
-                ))
-            })
-            .when(!home.seed_backup_passed(), |card| {
-                card.child(
-                    div()
-                        .text_xs()
-                        .text_color(rgb(OUT))
-                        .child(l10n::t("Word(s) don't match yet.")),
-                )
-            })
-        })
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(MUTED))
-                .child(if home.created_seed && home.height_fetching {
-                    l10n::t("Fetching a fast restore height…")
-                } else if home.created_seed {
-                    l10n::t("Starting height (fast)")
-                } else {
-                    l10n::t("Restore height (0 = scan from genesis)")
-                }),
-        )
-        .child(
-            div()
-                .id("height-field")
-                .key_context("Field")
-                .track_focus(&home.height_focus)
-                .cursor(CursorStyle::IBeam)
-                .h(px(36.))
-                .px_3()
-                .rounded_md()
-                .bg(rgb(FIELD))
-                .border_1()
-                .border_color(rgb(if height_focused { ACCENT } else { 0x2A3A2A }))
-                .flex()
-                .items_center()
-                .text_sm()
-                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                    this.focus_field(Field::Height, window, cx);
-                }))
-                .child(home.restore_height_text.clone()),
-        )
-        .child(
-            div()
-                .flex()
-                .flex_row()
-                .gap_2()
-                .child(action_button(
-                    "paste-seed",
-                    l10n::t("Paste clipboard into seed"),
-                    cx.listener(|this, _: &ClickEvent, _, cx| this.paste_seed_button(cx)),
-                ))
-                .child(action_button(
-                    "create-seed",
-                    l10n::t("Create seed"),
-                    cx.listener(|this, _: &ClickEvent, _, cx| this.create_seed(cx)),
-                ))
-                .when(home.created_seed, |row| {
-                    row.child(action_button(
-                        "copy-seed",
-                        l10n::t("Copy seed"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| this.copy_seed(cx)),
-                    ))
-                })
-                .when(home.seed_backup_passed(), |row| {
-                    row.child(action_button(
-                        "open-wallet",
-                        l10n::t("Open & sync"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| this.open_from_form(cx)),
-                    ))
-                })
-                .when(!home.seed_backup_passed(), |row| {
-                    row.child(
+                    .child(
                         div()
-                            .id("open-wallet-locked")
-                            .px_3()
-                            .py_2()
+                            .flex()
+                            .flex_row()
+                            .gap_2()
+                            .child(action_button(
+                                "open-existing-wallet",
+                                l10n::t("Unlock Existing Wallet"),
+                                cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.try_unlock_stored(cx)
+                                }),
+                            ))
+                            .child(action_button(
+                                "open-existing-wallet-settings",
+                                l10n::t("Settings"),
+                                cx.listener(|this, _: &ClickEvent, _, cx| this.go_settings(cx)),
+                            )),
+                    ),
+            )
+            .child(
+                if home.show_restore_form {
+                    div().pt_2().child(action_button(
+                        "hide-restore-form",
+                        l10n::t("Use stored wallet"),
+                        cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.show_restore_form = false;
+                            cx.notify();
+                        }),
+                    ))
+                } else {
+                    div().pt_2().child(action_button(
+                        "show-restore-form",
+                        l10n::t("Restore a different wallet"),
+                        cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.show_restore_form = true;
+                            cx.notify();
+                        }),
+                    ))
+                },
+            )
+        })
+        .when(show_restore_form, |card| {
+            card
+                .child(
+                    div().text_xs().text_color(rgb(MUTED)).child(if home.network_policy == network::Policy::I2p {
+                        l10n::t("Scan uses the I2P node from Settings")
+                    } else {
+                        l10n::t("Node URL")
+                    }),
+                )
+                .when(home.network_policy != network::Policy::I2p, |card| {
+                    card.child(
+                        div()
+                            .id("node-field")
+                            .key_context("Field")
+                            .track_focus(&home.node_focus)
+                            .cursor(CursorStyle::IBeam)
+                            .p_3()
                             .rounded_md()
-                            .bg(rgb(0x2A332A))
-                            .text_color(rgb(MUTED))
-                            .child(l10n::t("Open & sync")),
+                            .bg(rgb(FIELD))
+                            .border_1()
+                            .border_color(rgb(if node_focused { ACCENT } else { 0x2A3A2A }))
+                            .text_sm()
+                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                                this.focus_field(Field::Node, window, cx);
+                            }))
+                            .child(home.node_url.clone()),
                     )
                 })
-                .child(action_button(
-                    "restore-settings",
-                    l10n::t("Settings"),
-                    cx.listener(|this, _: &ClickEvent, _, cx| this.go_settings(cx)),
-                )),
-        )
+                .child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("Seed phrase")))
+                .child(
+                    div()
+                        .id("seed-field")
+                        .key_context("Field")
+                        .track_focus(&home.seed_focus)
+                        .cursor(CursorStyle::IBeam)
+                        .min_h(px(88.))
+                        .p_3()
+                        .rounded_md()
+                        .bg(rgb(FIELD))
+                        .border_1()
+                        .border_color(rgb(if seed_focused { ACCENT } else { 0x2A3A2A }))
+                        .text_sm()
+                        .text_color(rgb(if seed_muted { MUTED } else { TEXT }))
+                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                            this.focus_field(Field::Seed, window, cx);
+                        }))
+                        .child(seed_label),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(MUTED))
+                        .child(format!("{} words", home.word_count())),
+                )
+                .when(home.created_seed, |card| {
+                    card.child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(MUTED))
+                            .child(l10n::t(
+                                "This is your recovery seed. Write it down on paper and store it somewhere safe. Anyone with these words can access your funds.",
+                            )),
+                    )
+                    .child(
+                        div()
+                            .id("wrote-seed")
+                            .cursor(CursorStyle::PointingHand)
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.wrote_seed_down = !this.wrote_seed_down;
+                                cx.notify();
+                            }))
+                            .child(format!(
+                                "{}  {}",
+                                if home.wrote_seed_down { "[x]" } else { "[ ]" },
+                                l10n::t("I wrote down my recovery seed")
+                            )),
+                    )
+                })
+                .when(home.created_seed && home.wrote_seed_down, |card| {
+                    card.child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(MUTED))
+                            .child(l10n::t(
+                                "Confirm you wrote it down: enter the requested words below.",
+                            )),
+                    )
+                    .when(!home.challenge_indices.is_empty(), |card| {
+                        card.child(challenge_row(
+                            home,
+                            window,
+                            cx,
+                            0,
+                            home.challenge_indices[0],
+                        ))
+                    })
+                    .when(home.challenge_indices.len() > 1, |card| {
+                        card.child(challenge_row(
+                            home,
+                            window,
+                            cx,
+                            1,
+                            home.challenge_indices[1],
+                        ))
+                    })
+                    .when(home.challenge_indices.len() > 2, |card| {
+                        card.child(challenge_row(
+                            home,
+                            window,
+                            cx,
+                            2,
+                            home.challenge_indices[2],
+                        ))
+                    })
+                    .when(!home.seed_backup_passed(), |card| {
+                        card.child(
+                            div()
+                                .text_xs()
+                                .text_color(rgb(OUT))
+                                .child(l10n::t("Word(s) don't match yet.")),
+                        )
+                    })
+                })
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(MUTED))
+                        .child(if home.created_seed && home.height_fetching {
+                            l10n::t("Fetching a fast restore height…")
+                        } else if home.created_seed {
+                            l10n::t("Starting height (fast)")
+                        } else {
+                            l10n::t("Restore height (0 = scan from genesis)")
+                        }),
+                )
+                .child(
+                    div()
+                        .id("height-field")
+                        .key_context("Field")
+                        .track_focus(&home.height_focus)
+                        .cursor(CursorStyle::IBeam)
+                        .h(px(36.))
+                        .px_3()
+                        .rounded_md()
+                        .bg(rgb(FIELD))
+                        .border_1()
+                        .border_color(rgb(if height_focused { ACCENT } else { 0x2A3A2A }))
+                        .flex()
+                        .items_center()
+                        .text_sm()
+                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                            this.focus_field(Field::Height, window, cx);
+                        }))
+                        .child(home.restore_height_text.clone()),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .gap_2()
+                        .child(action_button(
+                            "paste-seed",
+                            l10n::t("Paste clipboard into seed"),
+                            cx.listener(|this, _: &ClickEvent, _, cx| this.paste_seed_button(cx)),
+                        ))
+                        .child(action_button(
+                            "create-seed",
+                            l10n::t("Create seed"),
+                            cx.listener(|this, _: &ClickEvent, _, cx| this.create_seed(cx)),
+                        ))
+                        .when(home.created_seed, |row| {
+                            row.child(action_button(
+                                "copy-seed",
+                                l10n::t("Copy seed"),
+                                cx.listener(|this, _: &ClickEvent, _, cx| this.copy_seed(cx)),
+                            ))
+                        })
+                        .when(home.seed_backup_passed(), |row| {
+                            row.child(action_button(
+                                "open-wallet",
+                                l10n::t("Open & sync"),
+                                cx.listener(|this, _: &ClickEvent, _, cx| this.open_from_form(cx)),
+                            ))
+                        })
+                        .when(!home.seed_backup_passed(), |row| {
+                            row.child(
+                                div()
+                                    .id("open-wallet-locked")
+                                    .px_3()
+                                    .py_2()
+                                    .rounded_md()
+                                    .bg(rgb(0x2A332A))
+                                    .text_color(rgb(MUTED))
+                                    .child(l10n::t("Open & sync")),
+                            )
+                        })
+                        .child(action_button(
+                            "restore-settings",
+                            l10n::t("Settings"),
+                            cx.listener(|this: &mut Home, _: &ClickEvent, _, cx| this.go_settings(cx)),
+                        )),
+                )
+        })
 }
 
 fn challenge_row(
@@ -3902,7 +3948,8 @@ fn install_menus(cx: &mut App) {
 }
 
 fn main() {
-    scan_tuning::apply();
+    let startup_node = std::env::var("NEXAWAL_NODE_URL").unwrap_or_default();
+    scan_tuning::apply_for_node(&startup_node);
     application().run(|cx: &mut App| {
         cx.set_app_identity("com.nexatrode.nexawal", "NexaWal");
         platform_icon::install_process_icon();
