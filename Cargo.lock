@@ -7054,7 +7054,7 @@ dependencies = [
 [[package]]
 name = "walletcore"
 version = "0.1.0"
-source = "git+https://github.com/cacaosteve/MoneroWalletCoreFFI.git?rev=529c724b06866a03e71ab044c3e91dc600477687#529c724b06866a03e71ab044c3e91dc600477687"
+source = "git+https://github.com/cacaosteve/MoneroWalletCoreFFI.git?rev=8fa2206aae76cb7eb27be1b3d550281731e82bb5#8fa2206aae76cb7eb27be1b3d550281731e82bb5"
 dependencies = [
  "bincode",
  "bytes",

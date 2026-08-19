@@ -74,7 +74,12 @@ hosts, the benchmark tests both `rpc.nexatrode.com` and `monero.nexatrode.com`; 
 `scan_benchmarks.jsonl` in the platform's NexaWal data directory. Set
 `NEXAWAL_BENCHMARK_NODES` to a comma-separated list to override the endpoints.
 `NEXAWAL_BENCHMARK_REPETITIONS` and `NEXAWAL_BENCHMARK_SECONDS` can override the
-default repetition count and sample duration.
+default repetition count and sample duration. Samples below 40 blocks/sec are marked
+as `stalled` and excluded from the usable average; override that threshold with
+`NEXAWAL_BENCHMARK_STALL_BPS` when testing a slower connection. Each JSONL record
+also includes WalletCore batch timing, actual returned blocks, binary-RPC request and
+response byte totals, RPC errors, and retry counts. The raw opt-in binary-RPC trace is
+kept in `scan_benchmark_rpc_<run-id>.jsonl` beside the benchmark results.
 
 The release executable has the NexaWal icon embedded on Windows. On macOS,
 `cargo run` installs the native padded, rounded icon in the Dock and Cmd-Tab

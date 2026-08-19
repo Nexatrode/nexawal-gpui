@@ -86,6 +86,19 @@ pub fn scan_benchmark_path() -> PathBuf {
     data_dir().join("scan_benchmarks.jsonl")
 }
 
+pub fn scan_benchmark_rpc_path(run_id: u64) -> PathBuf {
+    data_dir().join(format!("scan_benchmark_rpc_{run_id}.jsonl"))
+}
+
+/// WalletCore's per-wallet diagnostic log location for a mainnet benchmark wallet.
+pub fn walletcore_log_path(wallet_id: &str) -> PathBuf {
+    dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("WalletCaches")
+        .join("mainnet")
+        .join(format!("{wallet_id}.walletcore.log"))
+}
+
 pub fn append_scan_benchmark(line: &str) -> std::io::Result<()> {
     use std::io::Write;
 

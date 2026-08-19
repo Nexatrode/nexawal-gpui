@@ -1808,8 +1808,8 @@ impl Home {
             let _ = this.update(cx, |this, cx| {
                 this.benchmark_running = false;
                 let status = format!(
-                    "Benchmark complete · {}. Results saved to {}",
-                    report.summary, report.results_path
+                    "Benchmark complete · {}. Results saved to {} · RPC trace {}",
+                    report.summary, report.results_path, report.rpc_results_path
                 );
                 this.benchmark_status = Some(status.clone().into());
                 this.status = status.into();
