@@ -129,8 +129,9 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
         std::env::set_var("WALLETCORE_RPC_TELEMETRY_PATH", &rpc_telemetry_path);
     }
     let nodes = targets_for(&node_url);
+    let profiles = benchmark_profiles();
     let (repetitions, profile_window, cooldown) = benchmark_config();
-    let mut results = Vec::with_capacity(PROFILE_NAMES.len() * nodes.len() * repetitions);
+    let mut results = Vec::with_capacity(profiles.len() * nodes.len() * repetitions);
     let mut sample_count = 0usize;
 
     // The caller has already requested cancellation. Give WalletCore a short grace
@@ -139,7 +140,7 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
 
     for (node_index, target) in nodes.iter().enumerate() {
         for repetition in 0..repetitions {
-            let profile_order = shuffled_profiles(run_id, node_index, repetition);
+            let profile_order = shuffled_profiles(&profiles, run_id, node_index, repetition);
             for (order, profile_name) in profile_order.iter().enumerate() {
                 if sample_count > 0 && !cooldown.is_zero() {
                     thread::sleep(cooldown);
@@ -509,6 +510,34 @@ fn benchmark_stall_bps() -> f64 {
         .min(10_000.0)
 }
 
+fn benchmark_profiles() -> Vec<&'static str> {
+    let Some(raw) = std::env::var("NEXAWAL_BENCHMARK_PROFILES").ok() else {
+        return PROFILE_NAMES.to_vec();
+    };
+
+    let selected = raw
+        .split(',')
+        .map(str::trim)
+        .filter_map(|name| {
+            PROFILE_NAMES
+                .iter()
+                .copied()
+                .find(|profile| *profile == name)
+        })
+        .fold(Vec::new(), |mut profiles, profile| {
+            if !profiles.contains(&profile) {
+                profiles.push(profile);
+            }
+            profiles
+        });
+
+    if selected.is_empty() {
+        PROFILE_NAMES.to_vec()
+    } else {
+        selected
+    }
+}
+
 fn benchmark_config() -> (usize, Duration, Duration) {
     let repetitions = std::env::var("NEXAWAL_BENCHMARK_REPETITIONS")
         .ok()
@@ -532,8 +561,13 @@ fn benchmark_config() -> (usize, Duration, Duration) {
     )
 }
 
-fn shuffled_profiles(run_id: u64, node_index: usize, repetition: usize) -> [&'static str; 8] {
-    let mut profiles = PROFILE_NAMES;
+fn shuffled_profiles(
+    profiles: &[&'static str],
+    run_id: u64,
+    node_index: usize,
+    repetition: usize,
+) -> Vec<&'static str> {
+    let mut profiles = profiles.to_vec();
     let mut state = run_id
         .wrapping_add(node_index as u64)
         .wrapping_mul(31)
@@ -598,7 +632,7 @@ mod tests {
     #[test]
     fn shuffled_order_keeps_all_profiles() {
         for repetition in 0..10 {
-            let profiles = shuffled_profiles(42, 0, repetition);
+            let profiles = shuffled_profiles(&PROFILE_NAMES, 42, 0, repetition);
             assert!(profiles.contains(&"fast"));
             assert!(profiles.contains(&"cuprate"));
             assert!(profiles.contains(&"stall"));

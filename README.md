@@ -79,7 +79,9 @@ are inserted between samples; override that with `NEXAWAL_BENCHMARK_COOLDOWN_SEC
 (set it to `0` to disable the pause). Set `NEXAWAL_BENCHMARK_START_HEIGHT` to a
 fixed height when comparing separate runs so every run scans the same historical
 range; otherwise the benchmark starts 10,000 blocks before the current wallet
-checkpoint. Samples below 40 blocks/sec are marked `stalled` and excluded from the
+checkpoint. Set `NEXAWAL_BENCHMARK_PROFILES` to a comma-separated subset such as
+`batch-75` for a focused confirmation run; an invalid or empty selection keeps all
+profiles. Samples below 40 blocks/sec are marked `stalled` and excluded from the
 usable average; override that threshold with
 `NEXAWAL_BENCHMARK_STALL_BPS` when testing a slower connection. Each JSONL record
 also includes WalletCore batch timing, actual returned blocks, binary-RPC request and
