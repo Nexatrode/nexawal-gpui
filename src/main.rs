@@ -4120,6 +4120,36 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         .flex()
         .flex_col()
         .gap_1()
+        .child(
+            div()
+                .text_sm()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .child(l10n::t("History")),
+        )
+        .when(home.transfers.is_empty(), |list| {
+            list.child(
+                div()
+                    .p_4()
+                    .rounded_md()
+                    .bg(rgb(ROW))
+                    .text_sm()
+                    .text_color(rgb(MUTED))
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .child(l10n::t("No transfers found yet."))
+                    .child(div().text_xs().child(l10n::t(
+                        "New transactions will appear here after the wallet scan.",
+                    )))
+                    .child(action_button(
+                        "history-refresh",
+                        l10n::t("Refresh history"),
+                        cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.retry_refresh(cx);
+                        }),
+                    )),
+            )
+        })
         .children(home.transfers.iter().enumerate().map(|(idx, row)| {
             let color = match row.direction.as_str() {
                 "in" => IN,
@@ -4138,10 +4168,14 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 _ => "",
             };
             let conf = if row.is_pending || row.confirmations == 0 {
-                "pending".to_string()
+                l10n::t("Pending").to_string()
             } else {
-                format!("{} conf", row.confirmations)
+                format!("{} confirmations", row.confirmations)
             };
+            let height = row
+                .height
+                .map(|height| height.to_string())
+                .unwrap_or_else(|| l10n::t("Pending").to_string());
             div()
                 .id(("tx", idx))
                 .px_3()
@@ -4175,7 +4209,7 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                         )
                         .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
                             "{} · {} · {}",
-                            row.height.unwrap_or(0),
+                            height,
                             &row.txid.chars().take(8).collect::<String>(),
                             conf
                         )))
