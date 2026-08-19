@@ -598,7 +598,7 @@ impl Home {
     }
 
     fn start_fast_scan(&mut self) -> api::Result<()> {
-        scan_tuning::apply();
+        scan_tuning::apply_for_node(&self.scan_node_url());
         self.scan_stall_fallback_used = false;
         self.last_scan_progress_at = Some(Instant::now());
         self.last_scanned_for_stall = 0;
@@ -3948,7 +3948,8 @@ fn install_menus(cx: &mut App) {
 }
 
 fn main() {
-    scan_tuning::apply();
+    let startup_node = std::env::var("NEXAWAL_NODE_URL").unwrap_or_default();
+    scan_tuning::apply_for_node(&startup_node);
     application().run(|cx: &mut App| {
         cx.set_app_identity("com.nexatrode.nexawal", "NexaWal");
         platform_icon::install_process_icon();
