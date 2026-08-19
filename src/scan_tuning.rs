@@ -3,7 +3,7 @@
 use std::env;
 
 const FAST_BATCH: &str = "500";
-const STALL_BATCH: &str = "150";
+const BATCH_150: &str = "150";
 const BATCH_25: &str = "25";
 const BATCH_50: &str = "50";
 const BATCH_75: &str = "75";
@@ -17,7 +17,7 @@ pub const STALL_SECS: u64 = 125;
 enum ScanProfile {
     Fast,
     CuprateSafe,
-    StallFallback,
+    Batch150,
     Batch25,
     Batch50,
     Batch75,
@@ -30,7 +30,7 @@ impl ScanProfile {
         match self {
             Self::Fast => FAST_BATCH,
             Self::CuprateSafe => CUPRATE_BATCH,
-            Self::StallFallback => STALL_BATCH,
+            Self::Batch150 => BATCH_150,
             Self::Batch25 => BATCH_25,
             Self::Batch50 => BATCH_50,
             Self::Batch75 => BATCH_75,
@@ -43,7 +43,7 @@ impl ScanProfile {
         match self {
             Self::Fast => "fast",
             Self::CuprateSafe => "cuprate",
-            Self::StallFallback => "stall-fallback",
+            Self::Batch150 => "batch-150",
             Self::Batch25 => "batch-25",
             Self::Batch50 => "batch-50",
             Self::Batch75 => "batch-75",
@@ -62,26 +62,14 @@ fn profile_from_name(name: &str) -> Option<ScanProfile> {
     match name.to_ascii_lowercase().as_str() {
         "fast" => Some(ScanProfile::Fast),
         "cuprate" | "cuprate_safe" | "cuprate-safe" => Some(ScanProfile::CuprateSafe),
-        "stall" | "fallback" | "stall_fallback" | "stall-fallback" => {
-            Some(ScanProfile::StallFallback)
-        }
+        "stall" | "fallback" | "stall_fallback" | "stall-fallback" | "batch-150" | "batch_150"
+        | "150" => Some(ScanProfile::Batch150),
         "batch-25" | "batch_25" | "25" => Some(ScanProfile::Batch25),
         "batch-50" | "batch_50" | "50" => Some(ScanProfile::Batch50),
         "batch-75" | "batch_75" | "75" => Some(ScanProfile::Batch75),
         "batch-100" | "batch_100" | "100" => Some(ScanProfile::Batch100),
         "batch-125" | "batch_125" | "125" => Some(ScanProfile::Batch125),
         _ => None,
-    }
-}
-
-fn profile_for_node(node_url: &str) -> ScanProfile {
-    if let Some(profile) = profile_from_env() {
-        return profile;
-    }
-    if node_url.contains("rpc.nexatrode.com") || node_url.contains("cuprate") {
-        ScanProfile::CuprateSafe
-    } else {
-        ScanProfile::Fast
     }
 }
 
@@ -118,15 +106,39 @@ fn apply_profile(profile: ScanProfile) {
     );
 }
 
-/// Fast-sync path Catalyst uses: range batches with prune=true.
+fn apply_walletcore_defaults() {
+    unsafe {
+        std::env::remove_var("WALLETCORE_SCAN_PAR");
+        std::env::remove_var("WALLETCORE_SCAN_BATCH");
+        std::env::remove_var("WALLETCORE_WALLET2_FAST_FALLBACK");
+        std::env::remove_var("WALLETCORE_BULK_BIN_DEBUG");
+        std::env::set_var(
+            "WALLETCORE_REFRESH_TELEMETRY",
+            REFRESH_TELEMETRY_DEFAULT.to_string(),
+        );
+        if cfg!(debug_assertions) {
+            std::env::set_var("WALLETCORE_SCAN_LOG", "1");
+        } else {
+            std::env::set_var("WALLETCORE_SCAN_LOG", "0");
+        }
+    }
+    println!("🧪 walletcore scan tuning: using WalletCore defaults (range/75/75)");
+}
+
+/// Normal scan path: use WalletCore's shared range/75/75 defaults.
 #[allow(dead_code)]
 pub fn apply() {
-    apply_profile(ScanProfile::Fast);
+    apply_walletcore_defaults();
 }
 
 /// Fast-sync path with optional Cuprate-safe heuristic.
 pub fn apply_for_node(node_url: &str) {
-    apply_profile(profile_for_node(node_url));
+    let _ = node_url;
+    if let Some(profile) = profile_from_env() {
+        apply_profile(profile);
+    } else {
+        apply_walletcore_defaults();
+    }
 }
 
 /// Apply an explicitly named profile for diagnostics and benchmarks.
@@ -140,9 +152,13 @@ pub fn batch_for(name: &str) -> Option<&'static str> {
     profile_from_name(name).map(ScanProfile::batch)
 }
 
-/// After a stall or truncated fetch, shrink to 150 like iOS/Android.
-pub fn apply_stall_fallback() {
-    apply_profile(ScanProfile::StallFallback);
+/// Remove temporary benchmark profile variables so normal scans return to WalletCore defaults.
+pub fn clear_profile_override() {
+    unsafe {
+        std::env::remove_var("WALLETCORE_BULK_MODE");
+        std::env::remove_var("WALLETCORE_BULK_FETCH_BATCH");
+        std::env::remove_var("WALLETCORE_UPSTREAM_BLOCK_BATCH");
+    }
 }
 
 pub fn is_recoverable_fetch_error(message: &str) -> bool {

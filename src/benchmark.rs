@@ -16,7 +16,7 @@ use crate::{paths, scan_tuning};
 const PROFILE_NAMES: [&str; 8] = [
     "fast",
     "cuprate",
-    "stall",
+    "batch-150",
     "batch-25",
     "batch-50",
     "batch-75",
@@ -202,6 +202,7 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
     unsafe {
         std::env::remove_var("WALLETCORE_RPC_TELEMETRY_PATH");
     }
+    scan_tuning::clear_profile_override();
 
     let mut averages = BTreeMap::<String, SummaryStats>::new();
     for result in &results {
@@ -635,7 +636,7 @@ mod tests {
             let profiles = shuffled_profiles(&PROFILE_NAMES, 42, 0, repetition);
             assert!(profiles.contains(&"fast"));
             assert!(profiles.contains(&"cuprate"));
-            assert!(profiles.contains(&"stall"));
+            assert!(profiles.contains(&"batch-150"));
             assert!(profiles.contains(&"batch-25"));
             assert!(profiles.contains(&"batch-50"));
             assert!(profiles.contains(&"batch-75"));

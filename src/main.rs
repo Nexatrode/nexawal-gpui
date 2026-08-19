@@ -158,7 +158,6 @@ struct Home {
     last_scan_error: Option<String>,
     scan_rate: sync_status::ScanRate,
     scan_details_expanded: bool,
-    scan_stall_fallback_used: bool,
     last_scan_progress_at: Option<Instant>,
     last_scanned_for_stall: u64,
     benchmark_running: bool,
@@ -287,7 +286,6 @@ impl Home {
             last_scan_error: None,
             scan_rate: sync_status::ScanRate::default(),
             scan_details_expanded: paths::load_sync_details_expanded(),
-            scan_stall_fallback_used: false,
             last_scan_progress_at: None,
             last_scanned_for_stall: 0,
             benchmark_running: false,
@@ -605,7 +603,6 @@ impl Home {
     fn start_fast_scan(&mut self) -> api::Result<()> {
         self.benchmark_status = None;
         scan_tuning::apply_for_node(&self.scan_node_url());
-        self.scan_stall_fallback_used = false;
         self.last_scan_progress_at = Some(Instant::now());
         self.last_scanned_for_stall = 0;
         self.kick_refresh()
@@ -626,16 +623,6 @@ impl Home {
         if let Ok(sync) = api::sync_status(WALLET_ID) {
             self.persist_scan_cache_at(sync.last_scanned);
         }
-    }
-
-    fn start_stall_fallback_scan(&mut self) -> api::Result<()> {
-        self.persist_scan_cache();
-        let _ = api::refresh_cancel(WALLET_ID);
-        scan_tuning::apply_stall_fallback();
-        self.scan_stall_fallback_used = true;
-        self.last_scan_progress_at = Some(Instant::now());
-        self.status = l10n::t("Scan stalled · retrying with smaller batches…").into();
-        self.kick_refresh()
     }
 
     fn live_rate(&self) -> Option<&fiat::Rate> {
@@ -1844,7 +1831,6 @@ impl Home {
         self.scan_was_running = false;
         self.last_scan_error = None;
         self.scan_rate.reset();
-        self.scan_stall_fallback_used = false;
         self.last_scan_progress_at = None;
         self.last_scanned_for_stall = 0;
         self.address_copied_at = None;
@@ -2262,29 +2248,26 @@ impl Home {
                                 .last_scan_progress_at
                                 .is_some_and(|t| t.elapsed() >= Duration::from_secs(2));
                         if remaining > 3 && (stalled || recoverable) {
-                            if !self.scan_stall_fallback_used {
-                                if let Err(err) = self.start_stall_fallback_scan() {
-                                    self.scan_needs_retry = true;
-                                    self.last_scan_error = Some(err.to_string());
-                                    self.status =
-                                        format!("Scan stalled: {err}. Wallet → Retry sync.").into();
-                                }
-                            } else if stalled {
-                                self.persist_scan_cache();
-                                let _ = api::refresh_cancel(WALLET_ID);
-                                self.scan_needs_retry = true;
-                                self.last_scan_error = Some(format!(
+                            self.persist_scan_cache();
+                            let _ = api::refresh_cancel(WALLET_ID);
+                            self.scan_needs_retry = true;
+                            self.last_scan_error = Some(if recoverable {
+                                api::last_error().unwrap_or_else(|| {
+                                    "Recoverable RPC failure; retry without changing the scan profile.".to_string()
+                                })
+                            } else {
+                                format!(
                                     "Sync stalled: no scan progress for over {}s (lastScanned={}, target={})",
                                     scan_tuning::STALL_SECS,
                                     sync.last_scanned,
                                     sync.chain_height
-                                ));
-                                self.status = format!(
-                                    "Scan stalled at {} / {}. Wallet → Retry sync.",
-                                    sync.last_scanned, sync.chain_height
                                 )
-                                .into();
-                            }
+                            });
+                            self.status = format!(
+                                "Scan stopped at {} / {}. Wallet → Retry sync.",
+                                sync.last_scanned, sync.chain_height
+                            )
+                            .into();
                         }
                     }
                     RefreshJob::Idle => {

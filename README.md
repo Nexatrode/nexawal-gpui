@@ -66,10 +66,15 @@ cargo build --release
 
 ### Scan benchmark
 
+Normal scans use WalletCore's shared `range/75/75` defaults. The optional
+`NEXAWAL_SCAN_PROFILE` environment variable can explicitly select a diagnostic
+profile; normal scan failures are surfaced for a manual retry instead of silently
+switching batch sizes.
+
 With an opened wallet, use **Settings → Run scan benchmark** to stop the current
 sync and run three shuffled six-second samples for each of the 25, 50, 75, 100, 125,
-150, and 500-block profiles. The `fast` and `cuprate` labels both represent the
-current 500-block setting. When the configured endpoint is one of the Nexatrode production
+150, and 500-block diagnostic profiles. The `fast` and `cuprate` labels both represent
+the 500-block diagnostic setting. When the configured endpoint is one of the Nexatrode production
 hosts, the benchmark tests both `rpc.nexatrode.com` and `monero.nexatrode.com`; custom endpoints are tested by themselves. Results are appended to
 `scan_benchmarks.jsonl` in the platform's NexaWal data directory. Set
 `NEXAWAL_BENCHMARK_NODES` to a comma-separated list to override the endpoints.
