@@ -71,6 +71,10 @@ Normal scans use WalletCore's shared `range/75/75` defaults. The optional
 profile; normal scan failures are surfaced for a manual retry instead of silently
 switching batch sizes.
 
+Settings includes scan maintenance controls: **Clear scan cache** removes the
+desktop checkpoint without changing wallet keys, while **Rescan from height**
+clears tracked scan state and restarts from the selected block after confirmation.
+
 With an opened wallet, use **Settings → Run scan benchmark** to stop the current
 sync and run three shuffled six-second samples for each of the 25, 50, 75, 100, 125,
 150, and 500-block diagnostic profiles. The `fast` and `cuprate` labels both represent

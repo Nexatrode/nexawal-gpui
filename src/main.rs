@@ -83,6 +83,7 @@ fn should_auto_unlock_stored() -> bool {
 enum Field {
     Seed,
     Height,
+    RescanHeight,
     Dest,
     Amount,
     Node,
@@ -111,15 +112,23 @@ enum Screen {
     Legal,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MaintenanceAction {
+    ClearCache,
+    Rescan,
+}
+
 struct Home {
     core_version: SharedString,
     node_url: String,
     seed: String,
     restore_height_text: String,
+    rescan_height_text: String,
     active: Field,
     ui_focus: FocusHandle,
     seed_focus: FocusHandle,
     height_focus: FocusHandle,
+    rescan_height_focus: FocusHandle,
     dest_focus: FocusHandle,
     amount_focus: FocusHandle,
     node_focus: FocusHandle,
@@ -162,6 +171,7 @@ struct Home {
     last_scanned_for_stall: u64,
     benchmark_running: bool,
     benchmark_status: Option<SharedString>,
+    maintenance_confirmation: Option<MaintenanceAction>,
     address_copied_at: Option<Instant>,
     send_dest: String,
     send_amount: String,
@@ -231,10 +241,12 @@ impl Home {
                     "0".into()
                 }
             },
+            rescan_height_text: paths::load_restore_height().to_string(),
             active: Field::Seed,
             ui_focus: cx.focus_handle(),
             seed_focus: cx.focus_handle(),
             height_focus: cx.focus_handle(),
+            rescan_height_focus: cx.focus_handle(),
             dest_focus: cx.focus_handle(),
             amount_focus: cx.focus_handle(),
             node_focus: cx.focus_handle(),
@@ -290,6 +302,7 @@ impl Home {
             last_scanned_for_stall: 0,
             benchmark_running: false,
             benchmark_status: None,
+            maintenance_confirmation: None,
             address_copied_at: None,
             send_dest: String::new(),
             send_amount: String::new(),
@@ -327,6 +340,10 @@ impl Home {
 
     fn restore_height(&self) -> u64 {
         self.restore_height_text.trim().parse().unwrap_or(0)
+    }
+
+    fn rescan_height(&self) -> u64 {
+        self.rescan_height_text.trim().parse().unwrap_or(0)
     }
 
     fn word_count(&self) -> usize {
@@ -826,11 +843,129 @@ impl Home {
         cx.notify();
     }
 
+    fn request_clear_scan_cache(&mut self, cx: &mut Context<Self>) {
+        if !self.opened {
+            self.status = l10n::t("Open a wallet before clearing its scan cache.").into();
+            cx.notify();
+            return;
+        }
+        self.maintenance_confirmation = Some(MaintenanceAction::ClearCache);
+        self.status = l10n::t("Confirm clearing the local scan cache below.").into();
+        cx.notify();
+    }
+
+    fn request_rescan(&mut self, cx: &mut Context<Self>) {
+        if !self.opened {
+            self.status = l10n::t("Open a wallet before starting a rescan.").into();
+            cx.notify();
+            return;
+        }
+        let height = self.rescan_height();
+        if let Ok(sync) = api::sync_status(WALLET_ID) {
+            if sync.chain_height > 0 && height > sync.chain_height {
+                self.status = format!(
+                    "Rescan height {} is above the observed chain height {}.",
+                    height, sync.chain_height
+                )
+                .into();
+                cx.notify();
+                return;
+            }
+        }
+        self.maintenance_confirmation = Some(MaintenanceAction::Rescan);
+        self.status = format!("Confirm rescanning from block {} below.", height).into();
+        cx.notify();
+    }
+
+    fn cancel_maintenance(&mut self, cx: &mut Context<Self>) {
+        self.maintenance_confirmation = None;
+        self.status = l10n::t("Maintenance action cancelled.").into();
+        cx.notify();
+    }
+
+    fn confirm_maintenance(&mut self, cx: &mut Context<Self>) {
+        let Some(action) = self.maintenance_confirmation.take() else {
+            return;
+        };
+        match action {
+            MaintenanceAction::ClearCache => self.clear_scan_cache(cx),
+            MaintenanceAction::Rescan => self.rescan_from_height(cx),
+        }
+    }
+
+    fn clear_scan_cache(&mut self, cx: &mut Context<Self>) {
+        let was_running = matches!(api::refresh_job(WALLET_ID), RefreshJob::Running);
+        let _ = api::refresh_cancel(WALLET_ID);
+        let removed = fs::remove_file(paths::cache_path()).is_ok();
+        self.last_exported_scanned = None;
+        self.last_cache_persist_at = None;
+        self.scan_was_running = false;
+        self.scan_needs_retry = was_running;
+        self.last_scan_error =
+            was_running.then(|| "Sync cancelled while the local cache was cleared.".to_string());
+        self.status = if removed {
+            if was_running {
+                l10n::t("Local scan cache cleared. Sync cancelled; use Retry sync to continue.")
+            } else {
+                l10n::t("Local scan cache cleared.")
+            }
+        } else {
+            l10n::t("No local scan cache was present.")
+        }
+        .into();
+        self.poll_core();
+        cx.notify();
+    }
+
+    fn rescan_from_height(&mut self, cx: &mut Context<Self>) {
+        if !self.opened {
+            self.status = l10n::t("Open a wallet before starting a rescan.").into();
+            cx.notify();
+            return;
+        }
+        let height = self.rescan_height();
+        let _ = api::refresh_cancel(WALLET_ID);
+        if let Err(err) = api::force_rescan_from_height(WALLET_ID, height) {
+            self.status = format!("Could not prepare rescan: {err}").into();
+            cx.notify();
+            return;
+        }
+        let _ = fs::remove_file(paths::cache_path());
+        let _ = paths::save_restore_height(height);
+        self.restore_height_text = height.to_string();
+        self.rescan_height_text = height.to_string();
+        self.sync = api::sync_status(WALLET_ID).ok();
+        self.total_piconero = 0;
+        self.unlocked_piconero = 0;
+        self.transfers.clear();
+        self.last_exported_scanned = None;
+        self.last_cache_persist_at = None;
+        self.last_balance_poll_at = None;
+        self.last_transfers_poll_at = None;
+        self.scan_was_running = false;
+        self.scan_needs_retry = false;
+        self.last_scan_error = None;
+        self.scan_rate.reset();
+        self.last_scan_progress_at = Some(Instant::now());
+        self.last_scanned_for_stall = height;
+        self.apply_scan_proxy();
+        if let Err(err) = self.start_fast_scan() {
+            self.scan_needs_retry = true;
+            self.last_scan_error = Some(err.to_string());
+            self.status = format!("Rescan prepared, but refresh failed: {err}").into();
+        } else {
+            self.status = format!("Rescanning from block {}…", height).into();
+            self.start_poll(cx);
+        }
+        cx.notify();
+    }
+
     fn focus_field(&mut self, field: Field, window: &mut Window, cx: &mut Context<Self>) {
         self.active = field;
         match field {
             Field::Seed => self.seed_focus.focus(window, cx),
             Field::Height => self.height_focus.focus(window, cx),
+            Field::RescanHeight => self.rescan_height_focus.focus(window, cx),
             Field::Dest => self.dest_focus.focus(window, cx),
             Field::Amount => self.amount_focus.focus(window, cx),
             Field::Node => self.node_focus.focus(window, cx),
@@ -848,6 +983,7 @@ impl Home {
         match self.active {
             Field::Seed => &mut self.seed,
             Field::Height => &mut self.restore_height_text,
+            Field::RescanHeight => &mut self.rescan_height_text,
             Field::Dest => &mut self.send_dest,
             Field::Amount => &mut self.send_amount,
             Field::Node => &mut self.node_url,
@@ -883,7 +1019,10 @@ impl Home {
             };
         }
         if self.screen == Screen::Settings
-            && !matches!(self.active, Field::Node | Field::I2pNode | Field::I2pProxy)
+            && !matches!(
+                self.active,
+                Field::Node | Field::I2pNode | Field::I2pProxy | Field::RescanHeight
+            )
         {
             self.active = Field::Node;
         }
@@ -950,6 +1089,13 @@ impl Home {
                     self.restore_height_text = "0".into();
                 }
                 self.status = format!("Restore height {}.", self.restore_height()).into();
+            }
+            Field::RescanHeight => {
+                self.rescan_height_text = text.chars().filter(|c| c.is_ascii_digit()).collect();
+                if self.rescan_height_text.is_empty() {
+                    self.rescan_height_text = "0".into();
+                }
+                self.status = format!("Rescan height {}.", self.rescan_height()).into();
             }
             Field::Dest => {
                 let trimmed = text.trim();
@@ -1023,6 +1169,7 @@ impl Home {
         let text = match self.active {
             Field::Seed => self.seed.clone(),
             Field::Height => self.restore_height_text.clone(),
+            Field::RescanHeight => self.rescan_height_text.clone(),
             Field::Dest => self.send_dest.clone(),
             Field::Amount => self.send_amount.clone(),
             Field::Node => self.node_url.clone(),
@@ -1380,6 +1527,9 @@ impl Home {
         if self.active == Field::Height {
             self.restore_height_text = "0".into();
         }
+        if self.active == Field::RescanHeight {
+            self.rescan_height_text = "0".into();
+        }
         if self.active == Field::Dest || self.active == Field::Amount {
             self.send_max = false;
             self.clear_send_preview();
@@ -1427,6 +1577,12 @@ impl Home {
                 self.restore_height_text.pop();
                 if self.restore_height_text.is_empty() {
                     self.restore_height_text = "0".into();
+                }
+            }
+            Field::RescanHeight => {
+                self.rescan_height_text.pop();
+                if self.rescan_height_text.is_empty() {
+                    self.rescan_height_text = "0".into();
                 }
             }
             Field::Dest => {
@@ -1499,6 +1655,17 @@ impl Home {
                     self.restore_height_text = digits;
                 } else {
                     self.restore_height_text.push_str(&digits);
+                }
+            }
+            Field::RescanHeight => {
+                let digits: String = ch.chars().filter(|c| c.is_ascii_digit()).collect();
+                if digits.is_empty() {
+                    return;
+                }
+                if self.rescan_height_text == "0" {
+                    self.rescan_height_text = digits;
+                } else {
+                    self.rescan_height_text.push_str(&digits);
                 }
             }
             Field::Dest => {
@@ -1654,6 +1821,7 @@ impl Home {
         self.screen = Screen::Wallet;
         self.scan_needs_retry = scan_error.is_some();
         self.mnemonic = mnemonic.to_string();
+        self.rescan_height_text = restore_height.to_string();
         self.created_seed = false;
         self.wrote_seed_down = false;
         self.challenge_indices.clear();
@@ -1850,11 +2018,13 @@ impl Home {
         self.qr_image = None;
         self.seed.clear();
         self.mnemonic.clear();
+        self.rescan_height_text = "0".into();
         self.created_seed = false;
         self.wrote_seed_down = false;
         self.challenge_indices.clear();
         self.challenge_answers = Default::default();
         self.challenge_slot = 0;
+        self.maintenance_confirmation = None;
         self.receive_address = "".into();
         self.has_stored = wallet_store::is_marked_stored();
         self.show_restore_form = !self.has_stored;
@@ -3605,6 +3775,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
     let node_focused = home.node_focus.is_focused(window);
     let i2p_node_focused = home.i2p_rpc_focus.is_focused(window);
     let i2p_proxy_focused = home.i2p_proxy_focus.is_focused(window);
+    let rescan_height_focused = home.rescan_height_focus.is_focused(window);
     div()
         .flex()
         .flex_col()
@@ -3767,6 +3938,95 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                     .text_xs()
                     .text_color(rgb(MUTED))
                     .child("Optional. Fetches XMR/USD from api.kraken.com and, if needed, FX from api.frankfurter.dev. Those servers see your IP. Amounts and addresses are not sent."),
+            )
+        })
+        .child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("Scan maintenance")))
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(MUTED))
+                .child(l10n::t("Clear the local cache without changing wallet keys, or rescan from a chosen block.")),
+        )
+        .child(
+            div()
+                .id("settings-rescan-height")
+                .key_context("Field")
+                .track_focus(&home.rescan_height_focus)
+                .cursor(CursorStyle::IBeam)
+                .h(px(36.))
+                .px_3()
+                .rounded_md()
+                .bg(rgb(FIELD))
+                .border_1()
+                .border_color(rgb(if rescan_height_focused { ACCENT } else { 0x2A3A2A }))
+                .flex()
+                .items_center()
+                .text_sm()
+                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                    this.focus_field(Field::RescanHeight, window, cx);
+                }))
+                .child(home.rescan_height_text.clone()),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .gap_2()
+                .child(action_button(
+                    "settings-clear-scan-cache",
+                    l10n::t("Clear scan cache"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.request_clear_scan_cache(cx);
+                    }),
+                ))
+                .child(action_button(
+                    "settings-rescan",
+                    l10n::t("Rescan from height"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.request_rescan(cx);
+                    }),
+                )),
+        )
+        .when(home.maintenance_confirmation.is_some(), |card| {
+            let message = match home.maintenance_confirmation {
+                Some(MaintenanceAction::ClearCache) => {
+                    l10n::t("This cancels an active scan and deletes only the local scan cache. Continue?")
+                }
+                Some(MaintenanceAction::Rescan) => format!(
+                    "This clears tracked wallet state and starts a full rescan from block {}. Continue?",
+                    home.rescan_height()
+                )
+                .into(),
+                None => "".into(),
+            };
+            card.child(
+                div()
+                    .p_3()
+                    .rounded_md()
+                    .bg(rgb(FIELD))
+                    .text_xs()
+                    .text_color(rgb(MUTED))
+                    .child(message),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .gap_2()
+                    .child(action_button(
+                        "maintenance-confirm",
+                        l10n::t("Confirm"),
+                        cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.confirm_maintenance(cx);
+                        }),
+                    ))
+                    .child(action_button(
+                        "maintenance-cancel",
+                        l10n::t("Cancel"),
+                        cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.cancel_maintenance(cx);
+                        }),
+                    )),
             )
         })
         .child(action_button(

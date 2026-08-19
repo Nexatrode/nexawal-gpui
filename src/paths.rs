@@ -175,6 +175,10 @@ pub fn load_restore_height() -> u64 {
         .unwrap_or(0)
 }
 
+pub fn save_restore_height(height: u64) -> std::io::Result<()> {
+    write_bytes(restore_height_path(), height.to_string().as_bytes())
+}
+
 pub fn clear_wallet_slot() {
     let _ = fs::remove_file(wallet_slot_path());
     let _ = fs::remove_file(restore_height_path());
