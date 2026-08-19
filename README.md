@@ -74,8 +74,13 @@ hosts, the benchmark tests both `rpc.nexatrode.com` and `monero.nexatrode.com`; 
 `scan_benchmarks.jsonl` in the platform's NexaWal data directory. Set
 `NEXAWAL_BENCHMARK_NODES` to a comma-separated list to override the endpoints.
 `NEXAWAL_BENCHMARK_REPETITIONS` and `NEXAWAL_BENCHMARK_SECONDS` can override the
-default repetition count and sample duration. Samples below 40 blocks/sec are marked
-as `stalled` and excluded from the usable average; override that threshold with
+default repetition count and sample duration. By default, five seconds of cooldown
+are inserted between samples; override that with `NEXAWAL_BENCHMARK_COOLDOWN_SECS`
+(set it to `0` to disable the pause). Set `NEXAWAL_BENCHMARK_START_HEIGHT` to a
+fixed height when comparing separate runs so every run scans the same historical
+range; otherwise the benchmark starts 10,000 blocks before the current wallet
+checkpoint. Samples below 40 blocks/sec are marked `stalled` and excluded from the
+usable average; override that threshold with
 `NEXAWAL_BENCHMARK_STALL_BPS` when testing a slower connection. Each JSONL record
 also includes WalletCore batch timing, actual returned blocks, binary-RPC request and
 response byte totals, RPC errors, and retry counts. The raw opt-in binary-RPC trace is

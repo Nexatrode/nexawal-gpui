@@ -25,6 +25,7 @@ const PROFILE_NAMES: [&str; 8] = [
 ];
 const DEFAULT_REPETITIONS: usize = 3;
 const DEFAULT_WINDOW_SECS: u64 = 6;
+const DEFAULT_COOLDOWN_SECS: u64 = 5;
 const CANCEL_WAIT: Duration = Duration::from_secs(3);
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
 const DEFAULT_STALL_BPS: f64 = 40.0;
@@ -128,8 +129,9 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
         std::env::set_var("WALLETCORE_RPC_TELEMETRY_PATH", &rpc_telemetry_path);
     }
     let nodes = targets_for(&node_url);
-    let (repetitions, profile_window) = benchmark_config();
+    let (repetitions, profile_window, cooldown) = benchmark_config();
     let mut results = Vec::with_capacity(PROFILE_NAMES.len() * nodes.len() * repetitions);
+    let mut sample_count = 0usize;
 
     // The caller has already requested cancellation. Give WalletCore a short grace
     // period so the benchmark does not compete with the user's prior scan.
@@ -139,6 +141,9 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
         for repetition in 0..repetitions {
             let profile_order = shuffled_profiles(run_id, node_index, repetition);
             for (order, profile_name) in profile_order.iter().enumerate() {
+                if sample_count > 0 && !cooldown.is_zero() {
+                    thread::sleep(cooldown);
+                }
                 let sample_index = results.len();
                 let wallet_id = format!("nexawal-benchmark-{run_id}-{sample_index}");
                 let result = run_profile(
@@ -151,6 +156,7 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
                     repetition + 1,
                     order + 1,
                 );
+                sample_count += 1;
                 let line = json!({
                     "timestamp_ms": result.started_at_ms,
                     "node": target,
@@ -174,6 +180,7 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
                     "rpc_elapsed_ms": result.rpc_elapsed_ms,
                     "rpc_errors": result.rpc_errors,
                     "retries": result.retries,
+                    "cooldown_secs": cooldown.as_secs(),
                     "stalled": result.stalled,
                     "sample_quality": if result.stalled {
                         "stall"
@@ -502,7 +509,7 @@ fn benchmark_stall_bps() -> f64 {
         .min(10_000.0)
 }
 
-fn benchmark_config() -> (usize, Duration) {
+fn benchmark_config() -> (usize, Duration, Duration) {
     let repetitions = std::env::var("NEXAWAL_BENCHMARK_REPETITIONS")
         .ok()
         .and_then(|value| value.trim().parse().ok())
@@ -513,7 +520,16 @@ fn benchmark_config() -> (usize, Duration) {
         .and_then(|value| value.trim().parse().ok())
         .unwrap_or(DEFAULT_WINDOW_SECS)
         .clamp(2, 60);
-    (repetitions, Duration::from_secs(seconds))
+    let cooldown_secs = std::env::var("NEXAWAL_BENCHMARK_COOLDOWN_SECS")
+        .ok()
+        .and_then(|value| value.trim().parse().ok())
+        .unwrap_or(DEFAULT_COOLDOWN_SECS)
+        .clamp(0, 60);
+    (
+        repetitions,
+        Duration::from_secs(seconds),
+        Duration::from_secs(cooldown_secs),
+    )
 }
 
 fn shuffled_profiles(run_id: u64, node_index: usize, repetition: usize) -> [&'static str; 8] {

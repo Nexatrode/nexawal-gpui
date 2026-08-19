@@ -1781,10 +1781,14 @@ impl Home {
             return;
         }
 
-        let baseline = api::sync_status(WALLET_ID).ok();
-        let start_height = baseline
+        let baseline_start_height = api::sync_status(WALLET_ID)
+            .ok()
             .map(|sync| sync.last_scanned.saturating_sub(10_000))
             .unwrap_or_default();
+        let start_height = std::env::var("NEXAWAL_BENCHMARK_START_HEIGHT")
+            .ok()
+            .and_then(|value| value.trim().parse::<u64>().ok())
+            .unwrap_or(baseline_start_height);
         let node = self.scan_node_url();
         let mnemonic = self.mnemonic.clone();
         let run_id = benchmark::run_id();
@@ -1794,8 +1798,8 @@ impl Home {
         self.benchmark_status = None;
         self.scan_needs_retry = false;
         self.status = format!(
-            "Stopping the current sync · testing 10,000 recent blocks on {}…",
-            node
+            "Stopping the current sync · benchmarking from block {} on {}…",
+            start_height, node
         )
         .into();
         cx.notify();
