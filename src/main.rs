@@ -51,6 +51,7 @@ actions!(
         BackspaceField,
         OpenWallet,
         RetrySync,
+        FocusHistorySearch,
         CopyAddress,
         ShowReceive,
         ShowSend,
@@ -761,6 +762,17 @@ impl Home {
         cx.write_to_clipboard(gpui::ClipboardItem::new_string(row.txid.clone()));
         self.status = l10n::t("Transaction ID copied.").into();
         cx.notify();
+    }
+
+    fn focus_history_search(
+        &mut self,
+        _: &FocusHistorySearch,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.opened && self.screen == Screen::Wallet {
+            self.focus_field(Field::TransferSearch, window, cx);
+        }
     }
 
     fn export_transfer_history(&mut self, cx: &mut Context<Self>) {
@@ -2707,12 +2719,23 @@ impl Render for Home {
             .on_action(cx.listener(Self::backspace_field))
             .on_action(cx.listener(Self::open_wallet))
             .on_action(cx.listener(Self::retry_sync))
+            .on_action(cx.listener(Self::focus_history_search))
             .on_action(cx.listener(Self::copy_address_action))
             .on_action(cx.listener(Self::show_receive))
             .on_action(cx.listener(Self::show_send))
             .on_action(cx.listener(Self::show_wallet))
             .on_action(cx.listener(Self::show_settings))
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+                if event.keystroke.key == "escape"
+                    && this.screen == Screen::Wallet
+                    && this.active == Field::TransferSearch
+                    && !this.transfer_search.is_empty()
+                {
+                    this.transfer_search.clear();
+                    this.selected_transfer = None;
+                    cx.notify();
+                    return;
+                }
                 this.insert_typed(event, cx);
             }))
             .child(header(self))
@@ -4793,6 +4816,7 @@ fn install_menus(cx: &mut App) {
         Menu::new("Wallet").items([
             MenuItem::action("Open & sync", OpenWallet),
             MenuItem::action("Retry sync", RetrySync),
+            MenuItem::action("Find transaction", FocusHistorySearch),
             MenuItem::action("Copy address", CopyAddress),
             MenuItem::action("Receive", ShowReceive),
             MenuItem::action("Send", ShowSend),
@@ -4830,6 +4854,8 @@ fn main() {
             KeyBinding::new("cmd-m", Minimize, None),
             KeyBinding::new("cmd-v", PasteField, None),
             KeyBinding::new("ctrl-v", PasteField, None),
+            KeyBinding::new("cmd-f", FocusHistorySearch, None),
+            KeyBinding::new("ctrl-f", FocusHistorySearch, None),
             KeyBinding::new("cmd-c", CopyField, None),
             KeyBinding::new("ctrl-c", CopyField, None),
             KeyBinding::new("cmd-x", CutField, None),
