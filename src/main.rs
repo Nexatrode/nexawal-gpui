@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::fs;
+use std::ops::Range;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering as AtomicOrdering};
 use std::time::{Duration, Instant};
@@ -8,9 +9,10 @@ use std::time::{Duration, Instant};
 use gpui::SystemMenuType;
 use gpui::{
     App, Bounds, ClickEvent, ClipboardEntry, Context, CursorStyle, FocusHandle, Focusable,
-    ImageSource, KeyBinding, KeyDownEvent, Menu, MenuItem, MouseButton, ObjectFit, OsAction,
-    PathPromptOptions, RenderImage, ResizeEdge, SharedString, TitlebarOptions, Window,
-    WindowBounds, WindowOptions, actions, div, img, prelude::*, px, relative, rgb, size,
+    ImageSource, KeyBinding, KeyDownEvent, Menu, MenuItem, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, ObjectFit, OsAction, PathPromptOptions, RenderImage, ResizeEdge,
+    ScrollHandle, SharedString, TitlebarOptions, Window, WindowBounds, WindowOptions, actions, div,
+    img, prelude::*, px, relative, rgb, size,
 };
 use gpui_platform::application;
 use monerowalletcore::api::{self, RefreshJob, SyncStatus, Transfer};
@@ -33,6 +35,7 @@ mod scan_tuning;
 mod seed_backup;
 mod send_flow;
 mod sync_status;
+mod text_field;
 mod uri;
 mod wallet_store;
 
@@ -50,6 +53,15 @@ actions!(
         CutField,
         SelectAllField,
         BackspaceField,
+        DeleteField,
+        MoveLeft,
+        MoveRight,
+        SelectLeft,
+        SelectRight,
+        MoveHome,
+        MoveEnd,
+        SelectHome,
+        SelectEnd,
         OpenWallet,
         RetrySync,
         FocusHistorySearch,
@@ -324,6 +336,15 @@ struct Home {
     challenge_focus: FocusHandle,
     i2p_rpc_focus: FocusHandle,
     i2p_proxy_focus: FocusHandle,
+    edit_field: Option<Field>,
+    edit_selection: Range<usize>,
+    edit_selection_reversed: bool,
+    edit_marked_range: Option<Range<usize>>,
+    edit_last_layout: Option<gpui::ShapedLine>,
+    edit_last_bounds: Option<Bounds<gpui::Pixels>>,
+    edit_dragging: bool,
+    main_scroll_handle: ScrollHandle,
+    history_scroll_handle: ScrollHandle,
     status: SharedString,
     opened: bool,
     screen: Screen,
@@ -454,6 +475,15 @@ impl Home {
             challenge_focus: cx.focus_handle(),
             i2p_rpc_focus: cx.focus_handle(),
             i2p_proxy_focus: cx.focus_handle(),
+            edit_field: None,
+            edit_selection: 0..0,
+            edit_selection_reversed: false,
+            edit_marked_range: None,
+            edit_last_layout: None,
+            edit_last_bounds: None,
+            edit_dragging: false,
+            main_scroll_handle: ScrollHandle::new(),
+            history_scroll_handle: ScrollHandle::new(),
             status: if should_auto_unlock {
                 l10n::t("Unlocking Wallet...").into()
             } else if has_stored {
@@ -1298,6 +1328,15 @@ impl Home {
     }
 
     fn focus_field(&mut self, field: Field, window: &mut Window, cx: &mut Context<Self>) {
+        if self.edit_field != Some(field) {
+            let end = self.field_text(field).len();
+            self.edit_field = Some(field);
+            self.edit_selection = end..end;
+            self.edit_selection_reversed = false;
+            self.edit_marked_range = None;
+            self.edit_last_layout = None;
+            self.edit_last_bounds = None;
+        }
         self.active = field;
         match field {
             Field::Seed => self.seed_focus.focus(window, cx),
@@ -1317,25 +1356,279 @@ impl Home {
         cx.notify();
     }
 
-    fn active_text_mut(&mut self) -> &mut String {
-        match self.active {
-            Field::Seed => &mut self.seed,
-            Field::Height => &mut self.restore_height_text,
-            Field::RescanHeight => &mut self.rescan_height_text,
-            Field::Dest => &mut self.send_dest,
-            Field::Amount => &mut self.send_amount,
-            Field::Node => &mut self.node_url,
-            Field::RecvAmount => &mut self.recv_amount,
-            Field::RecvDesc => &mut self.recv_desc,
-            Field::RecvLabel => &mut self.recv_label,
-            Field::TransferSearch => &mut self.transfer_search,
+    fn field_text(&self, field: Field) -> String {
+        self.field_text_at(field, None)
+    }
+
+    fn field_text_at(&self, field: Field, challenge_slot: Option<usize>) -> String {
+        match field {
+            Field::Seed => self.seed.clone(),
+            Field::Height => self.restore_height_text.clone(),
+            Field::RescanHeight => self.rescan_height_text.clone(),
+            Field::Dest => self.send_dest.clone(),
+            Field::Amount => self.send_amount.clone(),
+            Field::Node => self.node_url.clone(),
+            Field::RecvAmount => self.recv_amount.clone(),
+            Field::RecvDesc => self.recv_desc.clone(),
+            Field::RecvLabel => self.recv_label.clone(),
+            Field::TransferSearch => self.transfer_search.clone(),
+            Field::Challenge => {
+                self.challenge_answers[challenge_slot.unwrap_or(self.challenge_slot).min(2)].clone()
+            }
+            Field::I2pNode => self.i2p_rpc.clone(),
+            Field::I2pProxy => self.i2p_proxy.clone(),
+        }
+    }
+
+    fn focus_handle_for(&self, field: Field) -> &FocusHandle {
+        match field {
+            Field::Seed => &self.seed_focus,
+            Field::Height => &self.height_focus,
+            Field::RescanHeight => &self.rescan_height_focus,
+            Field::Dest => &self.dest_focus,
+            Field::Amount => &self.amount_focus,
+            Field::Node => &self.node_focus,
+            Field::RecvAmount => &self.recv_amount_focus,
+            Field::RecvDesc => &self.recv_desc_focus,
+            Field::RecvLabel => &self.recv_label_focus,
+            Field::TransferSearch => &self.transfer_search_focus,
+            Field::Challenge => &self.challenge_focus,
+            Field::I2pNode => &self.i2p_rpc_focus,
+            Field::I2pProxy => &self.i2p_proxy_focus,
+        }
+    }
+
+    fn reset_edit_cursor(&mut self, field: Field) {
+        let end = self.field_text(field).len();
+        self.edit_field = Some(field);
+        self.edit_selection = end..end;
+        self.edit_selection_reversed = false;
+        self.edit_marked_range = None;
+        self.edit_last_layout = None;
+        self.edit_last_bounds = None;
+    }
+
+    fn place_edit_cursor(
+        &mut self,
+        field: Field,
+        position: gpui::Point<gpui::Pixels>,
+        extend: bool,
+        cx: &mut Context<Self>,
+    ) {
+        if self.edit_field != Some(field) {
+            return;
+        }
+        let (Some(bounds), Some(line)) = (
+            self.edit_last_bounds.as_ref(),
+            self.edit_last_layout.as_ref(),
+        ) else {
+            return;
+        };
+        let offset = line
+            .closest_index_for_x(position.x - bounds.left())
+            .min(self.field_text(field).len());
+        if extend {
+            self.select_edit_to(offset, cx);
+        } else {
+            self.move_edit_cursor(offset, cx);
+        }
+    }
+
+    fn edit_cursor_offset(&self) -> usize {
+        if self.edit_selection_reversed {
+            self.edit_selection.start
+        } else {
+            self.edit_selection.end
+        }
+    }
+
+    fn previous_edit_boundary(&self, offset: usize) -> usize {
+        use unicode_segmentation::UnicodeSegmentation;
+        self.field_text(self.active)
+            .grapheme_indices(true)
+            .rev()
+            .find_map(|(index, _)| (index < offset).then_some(index))
+            .unwrap_or(0)
+    }
+
+    fn next_edit_boundary(&self, offset: usize) -> usize {
+        use unicode_segmentation::UnicodeSegmentation;
+        let text = self.field_text(self.active);
+        text.grapheme_indices(true)
+            .find_map(|(index, _)| (index > offset).then_some(index))
+            .unwrap_or(text.len())
+    }
+
+    fn move_edit_cursor(&mut self, offset: usize, cx: &mut Context<Self>) {
+        self.edit_selection = offset..offset;
+        self.edit_selection_reversed = false;
+        self.edit_marked_range = None;
+        cx.notify();
+    }
+
+    fn select_edit_to(&mut self, offset: usize, cx: &mut Context<Self>) {
+        if self.edit_selection_reversed {
+            self.edit_selection.start = offset;
+        } else {
+            self.edit_selection.end = offset;
+        }
+        if self.edit_selection.end < self.edit_selection.start {
+            self.edit_selection = self.edit_selection.end..self.edit_selection.start;
+            self.edit_selection_reversed = !self.edit_selection_reversed;
+        }
+        cx.notify();
+    }
+
+    fn set_field_text_raw(&mut self, field: Field, text: String) {
+        match field {
+            Field::Seed => {
+                self.seed = text;
+                self.mark_imported_seed();
+            }
+            Field::Height => self.restore_height_text = text,
+            Field::RescanHeight => self.rescan_height_text = text,
+            Field::Dest => {
+                self.send_dest = text;
+                self.clear_send_preview();
+            }
+            Field::Amount => {
+                self.send_amount = text;
+                self.send_max = false;
+                self.clear_send_preview();
+            }
+            Field::Node => {
+                self.node_url = text;
+                let _ = paths::save_node_url(&self.node_url);
+            }
+            Field::RecvAmount => self.recv_amount = text,
+            Field::RecvDesc => self.recv_desc = text,
+            Field::RecvLabel => {
+                self.recv_label = text;
+                self.persist_recv_label();
+            }
+            Field::TransferSearch => {
+                self.transfer_search = text.to_lowercase();
+                self.selected_transfer = None;
+            }
             Field::Challenge => {
                 let slot = self.challenge_slot.min(2);
-                &mut self.challenge_answers[slot]
+                self.challenge_answers[slot] = text;
             }
-            Field::I2pNode => &mut self.i2p_rpc,
-            Field::I2pProxy => &mut self.i2p_proxy,
+            Field::I2pNode => {
+                self.i2p_rpc = text;
+                let _ = paths::save_i2p_rpc(&self.i2p_rpc);
+            }
+            Field::I2pProxy => {
+                self.i2p_proxy = text;
+                let _ = paths::save_i2p_proxy(&self.i2p_proxy);
+            }
         }
+    }
+
+    fn sanitize_edit_text(field: Field, text: &str) -> String {
+        match field {
+            Field::Height | Field::RescanHeight => {
+                text.chars().filter(char::is_ascii_digit).collect()
+            }
+            Field::Amount | Field::RecvAmount => text
+                .chars()
+                .filter(|ch| ch.is_ascii_digit() || *ch == '.' || *ch == ',')
+                .map(|ch| if ch == ',' { '.' } else { ch })
+                .collect(),
+            Field::Challenge => text
+                .chars()
+                .filter(|ch| ch.is_ascii_alphabetic() || *ch == '\'')
+                .collect(),
+            _ => text.replace(['\n', '\r'], " "),
+        }
+    }
+
+    fn replace_edit_selection(&mut self, text: &str, cx: &mut Context<Self>) {
+        let field = self.active;
+        let current = self.field_text(field);
+        let start = self.edit_selection.start.min(current.len());
+        let end = self.edit_selection.end.min(current.len()).max(start);
+        if field == Field::Dest
+            && (current.is_empty() || (start == 0 && end == current.len()))
+            && let Some(payment) = uri::parse(text.trim())
+        {
+            self.send_dest = payment.address;
+            if let Some(amount) = payment.amount_xmr {
+                self.send_amount = amount;
+                self.send_max = false;
+            }
+            self.clear_send_preview();
+            self.status = l10n::t("Payment URI filled destination.").into();
+            self.reset_edit_cursor(field);
+            cx.notify();
+            return;
+        }
+        let replacement = Self::sanitize_edit_text(field, text);
+        let mut updated = String::with_capacity(current.len() + replacement.len());
+        updated.push_str(&current[..start]);
+        updated.push_str(&replacement);
+        updated.push_str(&current[end..]);
+        self.set_field_text_raw(field, updated);
+        let cursor = start + replacement.len();
+        self.edit_selection = cursor..cursor;
+        self.edit_selection_reversed = false;
+        self.edit_marked_range = None;
+        cx.notify();
+    }
+
+    fn move_left(&mut self, _: &MoveLeft, _window: &mut Window, cx: &mut Context<Self>) {
+        if !self.edit_selection.is_empty() {
+            let offset = self.edit_selection.start;
+            self.move_edit_cursor(offset, cx);
+        } else {
+            self.move_edit_cursor(self.previous_edit_boundary(self.edit_cursor_offset()), cx);
+        }
+    }
+
+    fn move_right(&mut self, _: &MoveRight, _window: &mut Window, cx: &mut Context<Self>) {
+        if !self.edit_selection.is_empty() {
+            let offset = self.edit_selection.end;
+            self.move_edit_cursor(offset, cx);
+        } else {
+            self.move_edit_cursor(self.next_edit_boundary(self.edit_cursor_offset()), cx);
+        }
+    }
+
+    fn select_left(&mut self, _: &SelectLeft, _window: &mut Window, cx: &mut Context<Self>) {
+        self.select_edit_to(self.previous_edit_boundary(self.edit_cursor_offset()), cx);
+    }
+
+    fn select_right(&mut self, _: &SelectRight, _window: &mut Window, cx: &mut Context<Self>) {
+        self.select_edit_to(self.next_edit_boundary(self.edit_cursor_offset()), cx);
+    }
+
+    fn select_home(&mut self, _: &SelectHome, _window: &mut Window, cx: &mut Context<Self>) {
+        self.select_edit_to(0, cx);
+    }
+
+    fn select_end(&mut self, _: &SelectEnd, _window: &mut Window, cx: &mut Context<Self>) {
+        self.select_edit_to(self.field_text(self.active).len(), cx);
+    }
+
+    fn move_home(&mut self, _: &MoveHome, _window: &mut Window, cx: &mut Context<Self>) {
+        self.move_edit_cursor(0, cx);
+    }
+
+    fn move_end(&mut self, _: &MoveEnd, _window: &mut Window, cx: &mut Context<Self>) {
+        self.move_edit_cursor(self.field_text(self.active).len(), cx);
+    }
+
+    fn delete_forward(&mut self, _: &DeleteField, window: &mut Window, cx: &mut Context<Self>) {
+        if self.edit_selection.is_empty() {
+            let start = self.edit_cursor_offset();
+            let end = self.next_edit_boundary(start);
+            if start == end {
+                window.play_system_bell();
+                return;
+            }
+            self.edit_selection = start..end;
+        }
+        self.replace_edit_selection("", cx);
     }
 
     fn paste_field(&mut self, _: &PasteField, _window: &mut Window, cx: &mut Context<Self>) {
@@ -1387,7 +1680,10 @@ impl Home {
             cx.notify();
             return;
         };
-        self.replace_active(text, cx);
+        if self.edit_field != Some(self.active) {
+            self.reset_edit_cursor(self.active);
+        }
+        self.replace_edit_selection(&text, cx);
     }
 
     fn paste_seed_button(&mut self, cx: &mut Context<Self>) {
@@ -1404,99 +1700,12 @@ impl Home {
         };
         self.seed = normalize_seed(&text);
         self.mark_imported_seed();
+        self.reset_edit_cursor(Field::Seed);
         self.status = format!(
             "Seed field has {} words. Set restore height, then Open & sync.",
             self.word_count()
         )
         .into();
-        cx.notify();
-    }
-
-    fn replace_active(&mut self, text: String, cx: &mut Context<Self>) {
-        match self.active {
-            Field::Seed => {
-                self.seed = normalize_seed(&text);
-                self.mark_imported_seed();
-                self.status = format!(
-                    "Seed field has {} words. Set restore height, then Open & sync.",
-                    self.word_count()
-                )
-                .into();
-            }
-            Field::Height => {
-                self.restore_height_text = text.chars().filter(|c| c.is_ascii_digit()).collect();
-                if self.restore_height_text.is_empty() {
-                    self.restore_height_text = "0".into();
-                }
-                self.status = format!("Restore height {}.", self.restore_height()).into();
-            }
-            Field::RescanHeight => {
-                self.rescan_height_text = text.chars().filter(|c| c.is_ascii_digit()).collect();
-                if self.rescan_height_text.is_empty() {
-                    self.rescan_height_text = "0".into();
-                }
-                self.status = format!("Rescan height {}.", self.rescan_height()).into();
-            }
-            Field::Dest => {
-                let trimmed = text.trim();
-                if let Some(uri) = uri::parse(trimmed) {
-                    self.send_dest = uri.address;
-                    if let Some(amt) = uri.amount_xmr {
-                        self.send_amount = amt;
-                        self.send_max = false;
-                    }
-                    self.clear_send_preview();
-                    self.status = l10n::t("Payment URI filled destination.").into();
-                } else {
-                    self.send_dest = trimmed.to_string();
-                    self.clear_send_preview();
-                    self.status = l10n::t("Destination filled.").into();
-                }
-            }
-            Field::Amount => {
-                self.send_amount = text.trim().replace(',', ".");
-                self.send_max = false;
-                self.clear_send_preview();
-                self.status = l10n::t("Amount filled.").into();
-            }
-            Field::Node => {
-                self.node_url = text.trim().to_string();
-                let _ = paths::save_node_url(&self.node_url);
-                self.status = format!("Node {}", self.node_url).into();
-            }
-            Field::RecvAmount => {
-                self.recv_amount = text.trim().replace(',', ".");
-                self.status = l10n::t("Receive amount updated.").into();
-            }
-            Field::RecvDesc => {
-                self.recv_desc = text;
-                self.status = l10n::t("Receive description updated.").into();
-            }
-            Field::RecvLabel => {
-                self.recv_label = text;
-                self.persist_recv_label();
-                self.status = l10n::t("Receive label updated.").into();
-            }
-            Field::TransferSearch => {
-                self.transfer_search = text.trim().to_lowercase();
-                self.selected_transfer = None;
-            }
-            Field::Challenge => {
-                let slot = self.challenge_slot.min(2);
-                self.challenge_answers[slot] = text.trim().to_string();
-                self.status = l10n::t("Seed confirmation updated.").into();
-            }
-            Field::I2pNode => {
-                self.i2p_rpc = text.trim().to_string();
-                let _ = paths::save_i2p_rpc(&self.i2p_rpc);
-                self.status = l10n::t("I2P node updated.").into();
-            }
-            Field::I2pProxy => {
-                self.i2p_proxy = text.trim().to_string();
-                let _ = paths::save_i2p_proxy(&self.i2p_proxy);
-                self.status = l10n::t("I2P HTTP proxy updated.").into();
-            }
-        }
         cx.notify();
     }
 
@@ -1511,20 +1720,25 @@ impl Home {
             self.copy_address(cx);
             return;
         }
-        let text = match self.active {
-            Field::Seed => self.seed.clone(),
-            Field::Height => self.restore_height_text.clone(),
-            Field::RescanHeight => self.rescan_height_text.clone(),
-            Field::Dest => self.send_dest.clone(),
-            Field::Amount => self.send_amount.clone(),
-            Field::Node => self.node_url.clone(),
-            Field::RecvAmount => self.recv_amount.clone(),
-            Field::RecvDesc => self.recv_desc.clone(),
-            Field::RecvLabel => self.recv_label.clone(),
-            Field::TransferSearch => self.transfer_search.clone(),
-            Field::Challenge => self.challenge_answers[self.challenge_slot.min(2)].clone(),
-            Field::I2pNode => self.i2p_rpc.clone(),
-            Field::I2pProxy => self.i2p_proxy.clone(),
+        let text = if self.edit_field == Some(self.active) && !self.edit_selection.is_empty() {
+            let current = self.field_text(self.active);
+            current[self.edit_selection.clone()].to_string()
+        } else {
+            match self.active {
+                Field::Seed => self.seed.clone(),
+                Field::Height => self.restore_height_text.clone(),
+                Field::RescanHeight => self.rescan_height_text.clone(),
+                Field::Dest => self.send_dest.clone(),
+                Field::Amount => self.send_amount.clone(),
+                Field::Node => self.node_url.clone(),
+                Field::RecvAmount => self.recv_amount.clone(),
+                Field::RecvDesc => self.recv_desc.clone(),
+                Field::RecvLabel => self.recv_label.clone(),
+                Field::TransferSearch => self.transfer_search.clone(),
+                Field::Challenge => self.challenge_answers[self.challenge_slot.min(2)].clone(),
+                Field::I2pNode => self.i2p_rpc.clone(),
+                Field::I2pProxy => self.i2p_proxy.clone(),
+            }
         };
         if text.is_empty() && self.opened && self.active != Field::TransferSearch {
             self.copy_address(cx);
@@ -1877,28 +2091,14 @@ impl Home {
         {
             return;
         }
+        if self.edit_field != Some(self.active) {
+            self.reset_edit_cursor(self.active);
+        }
+        if self.edit_selection.is_empty() {
+            return;
+        }
         self.copy_field(&CopyField, window, cx);
-        self.active_text_mut().clear();
-        if self.active == Field::Height {
-            self.restore_height_text = "0".into();
-        }
-        if self.active == Field::RescanHeight {
-            self.rescan_height_text = "0".into();
-        }
-        if self.active == Field::Dest || self.active == Field::Amount {
-            self.send_max = false;
-            self.clear_send_preview();
-        }
-        if self.active == Field::RecvLabel {
-            self.persist_recv_label();
-        }
-        if self.active == Field::I2pNode {
-            let _ = paths::save_i2p_rpc(&self.i2p_rpc);
-        }
-        if self.active == Field::I2pProxy {
-            let _ = paths::save_i2p_proxy(&self.i2p_proxy);
-        }
-        cx.notify();
+        self.replace_edit_selection("", cx);
     }
 
     fn select_all_field(
@@ -1907,16 +2107,15 @@ impl Home {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        // Fields replace on paste; select-all is a no-op besides focusing.
+        if self.edit_field != Some(self.active) {
+            self.reset_edit_cursor(self.active);
+        }
+        self.edit_selection = 0..self.field_text(self.active).len();
+        self.edit_selection_reversed = false;
         cx.notify();
     }
 
-    fn backspace_field(
-        &mut self,
-        _: &BackspaceField,
-        _window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    fn backspace_field(&mut self, _: &BackspaceField, window: &mut Window, cx: &mut Context<Self>) {
         if self.opened
             && self.screen != Screen::Send
             && self.screen != Screen::Settings
@@ -1925,170 +2124,19 @@ impl Home {
         {
             return;
         }
-        match self.active {
-            Field::Seed => {
-                self.seed.pop();
-            }
-            Field::Height => {
-                self.restore_height_text.pop();
-                if self.restore_height_text.is_empty() {
-                    self.restore_height_text = "0".into();
-                }
-            }
-            Field::RescanHeight => {
-                self.rescan_height_text.pop();
-                if self.rescan_height_text.is_empty() {
-                    self.rescan_height_text = "0".into();
-                }
-            }
-            Field::Dest => {
-                self.send_dest.pop();
-                self.clear_send_preview();
-            }
-            Field::Amount => {
-                self.send_amount.pop();
-                self.send_max = false;
-                self.clear_send_preview();
-            }
-            Field::Node => {
-                self.node_url.pop();
-                let _ = paths::save_node_url(&self.node_url);
-            }
-            Field::RecvAmount => {
-                self.recv_amount.pop();
-            }
-            Field::RecvDesc => {
-                self.recv_desc.pop();
-            }
-            Field::RecvLabel => {
-                self.recv_label.pop();
-                self.persist_recv_label();
-            }
-            Field::TransferSearch => {
-                self.transfer_search.pop();
-                self.selected_transfer = None;
-            }
-            Field::Challenge => {
-                let slot = self.challenge_slot.min(2);
-                self.challenge_answers[slot].pop();
-            }
-            Field::I2pNode => {
-                self.i2p_rpc.pop();
-                let _ = paths::save_i2p_rpc(&self.i2p_rpc);
-            }
-            Field::I2pProxy => {
-                self.i2p_proxy.pop();
-                let _ = paths::save_i2p_proxy(&self.i2p_proxy);
-            }
+        if self.edit_field != Some(self.active) {
+            self.reset_edit_cursor(self.active);
         }
-        cx.notify();
-    }
-
-    fn insert_typed(&mut self, event: &KeyDownEvent, cx: &mut Context<Self>) {
-        if matches!(self.screen, Screen::Terms | Screen::Legal) {
-            return;
+        if self.edit_selection.is_empty() {
+            let cursor = self.edit_cursor_offset();
+            let start = self.previous_edit_boundary(cursor);
+            if cursor == start {
+                window.play_system_bell();
+                return;
+            }
+            self.edit_selection = start..cursor;
         }
-        if self.opened
-            && self.screen != Screen::Send
-            && self.screen != Screen::Settings
-            && self.screen != Screen::Receive
-            && !(self.screen == Screen::Wallet && self.active == Field::TransferSearch)
-        {
-            return;
-        }
-        if event.keystroke.modifiers.platform || event.keystroke.modifiers.control {
-            return;
-        }
-        let Some(ch) = event.keystroke.key_char.as_deref() else {
-            return;
-        };
-        if ch.is_empty() || ch == "\u{7f}" || ch == "\u{8}" {
-            return;
-        }
-        match self.active {
-            Field::Seed => self.seed.push_str(ch),
-            Field::Height => {
-                let digits: String = ch.chars().filter(|c| c.is_ascii_digit()).collect();
-                if digits.is_empty() {
-                    return;
-                }
-                if self.restore_height_text == "0" {
-                    self.restore_height_text = digits;
-                } else {
-                    self.restore_height_text.push_str(&digits);
-                }
-            }
-            Field::RescanHeight => {
-                let digits: String = ch.chars().filter(|c| c.is_ascii_digit()).collect();
-                if digits.is_empty() {
-                    return;
-                }
-                if self.rescan_height_text == "0" {
-                    self.rescan_height_text = digits;
-                } else {
-                    self.rescan_height_text.push_str(&digits);
-                }
-            }
-            Field::Dest => {
-                self.send_dest.push_str(ch.trim());
-                self.clear_send_preview();
-            }
-            Field::Amount => {
-                let filtered: String = ch
-                    .chars()
-                    .filter(|c| c.is_ascii_digit() || *c == '.' || *c == ',')
-                    .collect();
-                if filtered.is_empty() {
-                    return;
-                }
-                self.send_amount.push_str(&filtered.replace(',', "."));
-                self.send_max = false;
-                self.clear_send_preview();
-            }
-            Field::Node => {
-                self.node_url.push_str(ch.trim());
-                let _ = paths::save_node_url(&self.node_url);
-            }
-            Field::RecvAmount => {
-                let filtered: String = ch
-                    .chars()
-                    .filter(|c| c.is_ascii_digit() || *c == '.' || *c == ',')
-                    .collect();
-                if filtered.is_empty() {
-                    return;
-                }
-                self.recv_amount.push_str(&filtered.replace(',', "."));
-            }
-            Field::RecvDesc => self.recv_desc.push_str(ch),
-            Field::RecvLabel => {
-                self.recv_label.push_str(ch);
-                self.persist_recv_label();
-            }
-            Field::TransferSearch => {
-                self.transfer_search.push_str(&ch.to_lowercase());
-                self.selected_transfer = None;
-            }
-            Field::Challenge => {
-                let filtered: String = ch
-                    .chars()
-                    .filter(|c| c.is_ascii_alphabetic() || *c == '\'')
-                    .collect();
-                if filtered.is_empty() {
-                    return;
-                }
-                let slot = self.challenge_slot.min(2);
-                self.challenge_answers[slot].push_str(&filtered);
-            }
-            Field::I2pNode => {
-                self.i2p_rpc.push_str(ch.trim());
-                let _ = paths::save_i2p_rpc(&self.i2p_rpc);
-            }
-            Field::I2pProxy => {
-                self.i2p_proxy.push_str(ch.trim());
-                let _ = paths::save_i2p_proxy(&self.i2p_proxy);
-            }
-        }
-        cx.notify();
+        self.replace_edit_selection("", cx);
     }
 
     fn create_seed(&mut self, cx: &mut Context<Self>) {
@@ -2972,6 +3020,7 @@ impl Render for Home {
 
         let body = div()
             .id("main-scroll")
+            .track_scroll(&self.main_scroll_handle)
             .flex_1()
             .min_h(px(0.))
             .overflow_y_scroll()
@@ -3004,7 +3053,7 @@ impl Render for Home {
             })
             .child(status_line(self))
             .when(self.opened && self.screen == Screen::Wallet, |body| {
-                body.child(history(self, cx))
+                body.child(history(self, window, cx))
             });
 
         let shell = div()
@@ -3043,6 +3092,15 @@ impl Render for Home {
             .on_action(cx.listener(Self::cut_field))
             .on_action(cx.listener(Self::select_all_field))
             .on_action(cx.listener(Self::backspace_field))
+            .on_action(cx.listener(Self::delete_forward))
+            .on_action(cx.listener(Self::move_left))
+            .on_action(cx.listener(Self::move_right))
+            .on_action(cx.listener(Self::select_left))
+            .on_action(cx.listener(Self::select_right))
+            .on_action(cx.listener(Self::move_home))
+            .on_action(cx.listener(Self::move_end))
+            .on_action(cx.listener(Self::select_home))
+            .on_action(cx.listener(Self::select_end))
             .on_action(cx.listener(Self::open_wallet))
             .on_action(cx.listener(Self::retry_sync))
             .on_action(cx.listener(Self::focus_history_search))
@@ -3059,14 +3117,14 @@ impl Render for Home {
                 {
                     this.transfer_search.clear();
                     this.selected_transfer = None;
+                    this.reset_edit_cursor(Field::TransferSearch);
                     cx.notify();
-                    return;
                 }
-                this.insert_typed(event, cx);
             }))
             .child(header(self))
             .child(shell)
-            .child(resize_handle())
+            .child(scrollbar(&self.main_scroll_handle, "main-scrollbar"))
+            .child(resize_handles())
     }
 }
 
@@ -3216,18 +3274,263 @@ fn header(home: &Home) -> impl IntoElement {
         )
 }
 
-fn resize_handle() -> impl IntoElement {
+fn resize_handles() -> impl IntoElement {
     div()
-        .id("window-resize")
         .absolute()
-        .right_0()
-        .bottom_0()
-        .size(px(20.))
-        .cursor(CursorStyle::ResizeUpLeftDownRight)
-        .on_mouse_down(MouseButton::Left, |_, window, _| {
-            window.start_window_resize(ResizeEdge::BottomRight);
-        })
-        .child("⌟")
+        .inset_0()
+        .child(
+            div()
+                .id("window-resize-top-left")
+                .absolute()
+                .top_0()
+                .left_0()
+                .size(px(12.))
+                .cursor(CursorStyle::ResizeUpLeftDownRight)
+                .on_mouse_down(MouseButton::Left, |_, window, _| {
+                    window.start_window_resize(ResizeEdge::TopLeft);
+                }),
+        )
+        .child(
+            div()
+                .id("window-resize-top")
+                .absolute()
+                .top_0()
+                .left(px(12.))
+                .right(px(12.))
+                .h(px(8.))
+                .cursor(CursorStyle::ResizeUpDown)
+                .on_mouse_down(MouseButton::Left, |_, window, _| {
+                    window.start_window_resize(ResizeEdge::Top);
+                }),
+        )
+        .child(
+            div()
+                .id("window-resize-top-right")
+                .absolute()
+                .top_0()
+                .right_0()
+                .size(px(12.))
+                .cursor(CursorStyle::ResizeUpRightDownLeft)
+                .on_mouse_down(MouseButton::Left, |_, window, _| {
+                    window.start_window_resize(ResizeEdge::TopRight);
+                }),
+        )
+        .child(
+            div()
+                .id("window-resize-left")
+                .absolute()
+                .top(px(12.))
+                .bottom(px(12.))
+                .left_0()
+                .w(px(8.))
+                .cursor(CursorStyle::ResizeLeftRight)
+                .on_mouse_down(MouseButton::Left, |_, window, _| {
+                    window.start_window_resize(ResizeEdge::Left);
+                }),
+        )
+        .child(
+            div()
+                .id("window-resize-right")
+                .absolute()
+                .top(px(12.))
+                .bottom(px(12.))
+                .right_0()
+                .w(px(8.))
+                .cursor(CursorStyle::ResizeLeftRight)
+                .on_mouse_down(MouseButton::Left, |_, window, _| {
+                    window.start_window_resize(ResizeEdge::Right);
+                }),
+        )
+        .child(
+            div()
+                .id("window-resize-bottom-left")
+                .absolute()
+                .bottom_0()
+                .left_0()
+                .size(px(12.))
+                .cursor(CursorStyle::ResizeUpRightDownLeft)
+                .on_mouse_down(MouseButton::Left, |_, window, _| {
+                    window.start_window_resize(ResizeEdge::BottomLeft);
+                }),
+        )
+        .child(
+            div()
+                .id("window-resize-bottom")
+                .absolute()
+                .bottom_0()
+                .left(px(12.))
+                .right(px(12.))
+                .h(px(8.))
+                .cursor(CursorStyle::ResizeUpDown)
+                .on_mouse_down(MouseButton::Left, |_, window, _| {
+                    window.start_window_resize(ResizeEdge::Bottom);
+                }),
+        )
+        .child(
+            div()
+                .id("window-resize-bottom-right")
+                .absolute()
+                .right_0()
+                .bottom_0()
+                .size(px(16.))
+                .cursor(CursorStyle::ResizeUpLeftDownRight)
+                .on_mouse_down(MouseButton::Left, |_, window, _| {
+                    window.start_window_resize(ResizeEdge::BottomRight);
+                })
+                .child("⌟"),
+        )
+}
+
+fn scrollbar(handle: &ScrollHandle, id: &'static str) -> impl IntoElement {
+    let bounds = handle.bounds();
+    let max_offset = handle.max_offset().y;
+    let viewport = bounds.size.height;
+    if max_offset <= px(0.) || viewport <= px(0.) {
+        return div().id(id).absolute().size(px(0.));
+    }
+
+    let viewport_f = viewport.as_f32();
+    let max_offset_f = max_offset.as_f32();
+    let total = viewport_f + max_offset_f;
+    let thumb_height = (viewport_f * viewport_f / total).max(28.);
+    let track_height = (viewport_f - thumb_height).max(0.);
+    let current = (-handle.offset().y.as_f32()).clamp(0., max_offset_f);
+    let thumb_top = if max_offset_f > 0. {
+        track_height * current / max_offset_f
+    } else {
+        0.
+    };
+    let drag_handle = handle.clone();
+    let drag_top = bounds.top();
+    let drag_track_height = track_height;
+    let drag_max = max_offset_f;
+
+    div()
+        .id(id)
+        .absolute()
+        .top(bounds.top())
+        .left(bounds.right() - px(7.))
+        .w(px(5.))
+        .h(viewport)
+        .rounded_sm()
+        .bg(rgb(theme_row()))
+        .child(
+            div()
+                .id(SharedString::from(format!("{id}-thumb")))
+                .absolute()
+                .top(px(thumb_top))
+                .w_full()
+                .h(px(thumb_height))
+                .rounded_sm()
+                .bg(rgb(theme_muted()))
+                .hover(|thumb| thumb.bg(rgb(theme_accent())))
+                .on_mouse_down(MouseButton::Left, move |event: &MouseDownEvent, _, _| {
+                    if drag_track_height <= 0. || drag_max <= 0. {
+                        return;
+                    }
+                    let y = (event.position.y - drag_top).as_f32() - thumb_height / 2.;
+                    let fraction = (y / drag_track_height).clamp(0., 1.);
+                    drag_handle.set_offset(gpui::point(px(0.), px(-fraction * drag_max)));
+                }),
+        )
+}
+
+fn field_input(
+    home: &Home,
+    window: &Window,
+    cx: &mut Context<Home>,
+    field: Field,
+    id: &'static str,
+    placeholder: impl Into<SharedString>,
+    multiline: bool,
+    compact: bool,
+) -> impl IntoElement {
+    field_input_for(
+        home,
+        window,
+        cx,
+        field,
+        id,
+        placeholder,
+        multiline,
+        compact,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn field_input_for(
+    home: &Home,
+    window: &Window,
+    cx: &mut Context<Home>,
+    field: Field,
+    id: &'static str,
+    placeholder: impl Into<SharedString>,
+    multiline: bool,
+    compact: bool,
+    challenge_slot: Option<usize>,
+) -> impl IntoElement {
+    let focused = home.focus_handle_for(field).is_focused(window)
+        && challenge_slot.is_none_or(|slot| home.challenge_slot == slot);
+    let entity = cx.entity();
+    div()
+        .id(id)
+        .key_context("Field")
+        .track_focus(home.focus_handle_for(field))
+        .cursor(CursorStyle::IBeam)
+        .when(multiline, |field| field.min_h(px(88.)))
+        .when(compact, |field| field.h(px(36.)))
+        .p_3()
+        .rounded_md()
+        .bg(rgb(theme_field()))
+        .border_1()
+        .border_color(rgb(if focused {
+            theme_accent()
+        } else {
+            theme_border()
+        }))
+        .flex()
+        .when(compact, |field| field.items_center())
+        .text_sm()
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |this, event: &MouseDownEvent, window, cx| {
+                if let Some(slot) = challenge_slot {
+                    let changed_slot = this.challenge_slot != slot;
+                    this.challenge_slot = slot;
+                    if changed_slot {
+                        this.reset_edit_cursor(field);
+                    }
+                }
+                this.edit_dragging = true;
+                let extend = event.modifiers.shift;
+                this.place_edit_cursor(field, event.position, extend, cx);
+                this.focus_field(field, window, cx);
+            }),
+        )
+        .on_mouse_up(
+            MouseButton::Left,
+            cx.listener(|this, _: &MouseUpEvent, _, _| {
+                this.edit_dragging = false;
+            }),
+        )
+        .on_mouse_up_out(
+            MouseButton::Left,
+            cx.listener(|this, _: &MouseUpEvent, _, _| {
+                this.edit_dragging = false;
+            }),
+        )
+        .on_mouse_move(cx.listener(move |this, event: &MouseMoveEvent, _, cx| {
+            if this.edit_dragging {
+                this.place_edit_cursor(field, event.position, true, cx);
+            }
+        }))
+        .child(text_field::FieldElement::new(
+            entity,
+            field,
+            challenge_slot,
+            placeholder,
+        ))
 }
 
 fn unlocking_card(home: &Home) -> impl IntoElement {
@@ -3263,20 +3566,6 @@ fn unlocking_card(home: &Home) -> impl IntoElement {
 
 fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoElement {
     let show_restore_form = !home.has_stored || home.show_restore_form;
-    let seed_focused = home.seed_focus.is_focused(window);
-    let height_focused = home.height_focus.is_focused(window);
-    let node_focused = home.node_focus.is_focused(window);
-    let seed_label = if home.seed.trim().is_empty() {
-        if home.has_stored {
-            l10n::t("Paste here only to restore a different wallet.").to_string()
-        } else {
-            l10n::t("Click this box, then ⌘V or Edit → Paste. Open is a separate button.")
-                .to_string()
-        }
-    } else {
-        home.seed.clone()
-    };
-    let seed_muted = home.seed.trim().is_empty();
 
     div()
         .flex()
@@ -3363,42 +3652,30 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                 )
                 .when(home.network_policy != network::Policy::I2p, |card| {
                     card.child(
-                        div()
-                            .id("node-field")
-                            .key_context("Field")
-                            .track_focus(&home.node_focus)
-                            .cursor(CursorStyle::IBeam)
-                            .p_3()
-                            .rounded_md()
-                            .bg(rgb(theme_field()))
-                            .border_1()
-                            .border_color(rgb(if node_focused { theme_accent() } else { theme_border() }))
-                            .text_sm()
-                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                                this.focus_field(Field::Node, window, cx);
-                            }))
-                            .child(home.node_url.clone()),
+                        field_input(
+                            home,
+                            window,
+                            cx,
+                            Field::Node,
+                            "node-field",
+                            "http://127.0.0.1:18081",
+                            false,
+                            false,
+                        ),
                     )
                 })
                 .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("Seed phrase")))
                 .child(
-                    div()
-                        .id("seed-field")
-                        .key_context("Field")
-                        .track_focus(&home.seed_focus)
-                        .cursor(CursorStyle::IBeam)
-                        .min_h(px(88.))
-                        .p_3()
-                        .rounded_md()
-                        .bg(rgb(theme_field()))
-                        .border_1()
-                        .border_color(rgb(if seed_focused { theme_accent() } else { theme_border() }))
-                        .text_sm()
-                        .text_color(rgb(if seed_muted { theme_muted() } else { theme_text() }))
-                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                            this.focus_field(Field::Seed, window, cx);
-                        }))
-                        .child(seed_label),
+                    field_input(
+                        home,
+                        window,
+                        cx,
+                        Field::Seed,
+                        "seed-field",
+                        "Paste or type your 25-word recovery phrase",
+                        true,
+                        false,
+                    ),
                 )
                 .child(
                     div()
@@ -3488,24 +3765,16 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         }),
                 )
                 .child(
-                    div()
-                        .id("height-field")
-                        .key_context("Field")
-                        .track_focus(&home.height_focus)
-                        .cursor(CursorStyle::IBeam)
-                        .h(px(36.))
-                        .px_3()
-                        .rounded_md()
-                        .bg(rgb(theme_field()))
-                        .border_1()
-                        .border_color(rgb(if height_focused { theme_accent() } else { theme_border() }))
-                        .flex()
-                        .items_center()
-                        .text_sm()
-                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                            this.focus_field(Field::Height, window, cx);
-                        }))
-                        .child(home.restore_height_text.clone()),
+                    field_input(
+                        home,
+                        window,
+                        cx,
+                        Field::Height,
+                        "height-field",
+                        "0",
+                        false,
+                        true,
+                    ),
                 )
                 .child(
                     div()
@@ -3564,16 +3833,11 @@ fn challenge_row(
     slot: usize,
     word_index: usize,
 ) -> impl IntoElement {
-    let focused = home.active == Field::Challenge
-        && home.challenge_slot == slot
-        && home.challenge_focus.is_focused(window);
-    let answer = home
-        .challenge_answers
-        .get(slot)
-        .cloned()
-        .unwrap_or_default();
-    let muted = answer.trim().is_empty();
-    let shown = if muted { String::new() } else { answer };
+    let id = match slot {
+        0 => "challenge-0",
+        1 => "challenge-1",
+        _ => "challenge-2",
+    };
     div()
         .flex()
         .flex_row()
@@ -3586,36 +3850,17 @@ fn challenge_row(
                 .w(px(80.))
                 .child(format!("Word #{}", word_index + 1)),
         )
-        .child(
-            div()
-                .id(SharedString::from(format!("challenge-{slot}")))
-                .key_context("Field")
-                .when(home.challenge_slot == slot, |field| {
-                    field.track_focus(&home.challenge_focus)
-                })
-                .cursor(CursorStyle::IBeam)
-                .flex_1()
-                .p_3()
-                .rounded_md()
-                .bg(rgb(theme_field()))
-                .border_1()
-                .border_color(rgb(if focused {
-                    theme_accent()
-                } else {
-                    theme_border()
-                }))
-                .text_sm()
-                .text_color(rgb(if muted { theme_muted() } else { theme_text() }))
-                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                    this.challenge_slot = slot;
-                    this.focus_field(Field::Challenge, window, cx);
-                }))
-                .child(if muted {
-                    "type the word".to_string()
-                } else {
-                    shown
-                }),
-        )
+        .child(field_input_for(
+            home,
+            window,
+            cx,
+            Field::Challenge,
+            id,
+            "type the word",
+            false,
+            false,
+            Some(slot),
+        ))
 }
 
 fn opened_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
@@ -3854,30 +4099,6 @@ fn sync_kv(label: SharedString, value: String) -> impl IntoElement {
 }
 
 fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoElement {
-    let amount_focused = home.recv_amount_focus.is_focused(window);
-    let desc_focused = home.recv_desc_focus.is_focused(window);
-    let label_focused = home.recv_label_focus.is_focused(window);
-    let amount_label = if home.recv_amount.trim().is_empty() {
-        match home.recv_amount_mode {
-            AmountMode::Xmr => "Optional amount in XMR".to_string(),
-            AmountMode::Fiat => format!("Optional amount in {}", home.fiat_currency),
-        }
-    } else {
-        home.recv_amount.clone()
-    };
-    let desc_label = if home.recv_desc.trim().is_empty() {
-        "Optional description".to_string()
-    } else {
-        home.recv_desc.clone()
-    };
-    let label_text = if home.recv_label.trim().is_empty() {
-        "Label (optional)".to_string()
-    } else {
-        home.recv_label.clone()
-    };
-    let amount_muted = home.recv_amount.trim().is_empty();
-    let desc_muted = home.recv_desc.trim().is_empty();
-    let label_muted = home.recv_label.trim().is_empty();
     let uri = home.receive_uri();
     let recv_secondary = home
         .recv_piconero()
@@ -3931,32 +4152,16 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                 .text_color(rgb(theme_muted()))
                 .child(l10n::t("Label")),
         )
-        .child(
-            div()
-                .id("recv-label")
-                .key_context("Field")
-                .track_focus(&home.recv_label_focus)
-                .cursor(CursorStyle::IBeam)
-                .p_3()
-                .rounded_md()
-                .bg(rgb(theme_field()))
-                .border_1()
-                .border_color(rgb(if label_focused {
-                    theme_accent()
-                } else {
-                    theme_border()
-                }))
-                .text_sm()
-                .text_color(rgb(if label_muted {
-                    theme_muted()
-                } else {
-                    theme_text()
-                }))
-                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                    this.focus_field(Field::RecvLabel, window, cx);
-                }))
-                .child(label_text),
-        )
+        .child(field_input(
+            home,
+            window,
+            cx,
+            Field::RecvLabel,
+            "recv-label",
+            "Label (optional)",
+            false,
+            false,
+        ))
         .when_some(home.qr_image.clone(), |card, image| {
             card.child(
                 img(ImageSource::Render(image))
@@ -3985,32 +4190,16 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                     AmountMode::Fiat => format!("Amount (optional, {})", home.fiat_currency),
                 }),
         )
-        .child(
-            div()
-                .id("recv-amount")
-                .key_context("Field")
-                .track_focus(&home.recv_amount_focus)
-                .cursor(CursorStyle::IBeam)
-                .p_3()
-                .rounded_md()
-                .bg(rgb(theme_field()))
-                .border_1()
-                .border_color(rgb(if amount_focused {
-                    theme_accent()
-                } else {
-                    theme_border()
-                }))
-                .text_sm()
-                .text_color(rgb(if amount_muted {
-                    theme_muted()
-                } else {
-                    theme_text()
-                }))
-                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                    this.focus_field(Field::RecvAmount, window, cx);
-                }))
-                .child(amount_label),
-        )
+        .child(field_input(
+            home,
+            window,
+            cx,
+            Field::RecvAmount,
+            "recv-amount",
+            "Optional amount",
+            false,
+            false,
+        ))
         .when(home.live_rate().is_some(), |card| {
             card.child(action_button(
                 "recv-unit",
@@ -4036,32 +4225,16 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                 .text_color(rgb(theme_muted()))
                 .child(l10n::t("Description (optional)")),
         )
-        .child(
-            div()
-                .id("recv-desc")
-                .key_context("Field")
-                .track_focus(&home.recv_desc_focus)
-                .cursor(CursorStyle::IBeam)
-                .p_3()
-                .rounded_md()
-                .bg(rgb(theme_field()))
-                .border_1()
-                .border_color(rgb(if desc_focused {
-                    theme_accent()
-                } else {
-                    theme_border()
-                }))
-                .text_sm()
-                .text_color(rgb(if desc_muted {
-                    theme_muted()
-                } else {
-                    theme_text()
-                }))
-                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                    this.focus_field(Field::RecvDesc, window, cx);
-                }))
-                .child(desc_label),
-        )
+        .child(field_input(
+            home,
+            window,
+            cx,
+            Field::RecvDesc,
+            "recv-desc",
+            "Optional description",
+            false,
+            false,
+        ))
         .child(div().text_xs().text_color(rgb(theme_muted())).child(
             if home.address_copy_hint_active() {
                 "Copied.".to_string()
@@ -4087,23 +4260,6 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
 }
 
 fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoElement {
-    let dest_focused = home.dest_focus.is_focused(window);
-    let amount_focused = home.amount_focus.is_focused(window);
-    let dest_label = if home.send_dest.trim().is_empty() {
-        "Paste a Monero address or monero: URI".to_string()
-    } else {
-        home.send_dest.clone()
-    };
-    let amount_label = if home.send_amount.trim().is_empty() {
-        match home.send_amount_mode {
-            AmountMode::Xmr => "Amount in XMR".to_string(),
-            AmountMode::Fiat => format!("Amount in {}", home.fiat_currency),
-        }
-    } else {
-        home.send_amount.clone()
-    };
-    let dest_muted = home.send_dest.trim().is_empty();
-    let amount_muted = home.send_amount.trim().is_empty();
     let fee_line = match (home.send_preview_amount, home.send_fee) {
         (Some(amt), Some(fee)) => {
             let mut line = format!(
@@ -4159,33 +4315,16 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
                 .text_color(rgb(theme_muted()))
                 .child(l10n::t("Destination")),
         )
-        .child(
-            div()
-                .id("send-dest")
-                .key_context("Field")
-                .track_focus(&home.dest_focus)
-                .cursor(CursorStyle::IBeam)
-                .min_h(px(56.))
-                .p_3()
-                .rounded_md()
-                .bg(rgb(theme_field()))
-                .border_1()
-                .border_color(rgb(if dest_focused {
-                    theme_accent()
-                } else {
-                    theme_border()
-                }))
-                .text_sm()
-                .text_color(rgb(if dest_muted {
-                    theme_muted()
-                } else {
-                    theme_text()
-                }))
-                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                    this.focus_field(Field::Dest, window, cx);
-                }))
-                .child(dest_label),
-        )
+        .child(field_input(
+            home,
+            window,
+            cx,
+            Field::Dest,
+            "send-dest",
+            "Paste a Monero address or monero: URI",
+            true,
+            false,
+        ))
         .child(action_button(
             "send-paste-qr",
             l10n::t("Paste QR from clipboard"),
@@ -4251,32 +4390,16 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
                     AmountMode::Fiat => format!("Amount ({})", home.fiat_currency),
                 }),
         )
-        .child(
-            div()
-                .id("send-amount")
-                .key_context("Field")
-                .track_focus(&home.amount_focus)
-                .cursor(CursorStyle::IBeam)
-                .p_3()
-                .rounded_md()
-                .bg(rgb(theme_field()))
-                .border_1()
-                .border_color(rgb(if amount_focused {
-                    theme_accent()
-                } else {
-                    theme_border()
-                }))
-                .text_sm()
-                .text_color(rgb(if amount_muted {
-                    theme_muted()
-                } else {
-                    theme_text()
-                }))
-                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                    this.focus_field(Field::Amount, window, cx);
-                }))
-                .child(amount_label),
-        )
+        .child(field_input(
+            home,
+            window,
+            cx,
+            Field::Amount,
+            "send-amount",
+            "Amount",
+            false,
+            false,
+        ))
         .when(home.live_rate().is_some(), |card| {
             card.child(action_button(
                 "send-unit",
@@ -4433,10 +4556,6 @@ fn legal_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
 }
 
 fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoElement {
-    let node_focused = home.node_focus.is_focused(window);
-    let i2p_node_focused = home.i2p_rpc_focus.is_focused(window);
-    let i2p_proxy_focused = home.i2p_proxy_focus.is_focused(window);
-    let rescan_height_focused = home.rescan_height_focus.is_focused(window);
     div()
         .flex()
         .flex_col()
@@ -4490,69 +4609,40 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
         })
         .when(home.network_policy != network::Policy::I2p, |card| {
             card.child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("Clearnet node")))
-                .child(
-                    div()
-                        .id("settings-node")
-                        .key_context("Field")
-                        .track_focus(&home.node_focus)
-                        .cursor(CursorStyle::IBeam)
-                        .p_3()
-                        .rounded_md()
-                        .bg(rgb(theme_field()))
-                        .border_1()
-                        .border_color(rgb(if node_focused { theme_accent() } else { theme_border() }))
-                        .text_sm()
-                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                            this.focus_field(Field::Node, window, cx);
-                        }))
-                        .child(home.node_url.clone()),
-                )
+                .child(field_input(
+                    home,
+                    window,
+                    cx,
+                    Field::Node,
+                    "settings-node",
+                    "http://127.0.0.1:18081",
+                    false,
+                    false,
+                ))
         })
         .when(home.network_policy != network::Policy::Clearnet, |card| {
             card.child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("I2P node (host:port)")))
-                .child(
-                    div()
-                        .id("settings-i2p-node")
-                        .key_context("Field")
-                        .track_focus(&home.i2p_rpc_focus)
-                        .cursor(CursorStyle::IBeam)
-                        .p_3()
-                        .rounded_md()
-                        .bg(rgb(theme_field()))
-                        .border_1()
-                        .border_color(rgb(if i2p_node_focused { theme_accent() } else { theme_border() }))
-                        .text_sm()
-                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                            this.focus_field(Field::I2pNode, window, cx);
-                        }))
-                        .child(if home.i2p_rpc.trim().is_empty() {
-                            "hostname.b32.i2p:18081".to_string()
-                        } else {
-                            home.i2p_rpc.clone()
-                        }),
-                )
+                .child(field_input(
+                    home,
+                    window,
+                    cx,
+                    Field::I2pNode,
+                    "settings-i2p-node",
+                    "hostname.b32.i2p:18081",
+                    false,
+                    false,
+                ))
                 .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("I2P HTTP proxy (host:port)")))
-                .child(
-                    div()
-                        .id("settings-i2p-proxy")
-                        .key_context("Field")
-                        .track_focus(&home.i2p_proxy_focus)
-                        .cursor(CursorStyle::IBeam)
-                        .p_3()
-                        .rounded_md()
-                        .bg(rgb(theme_field()))
-                        .border_1()
-                        .border_color(rgb(if i2p_proxy_focused { theme_accent() } else { theme_border() }))
-                        .text_sm()
-                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                            this.focus_field(Field::I2pProxy, window, cx);
-                        }))
-                        .child(if home.i2p_proxy.trim().is_empty() {
-                            "127.0.0.1:4444".to_string()
-                        } else {
-                            home.i2p_proxy.clone()
-                        }),
-                )
+                .child(field_input(
+                    home,
+                    window,
+                    cx,
+                    Field::I2pProxy,
+                    "settings-i2p-proxy",
+                    "127.0.0.1:4444",
+                    false,
+                    false,
+                ))
                 .child(action_button(
                     "apply-i2p",
                     l10n::t("Apply I2P settings"),
@@ -4646,24 +4736,16 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 .child(l10n::t("Clear the local cache without changing wallet keys, or rescan from a chosen block.")),
         )
         .child(
-            div()
-                .id("settings-rescan-height")
-                .key_context("Field")
-                .track_focus(&home.rescan_height_focus)
-                .cursor(CursorStyle::IBeam)
-                .h(px(36.))
-                .px_3()
-                .rounded_md()
-                .bg(rgb(theme_field()))
-                .border_1()
-                .border_color(rgb(if rescan_height_focused { theme_accent() } else { theme_border() }))
-                .flex()
-                .items_center()
-                .text_sm()
-                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                    this.focus_field(Field::RescanHeight, window, cx);
-                }))
-                .child(home.rescan_height_text.clone()),
+            field_input(
+                home,
+                window,
+                cx,
+                Field::RescanHeight,
+                "settings-rescan-height",
+                "0",
+                false,
+                true,
+            ),
         )
         .child(
             div()
@@ -4778,7 +4860,7 @@ fn status_line(home: &Home) -> impl IntoElement {
         .child(home.status.clone())
 }
 
-fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
+fn history(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoElement {
     let filter = home.transfer_filter;
     let search = home.transfer_search.trim().to_lowercase();
     let visible_transfers: Vec<_> = home
@@ -4803,6 +4885,7 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
 
     div()
         .id("history")
+        .track_scroll(&home.history_scroll_handle)
         .flex_1()
         .min_h(px(180.))
         .overflow_y_scroll()
@@ -4815,39 +4898,16 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .child(l10n::t("History")),
         )
-        .child(
-            div()
-                .id("history-search")
-                .key_context("Field")
-                .track_focus(&home.transfer_search_focus)
-                .cursor(CursorStyle::IBeam)
-                .h(px(36.))
-                .px_3()
-                .rounded_md()
-                .bg(rgb(theme_field()))
-                .border_1()
-                .border_color(rgb(if home.active == Field::TransferSearch {
-                    theme_accent()
-                } else {
-                    theme_border()
-                }))
-                .flex()
-                .items_center()
-                .text_sm()
-                .text_color(rgb(if home.transfer_search.is_empty() {
-                    theme_muted()
-                } else {
-                    theme_text()
-                }))
-                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                    this.focus_field(Field::TransferSearch, window, cx);
-                }))
-                .child(if home.transfer_search.is_empty() {
-                    l10n::t("Search transaction ID")
-                } else {
-                    home.transfer_search.clone().into()
-                }),
-        )
+        .child(field_input(
+            home,
+            window,
+            cx,
+            Field::TransferSearch,
+            "history-search",
+            "Search transaction ID",
+            false,
+            true,
+        ))
         .child(
             div()
                 .flex()
@@ -5397,7 +5457,65 @@ fn install_menus(cx: &mut App) {
     cx.set_dock_menu(vec![MenuItem::action("Show nexawal", ShowApp)]);
 }
 
+fn run_sync_audit_cli() -> ! {
+    let Some(mnemonic) = std::env::var("NEXAWAL_MNEMONIC")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+    else {
+        eprintln!("--sync-audit requires NEXAWAL_MNEMONIC set in the local shell");
+        std::process::exit(2);
+    };
+    if let Err(err) = api::primary_address_from_mnemonic(&mnemonic, true) {
+        eprintln!("--sync-audit mnemonic validation failed: {err}");
+        eprintln!("Use the complete English Monero seed (13 or 25 words); the seed is not logged.");
+        std::process::exit(2);
+    }
+    let start_height = std::env::var("NEXAWAL_AUDIT_START_HEIGHT")
+        .or_else(|_| std::env::var("NEXAWAL_RESTORE_HEIGHT"))
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .unwrap_or_else(|| {
+            eprintln!(
+                "--sync-audit requires NEXAWAL_AUDIT_START_HEIGHT (or NEXAWAL_RESTORE_HEIGHT)"
+            );
+            std::process::exit(2);
+        });
+    let target_height = std::env::var("NEXAWAL_AUDIT_TARGET_HEIGHT")
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok());
+    let node = std::env::var("NEXAWAL_NODE_URL").unwrap_or_else(|_| paths::DEFAULT_NODE.into());
+    let report = benchmark::run_sync_audit(
+        node,
+        mnemonic,
+        start_height,
+        target_height,
+        benchmark::run_id(),
+    );
+    println!("{}", report.summary);
+    eprintln!("RPC telemetry: {}", report.rpc_results_path);
+    let status = std::fs::read_to_string(&report.results_path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|value| {
+            value
+                .get("comparison")
+                .and_then(|comparison| comparison.get("status"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+        })
+        .unwrap_or_else(|| "unknown".to_string());
+    eprintln!("sync audit status: {status}");
+    std::process::exit(match status.as_str() {
+        "pass" => 0,
+        "not-comparable" => 2,
+        _ => 1,
+    });
+}
+
 fn main() {
+    if std::env::args().any(|arg| arg == "--sync-audit") {
+        run_sync_audit_cli();
+    }
     let startup_node = std::env::var("NEXAWAL_NODE_URL").unwrap_or_default();
     scan_tuning::apply_for_node(&startup_node);
     application().run(|cx: &mut App| {
@@ -5429,6 +5547,21 @@ fn main() {
             KeyBinding::new("cmd-a", SelectAllField, None),
             KeyBinding::new("ctrl-a", SelectAllField, None),
             KeyBinding::new("backspace", BackspaceField, None),
+            KeyBinding::new("delete", DeleteField, None),
+            KeyBinding::new("left", MoveLeft, None),
+            KeyBinding::new("right", MoveRight, None),
+            KeyBinding::new("shift-left", SelectLeft, None),
+            KeyBinding::new("shift-right", SelectRight, None),
+            KeyBinding::new("home", MoveHome, None),
+            KeyBinding::new("end", MoveEnd, None),
+            KeyBinding::new("cmd-left", MoveHome, None),
+            KeyBinding::new("cmd-right", MoveEnd, None),
+            KeyBinding::new("shift-home", SelectHome, None),
+            KeyBinding::new("shift-end", SelectEnd, None),
+            KeyBinding::new("cmd-shift-left", SelectHome, None),
+            KeyBinding::new("cmd-shift-right", SelectEnd, None),
+            KeyBinding::new("ctrl-shift-left", SelectHome, None),
+            KeyBinding::new("ctrl-shift-right", SelectEnd, None),
         ]);
         cx.on_window_closed(|cx, _| {
             if cx.windows().is_empty() {

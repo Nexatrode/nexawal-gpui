@@ -37,6 +37,13 @@ pub struct BenchmarkReport {
     pub summary: String,
 }
 
+#[derive(Debug)]
+pub struct SyncAuditReport {
+    pub results_path: String,
+    pub rpc_results_path: String,
+    pub summary: String,
+}
+
 pub fn run_id() -> u64 {
     now_ms() as u64 ^ u64::from(std::process::id())
 }
@@ -249,6 +256,404 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
         rpc_results_path: rpc_telemetry_path.display().to_string(),
         summary,
     }
+}
+
+/// Scan each selected node to completion and compare the resulting wallet state.
+/// A supplied target height is a deterministic comparison ceiling; the scan
+/// still finishes at the daemon tip so WalletCore can rebuild and persist its
+/// transfer ledger instead of returning a partially-cancelled empty ledger.
+/// This is intentionally separate from the short throughput benchmark: a speed
+/// sample cannot prove that two nodes produced the same transaction history.
+pub fn run_sync_audit(
+    node_url: String,
+    mnemonic: String,
+    start_height: u64,
+    target_height: Option<u64>,
+    run_id: u64,
+) -> SyncAuditReport {
+    let results_path = paths::sync_audit_path(run_id);
+    let rpc_path = paths::sync_audit_rpc_path(run_id);
+    let _ = fs::remove_file(&results_path);
+    let _ = fs::remove_file(&rpc_path);
+    unsafe {
+        std::env::set_var("WALLETCORE_RPC_TELEMETRY_PATH", &rpc_path);
+    }
+
+    let timeout = audit_timeout();
+    let targets = targets_for(&node_url);
+    let mut samples = Vec::with_capacity(targets.len());
+    for (index, target) in targets.iter().enumerate() {
+        let wallet_id = format!("nexawal-audit-{run_id}-{index}");
+        samples.push(run_audit_target(
+            &wallet_id,
+            target,
+            &mnemonic,
+            start_height,
+            target_height,
+            timeout,
+            &rpc_path,
+        ));
+    }
+
+    unsafe {
+        std::env::remove_var("WALLETCORE_RPC_TELEMETRY_PATH");
+    }
+    scan_tuning::clear_profile_override();
+
+    let comparison = compare_audit_targets(&samples, target_height);
+    let comparison_status = comparison
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let report = json!({
+        "schema": 2,
+        "run_id": run_id,
+        "started_at_ms": now_ms(),
+        "start_height": start_height,
+        "target_height": target_height,
+        "timeout_secs": timeout.as_secs(),
+        "targets": samples,
+        "comparison": comparison,
+    });
+    let report_text = serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".into());
+    let _ = fs::create_dir_all(paths::data_dir());
+    let write_result = fs::write(&results_path, report_text);
+    let summary = if let Err(err) = write_result {
+        format!(
+            "{} target(s) · {} · could not write report: {err}",
+            targets.len(),
+            comparison_status
+        )
+    } else {
+        format!(
+            "{} target(s) · {} · report {} · RPC trace {}",
+            targets.len(),
+            comparison_status,
+            results_path.display(),
+            rpc_path.display()
+        )
+    };
+
+    SyncAuditReport {
+        results_path: results_path.display().to_string(),
+        rpc_results_path: rpc_path.display().to_string(),
+        summary,
+    }
+}
+
+fn run_audit_target(
+    wallet_id: &str,
+    node_url: &str,
+    mnemonic: &str,
+    start_height: u64,
+    target_height: Option<u64>,
+    timeout: Duration,
+    rpc_path: &std::path::Path,
+) -> Value {
+    let started_at_ms = now_ms();
+    let started = Instant::now();
+    let log_path = paths::walletcore_log_path(wallet_id);
+    let log_offset = file_len(&log_path);
+    let rpc_offset = file_len(rpc_path);
+    let mut outcome = "open-failed";
+    let mut error = None;
+
+    if target_height.is_some_and(|target| target <= start_height) {
+        error = Some("target height must be above start height".to_string());
+    } else {
+        // The FFI keeps a process-wide last-error slot. Clear a previous
+        // target's message before an open attempt so a raw validation error
+        // (for example an invalid mnemonic) cannot inherit stale text.
+        let _ = api::last_error();
+        match api::open_from_mnemonic(wallet_id, mnemonic, start_height, true)
+            .and_then(|_| api::set_gap_limit(wallet_id, 50))
+        {
+            Err(err) => error = Some(err.to_string()),
+            Ok(()) => {
+                // An audit must use the production default rather than an
+                // accidentally inherited diagnostic profile.
+                scan_tuning::clear_profile_override();
+                scan_tuning::apply();
+                match api::refresh_async(wallet_id, node_url) {
+                    Err(err) => {
+                        outcome = "start-failed";
+                        error = Some(err.to_string());
+                    }
+                    Ok(()) => {
+                        outcome = "timeout";
+                        let deadline = Instant::now() + timeout;
+                        while Instant::now() < deadline {
+                            match api::refresh_job(wallet_id) {
+                                RefreshJob::Failed(message) => {
+                                    outcome = "scan-failed";
+                                    error = Some(message);
+                                    break;
+                                }
+                                RefreshJob::Running => {}
+                                RefreshJob::Idle => {
+                                    if let Ok(status) = api::sync_status(wallet_id) {
+                                        let reached_tip = status.chain_height > start_height
+                                            && status.last_scanned >= status.chain_height;
+                                        if reached_tip {
+                                            outcome = "completed";
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            thread::sleep(Duration::from_millis(250));
+                        }
+                        if outcome == "timeout" {
+                            let _ = api::refresh_cancel(wallet_id);
+                        }
+                        wait_for_idle(wallet_id, CANCEL_WAIT);
+                    }
+                }
+            }
+        }
+    }
+
+    let sync = api::sync_status(wallet_id).ok();
+    let balance = api::get_balance(wallet_id).ok();
+    let transfers = api::list_transfers(wallet_id).unwrap_or_default();
+    let metrics = collect_metrics(&log_path, log_offset, Some(rpc_path), rpc_offset);
+    let transfer_values: Vec<Value> = transfers
+        .iter()
+        .map(|transfer| {
+            json!({
+                "txid": transfer.txid,
+                "direction": transfer.direction,
+                "amount_piconero": transfer.amount,
+                "fee_piconero": transfer.fee,
+                "height": transfer.height,
+                "timestamp": transfer.timestamp,
+                "confirmations": transfer.confirmations,
+                "is_pending": transfer.is_pending,
+            })
+        })
+        .collect();
+    let fee_comparison_height = target_height.unwrap_or_else(|| {
+        sync.as_ref()
+            .map(|status| status.last_scanned)
+            .unwrap_or(start_height)
+    });
+    let missing_fee_txids = missing_confirmed_fee_txids(&transfer_values, fee_comparison_height);
+
+    json!({
+        "node": node_url,
+        "node_label": node_label(node_url),
+        "wallet_id": wallet_id,
+        "started_at_ms": started_at_ms,
+        "elapsed_ms": started.elapsed().as_millis(),
+        "start_height": start_height,
+        "target_height": target_height,
+        "outcome": outcome,
+        "error": error,
+        "sync": sync.map(|status| json!({
+            "chain_height": status.chain_height,
+            "last_scanned": status.last_scanned,
+            "restore_height": status.restore_height,
+            "chain_time": status.chain_time,
+        })),
+        "balance_total_piconero": balance.as_ref().map(|value| value.total_piconero),
+        "balance_unlocked_piconero": balance.as_ref().map(|value| value.unlocked_piconero),
+        "transfer_count": transfer_values.len(),
+        "fees_complete": missing_fee_txids.is_empty(),
+        "missing_fee_count": missing_fee_txids.len(),
+        "missing_fee_txids": missing_fee_txids,
+        "transfers": transfer_values,
+        "rpc_calls": metrics.rpc_calls,
+        "rpc_request_bytes": metrics.rpc_request_bytes,
+        "rpc_response_bytes": metrics.rpc_response_bytes,
+        "rpc_elapsed_ms": metrics.rpc_elapsed_ms,
+        "rpc_errors": metrics.rpc_errors,
+        "retries": metrics.retries,
+    })
+}
+
+fn compare_audit_targets(samples: &[Value], target_height: Option<u64>) -> Value {
+    if samples.len() < 2 {
+        return json!({
+            "status": "not-comparable",
+            "reason": "at least two node targets are required",
+        });
+    }
+
+    let left = &samples[0];
+    let right = &samples[1];
+    let left_last = sample_last_scanned(left);
+    let right_last = sample_last_scanned(right);
+    let common_height = target_height.unwrap_or_else(|| left_last.min(right_last));
+    let left_transfers = audit_transfer_map(left, common_height);
+    let right_transfers = audit_transfer_map(right, common_height);
+    let left_missing_fees = missing_confirmed_fee_txids_from_map(&left_transfers);
+    let right_missing_fees = missing_confirmed_fee_txids_from_map(&right_transfers);
+    let left_ids: std::collections::BTreeSet<_> = left_transfers.keys().cloned().collect();
+    let right_ids: std::collections::BTreeSet<_> = right_transfers.keys().cloned().collect();
+    let missing_from_right: Vec<_> = left_ids.difference(&right_ids).cloned().collect();
+    let missing_from_left: Vec<_> = right_ids.difference(&left_ids).cloned().collect();
+    let mut mismatches = Vec::new();
+    for txid in left_ids.intersection(&right_ids) {
+        let a = &left_transfers[txid];
+        let b = &right_transfers[txid];
+        let fields = ["direction", "amount_piconero", "fee_piconero", "height"];
+        let different: Vec<_> = fields
+            .iter()
+            .filter(|field| a.get(**field) != b.get(**field))
+            .copied()
+            .collect();
+        if !different.is_empty() {
+            mismatches.push(json!({
+                "txid": txid,
+                "fields": different,
+                "left": a,
+                "right": b,
+            }));
+        }
+    }
+
+    let complete = [left, right].iter().all(|sample| {
+        matches!(
+            sample.get("outcome").and_then(Value::as_str),
+            Some("completed") | Some("target-reached")
+        )
+    });
+    let balance_equal = target_height.is_some()
+        && left
+            .get("balance_total_piconero")
+            .and_then(Value::as_u64)
+            .zip(right.get("balance_total_piconero").and_then(Value::as_u64))
+            .is_some_and(|(left_total, right_total)| left_total == right_total)
+        && left
+            .get("balance_unlocked_piconero")
+            .and_then(Value::as_u64)
+            .zip(
+                right
+                    .get("balance_unlocked_piconero")
+                    .and_then(Value::as_u64),
+            )
+            .is_some_and(|(left_unlocked, right_unlocked)| left_unlocked == right_unlocked);
+    let history_equal =
+        missing_from_right.is_empty() && missing_from_left.is_empty() && mismatches.is_empty();
+    let fees_complete = left_missing_fees.is_empty() && right_missing_fees.is_empty();
+    let status = if !complete {
+        "incomplete"
+    } else if !history_equal || !fees_complete || (target_height.is_some() && !balance_equal) {
+        "fail"
+    } else {
+        "pass"
+    };
+
+    json!({
+        "status": status,
+        "common_height": common_height,
+        "left_node": left.get("node"),
+        "right_node": right.get("node"),
+        "history_equal": history_equal,
+        "fees_complete": fees_complete,
+        "left_missing_fee_count": left_missing_fees.len(),
+        "left_missing_fee_txids": left_missing_fees,
+        "right_missing_fee_count": right_missing_fees.len(),
+        "right_missing_fee_txids": right_missing_fees,
+        "balance_equal_at_target": if target_height.is_some() { Some(balance_equal) } else { None::<bool> },
+        "left_transfer_count": left_transfers.len(),
+        "right_transfer_count": right_transfers.len(),
+        "missing_from_right_count": missing_from_right.len(),
+        "missing_from_right": missing_from_right.into_iter().take(50).collect::<Vec<_>>(),
+        "missing_from_left_count": missing_from_left.len(),
+        "missing_from_left": missing_from_left.into_iter().take(50).collect::<Vec<_>>(),
+        "mismatch_count": mismatches.len(),
+        "mismatches": mismatches.into_iter().take(50).collect::<Vec<_>>(),
+    })
+}
+
+fn missing_confirmed_fee_txids(transfers: &[Value], max_height: u64) -> Vec<String> {
+    transfers
+        .iter()
+        .filter(|transfer| {
+            !transfer
+                .get("is_pending")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
+        .filter(|transfer| {
+            transfer
+                .get("height")
+                .and_then(Value::as_u64)
+                .is_some_and(|height| height <= max_height)
+        })
+        .filter(|transfer| transfer.get("fee_piconero").is_none_or(Value::is_null))
+        .filter_map(|transfer| {
+            transfer
+                .get("txid")
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned)
+        })
+        .collect()
+}
+
+fn missing_confirmed_fee_txids_from_map(
+    transfers: &std::collections::BTreeMap<String, Value>,
+) -> Vec<String> {
+    transfers
+        .iter()
+        .filter(|(_, transfer)| {
+            !transfer
+                .get("is_pending")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
+        .filter(|(_, transfer)| transfer.get("height").and_then(Value::as_u64).is_some())
+        .filter(|(_, transfer)| transfer.get("fee_piconero").is_none_or(Value::is_null))
+        .map(|(txid, _)| txid.clone())
+        .collect()
+}
+
+fn audit_transfer_map(
+    sample: &Value,
+    max_height: u64,
+) -> std::collections::BTreeMap<String, Value> {
+    sample
+        .get("transfers")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|transfer| {
+            transfer
+                .get("height")
+                .and_then(Value::as_u64)
+                .is_none_or(|height| height <= max_height)
+        })
+        .filter_map(|transfer| {
+            transfer
+                .get("txid")
+                .and_then(Value::as_str)
+                .map(|txid| (txid.to_string(), transfer.clone()))
+        })
+        .collect()
+}
+
+fn sample_last_scanned(sample: &Value) -> u64 {
+    sample
+        .get("sync")
+        .and_then(Value::as_object)
+        .and_then(|sync| sync.get("last_scanned"))
+        .and_then(Value::as_u64)
+        .unwrap_or_else(|| {
+            sample
+                .get("start_height")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+        })
+}
+
+fn audit_timeout() -> Duration {
+    let seconds = std::env::var("NEXAWAL_AUDIT_TIMEOUT_SECS")
+        .ok()
+        .and_then(|value| value.trim().parse().ok())
+        .unwrap_or(3_600)
+        .clamp(60, 86_400);
+    Duration::from_secs(seconds)
 }
 
 fn run_profile(
@@ -643,5 +1048,123 @@ mod tests {
             assert!(profiles.contains(&"batch-100"));
             assert!(profiles.contains(&"batch-125"));
         }
+    }
+
+    #[test]
+    fn sync_audit_comparison_passes_matching_history() {
+        let transfer = json!({
+            "txid": "abc",
+            "direction": "in",
+            "amount_piconero": 42,
+            "fee_piconero": 0,
+            "height": 100,
+        });
+        let samples = vec![
+            json!({
+                "node": "one",
+                "outcome": "target-reached",
+                "sync": {"last_scanned": 100},
+                "balance_total_piconero": 42,
+                "balance_unlocked_piconero": 42,
+                "transfers": [transfer.clone()],
+            }),
+            json!({
+                "node": "two",
+                "outcome": "target-reached",
+                "sync": {"last_scanned": 100},
+                "balance_total_piconero": 42,
+                "balance_unlocked_piconero": 42,
+                "transfers": [transfer],
+            }),
+        ];
+        let comparison = compare_audit_targets(&samples, Some(100));
+        assert_eq!(
+            comparison.get("status").and_then(Value::as_str),
+            Some("pass")
+        );
+    }
+
+    #[test]
+    fn sync_audit_comparison_detects_missing_history() {
+        let samples = vec![
+            json!({
+                "node": "one",
+                "outcome": "target-reached",
+                "sync": {"last_scanned": 100},
+                "balance_total_piconero": 42,
+                "balance_unlocked_piconero": 42,
+                "transfers": [{
+                    "txid": "abc",
+                    "direction": "in",
+                    "amount_piconero": 42,
+                    "fee_piconero": 0,
+                    "height": 100,
+                }],
+            }),
+            json!({
+                "node": "two",
+                "outcome": "target-reached",
+                "sync": {"last_scanned": 100},
+                "balance_total_piconero": 0,
+                "balance_unlocked_piconero": 0,
+                "transfers": [],
+            }),
+        ];
+        let comparison = compare_audit_targets(&samples, Some(100));
+        assert_eq!(
+            comparison.get("status").and_then(Value::as_str),
+            Some("fail")
+        );
+        assert_eq!(
+            comparison
+                .get("missing_from_right_count")
+                .and_then(Value::as_u64),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn sync_audit_comparison_fails_confirmed_transfer_without_fee() {
+        let transfer = json!({
+            "txid": "abc",
+            "direction": "in",
+            "amount_piconero": 42,
+            "fee_piconero": null,
+            "height": 100,
+            "is_pending": false,
+        });
+        let samples = vec![
+            json!({
+                "node": "one",
+                "outcome": "target-reached",
+                "sync": {"last_scanned": 100},
+                "balance_total_piconero": 42,
+                "balance_unlocked_piconero": 42,
+                "transfers": [transfer.clone()],
+            }),
+            json!({
+                "node": "two",
+                "outcome": "target-reached",
+                "sync": {"last_scanned": 100},
+                "balance_total_piconero": 42,
+                "balance_unlocked_piconero": 42,
+                "transfers": [transfer],
+            }),
+        ];
+        let comparison = compare_audit_targets(&samples, Some(100));
+        assert_eq!(
+            comparison.get("status").and_then(Value::as_str),
+            Some("fail")
+        );
+        assert_eq!(
+            comparison.get("fees_complete").and_then(Value::as_bool),
+            Some(false)
+        );
+        assert_eq!(
+            comparison
+                .get("left_missing_fee_count")
+                .and_then(Value::as_u64),
+            Some(1)
+        );
     }
 }

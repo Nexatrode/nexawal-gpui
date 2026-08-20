@@ -107,6 +107,53 @@ also includes WalletCore batch timing, actual returned blocks, binary-RPC reques
 response byte totals, RPC errors, and retry counts. The raw opt-in binary-RPC trace is
 kept in `scan_benchmark_rpc_<run-id>.jsonl` beside the benchmark results.
 
+### Deterministic sync audit
+
+For a correctness comparison rather than a speed sample, run the release binary
+with `--sync-audit`. This requires a mnemonic in the local shell and never
+writes it to the report. Set a fixed start and target height when comparing a
+wallet export from another client:
+
+```bash
+export NEXAWAL_MNEMONIC='word1 word2 ... word25'
+export NEXAWAL_AUDIT_START_HEIGHT=3519450
+export NEXAWAL_AUDIT_TARGET_HEIGHT=3671512
+export NEXAWAL_NODE_URL=https://rpc.nexatrode.com
+export NEXAWAL_AUDIT_TIMEOUT_SECS=1800
+cargo run --release -- --sync-audit
+```
+
+When the endpoint is one of the two Nexatrode production hosts, the audit runs
+both nodes sequentially with isolated temporary WalletCore IDs. WalletCore is
+allowed to finish at the current daemon tip so its final transfer ledger is
+persisted; `NEXAWAL_AUDIT_TARGET_HEIGHT` is the comparison ceiling, not an
+early-cancel point. The audit compares transaction IDs, direction, amount, fee,
+block height, and (when both scans are complete) balances. Exit status `0`
+means the node comparison passed; `1` means incomplete or different wallet
+state; `2` means the inputs were not comparable. Reports are written to
+`sync_audit_<run-id>.json`, with RPC telemetry in the neighboring
+`sync_audit_rpc_<run-id>.jsonl` file.
+
+The Feather export and an audit report can be compared without copying wallet
+keys or encrypted caches:
+
+```bash
+python3 scripts/compare-history.py \
+  notes/history_export_wallet_1.csv \
+  "$HOME/Library/Application Support/nexawal/sync_audit_<run-id>.json" \
+  --audit-node monero.nexatrode.com \
+  --max-height 3671512 \
+  --allow-extra
+```
+
+`--allow-extra` is useful when the GPUI scan has reached a newer chain height
+than an older Feather export. The comparator exits nonzero for a Feather row
+missing from GPUI, duplicate transaction IDs, or mismatched direction, amount,
+fee, or block height. For outgoing rows it normalizes Feather's `balanceDelta`
+to WalletCore's gross debit (`amount + fee`). `--allow-missing-fees` exists only
+for reports created before WalletCore historical fee support; fresh audits treat
+a Feather-provided fee missing from WalletCore as a mismatch.
+
 The release executable has the NexaWal icon embedded on Windows. On macOS,
 `cargo run` installs the native padded, rounded icon in the Dock and Cmd-Tab
 switcher. To create a normal signed-ready `.app` bundle with `nexawal.icns`:

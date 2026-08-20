@@ -106,6 +106,14 @@ pub fn scan_benchmark_rpc_path(run_id: u64) -> PathBuf {
     data_dir().join(format!("scan_benchmark_rpc_{run_id}.jsonl"))
 }
 
+pub fn sync_audit_path(run_id: u64) -> PathBuf {
+    data_dir().join(format!("sync_audit_{run_id}.json"))
+}
+
+pub fn sync_audit_rpc_path(run_id: u64) -> PathBuf {
+    data_dir().join(format!("sync_audit_rpc_{run_id}.jsonl"))
+}
+
 /// WalletCore's per-wallet diagnostic log location for a mainnet benchmark wallet.
 pub fn walletcore_log_path(wallet_id: &str) -> PathBuf {
     dirs::data_dir()
