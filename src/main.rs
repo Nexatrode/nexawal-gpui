@@ -184,6 +184,8 @@ struct Home {
     last_scanned_for_stall: u64,
     benchmark_running: bool,
     benchmark_status: Option<SharedString>,
+    node_probe_running: bool,
+    node_probe_status: Option<SharedString>,
     maintenance_confirmation: Option<MaintenanceAction>,
     address_copied_at: Option<Instant>,
     send_dest: String,
@@ -319,6 +321,8 @@ impl Home {
             last_scanned_for_stall: 0,
             benchmark_running: false,
             benchmark_status: None,
+            node_probe_running: false,
+            node_probe_status: None,
             maintenance_confirmation: None,
             address_copied_at: None,
             send_dest: String::new(),
@@ -2141,6 +2145,50 @@ impl Home {
                 this.benchmark_status = Some(status.clone().into());
                 this.status = status.into();
                 this.poll_core();
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    fn probe_scan_node(&mut self, cx: &mut Context<Self>) {
+        if self.node_probe_running {
+            return;
+        }
+        let node = self.scan_node_url();
+        let proxy = self.scan_proxy();
+        self.node_probe_running = true;
+        self.node_probe_status = None;
+        self.status = format!("Testing scan node {node}…").into();
+        cx.notify();
+
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_executor()
+                .spawn(async move { daemon::probe(&node, proxy.as_deref()) })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.node_probe_running = false;
+                match result {
+                    Ok(probe) => {
+                        let target = if probe.target_height == 0 {
+                            "unknown".to_string()
+                        } else {
+                            probe.target_height.to_string()
+                        };
+                        let status = format!(
+                            "Node OK · height {} / target {} · {} ms",
+                            probe.height, target, probe.latency_ms
+                        );
+                        this.node_probe_status = Some(status.clone().into());
+                        this.status = status.into();
+                    }
+                    Err(err) => {
+                        let status = format!("Node test failed: {err}");
+                        this.node_probe_status = Some(status.clone().into());
+                        this.status = status.into();
+                    }
+                }
                 cx.notify();
             });
         })
@@ -3970,6 +4018,18 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
             home.network_policy.label(),
             cx.listener(|this, _: &ClickEvent, _, cx| this.cycle_network_policy(cx)),
         ))
+        .child(action_button(
+            "settings-test-node",
+            if home.node_probe_running {
+                l10n::t("Testing node…")
+            } else {
+                l10n::t("Test scan node")
+            },
+            cx.listener(|this, _: &ClickEvent, _, cx| this.probe_scan_node(cx)),
+        ))
+        .when_some(home.node_probe_status.clone(), |card, status| {
+            card.child(div().text_xs().text_color(rgb(MUTED)).child(status))
+        })
         .when(home.network_policy != network::Policy::I2p, |card| {
             card.child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("Clearnet node")))
                 .child(
