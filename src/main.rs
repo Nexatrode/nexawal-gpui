@@ -63,15 +63,17 @@ actions!(
 
 const WALLET_ID: &str = "main_wallet";
 const GAP_LIMIT: u32 = 50;
-const BG: u32 = 0x0A0F0A;
-const CARD: u32 = 0x121812;
-const ROW: u32 = 0x161E16;
-const FIELD: u32 = 0x0D140D;
-const TEXT: u32 = 0xF2F2F2;
-const MUTED: u32 = 0x8A9A8A;
-const ACCENT: u32 = 0xFF6B35;
-const IN: u32 = 0x6EE7B7;
-const OUT: u32 = 0xF87171;
+// Shared with the iOS/Android Techno theme: black terminal background,
+// neon-green primary text/CTA, green secondary text, and bright green borders.
+const BG: u32 = 0x000000;
+const CARD: u32 = 0x0A0F0A;
+const ROW: u32 = 0x0F1C0F;
+const FIELD: u32 = 0x070B07;
+const TEXT: u32 = 0x39FF14;
+const MUTED: u32 = 0x59BF66;
+const ACCENT: u32 = 0x39FF14;
+const IN: u32 = 0x39FF14;
+const OUT: u32 = 0xFF5959;
 const ACTIVE_SYNC_AUX_POLL_INTERVAL: Duration = Duration::from_secs(10);
 const ACTIVE_SYNC_CACHE_INTERVAL: Duration = Duration::from_secs(120);
 const ACTIVE_SYNC_CACHE_BLOCK_DELTA: u64 = 1_000;
@@ -210,7 +212,44 @@ fn theme_disabled() -> u32 {
 }
 
 fn theme_button_text() -> u32 {
-    0xFFFFFF
+    match active_theme() {
+        Theme::Classic => 0xFFFFFF,
+        Theme::Neon => 0x001A12,
+    }
+}
+
+fn techno_font_family() -> &'static str {
+    #[cfg(target_os = "macos")]
+    {
+        "Menlo"
+    }
+    #[cfg(target_os = "windows")]
+    {
+        "Consolas"
+    }
+    #[cfg(target_os = "linux")]
+    {
+        "DejaVu Sans Mono"
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    {
+        "monospace"
+    }
+}
+
+fn theme_font_family() -> &'static str {
+    match active_theme() {
+        Theme::Classic => ".SystemUIFont",
+        Theme::Neon => techno_font_family(),
+    }
+}
+
+fn theme_display_label(label: SharedString) -> SharedString {
+    if active_theme() == Theme::Neon {
+        label.to_string().to_uppercase().into()
+    } else {
+        label
+    }
 }
 
 fn should_auto_unlock_stored() -> bool {
@@ -2992,6 +3031,7 @@ impl Render for Home {
             .relative()
             .bg(rgb(theme_bg()))
             .text_color(rgb(theme_text()))
+            .font_family(theme_font_family())
             .flex()
             .flex_col()
             .p_6()
@@ -3049,7 +3089,11 @@ fn side_rail(home: &Home, cx: &mut Context<Home>, compact: bool) -> impl IntoEle
                     .text_sm()
                     .font_weight(gpui::FontWeight::SEMIBOLD)
                     .text_color(rgb(theme_accent()))
-                    .child("NexaWal"),
+                    .child(if active_theme() == Theme::Neon {
+                        "NEXAWAL"
+                    } else {
+                        "NexaWal"
+                    }),
             )
         })
         .when(compact, |rail| {
@@ -3106,10 +3150,11 @@ fn side_nav_button(
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
     let label = label.into();
+    let display_label = theme_display_label(label.clone());
     let button_text = if compact {
         icon.to_string()
     } else {
-        format!("{icon}  {label}")
+        format!("{icon}  {display_label}")
     };
 
     div()

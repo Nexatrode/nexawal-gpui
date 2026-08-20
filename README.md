@@ -40,7 +40,8 @@ between them from Settings. The selected theme is stored in the platform's
 NexaWal data directory and applies to the shared wallet, receive, send, and
 settings components. On narrower desktop windows the rail automatically
 collapses to an icon rail while retaining accessible Wallet/Receive/Send/Settings
-labels.
+labels. Techno mode uses the same black/neon-green palette and a platform
+monospaced font family as the iOS and Android Techno implementations.
 
 Keyring v3 does not enable a native backend by default. This repository enables each platform backend explicitly; builds before this change used a temporary in-memory backend and require entering the seed one final time to migrate it into persistent secure storage.
 
