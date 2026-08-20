@@ -186,6 +186,8 @@ struct Home {
     benchmark_status: Option<SharedString>,
     node_probe_running: bool,
     node_probe_status: Option<SharedString>,
+    broadcast_probe_running: bool,
+    broadcast_probe_status: Option<SharedString>,
     maintenance_confirmation: Option<MaintenanceAction>,
     address_copied_at: Option<Instant>,
     send_dest: String,
@@ -323,6 +325,8 @@ impl Home {
             benchmark_status: None,
             node_probe_running: false,
             node_probe_status: None,
+            broadcast_probe_running: false,
+            broadcast_probe_status: None,
             maintenance_confirmation: None,
             address_copied_at: None,
             send_dest: String::new(),
@@ -2195,6 +2199,50 @@ impl Home {
         .detach();
     }
 
+    fn probe_broadcast_node(&mut self, cx: &mut Context<Self>) {
+        if self.broadcast_probe_running {
+            return;
+        }
+        let node = self.broadcast_node_url();
+        let proxy = self.broadcast_proxy();
+        self.broadcast_probe_running = true;
+        self.broadcast_probe_status = None;
+        self.status = format!("Testing broadcast node {node}…").into();
+        cx.notify();
+
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_executor()
+                .spawn(async move { daemon::probe(&node, proxy.as_deref()) })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.broadcast_probe_running = false;
+                match result {
+                    Ok(probe) => {
+                        let target = if probe.target_height == 0 {
+                            "unknown".to_string()
+                        } else {
+                            probe.target_height.to_string()
+                        };
+                        let status = format!(
+                            "Broadcast node OK · height {} / target {} · {} ms",
+                            probe.height, target, probe.latency_ms
+                        );
+                        this.broadcast_probe_status = Some(status.clone().into());
+                        this.status = status.into();
+                    }
+                    Err(err) => {
+                        let status = format!("Broadcast node test failed: {err}");
+                        this.broadcast_probe_status = Some(status.clone().into());
+                        this.status = status.into();
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     fn forget(&mut self, cx: &mut Context<Self>) {
         let _ = api::refresh_cancel(WALLET_ID);
         let _ = api::reset_tracked_outputs(WALLET_ID);
@@ -4028,6 +4076,18 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
             cx.listener(|this, _: &ClickEvent, _, cx| this.probe_scan_node(cx)),
         ))
         .when_some(home.node_probe_status.clone(), |card, status| {
+            card.child(div().text_xs().text_color(rgb(MUTED)).child(status))
+        })
+        .child(action_button(
+            "settings-test-broadcast-node",
+            if home.broadcast_probe_running {
+                l10n::t("Testing broadcast…")
+            } else {
+                l10n::t("Test broadcast node")
+            },
+            cx.listener(|this, _: &ClickEvent, _, cx| this.probe_broadcast_node(cx)),
+        ))
+        .when_some(home.broadcast_probe_status.clone(), |card, status| {
             card.child(div().text_xs().text_color(rgb(MUTED)).child(status))
         })
         .when(home.network_policy != network::Policy::I2p, |card| {
