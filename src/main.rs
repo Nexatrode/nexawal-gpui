@@ -764,6 +764,15 @@ impl Home {
         cx.notify();
     }
 
+    fn copy_transfer_amount(&mut self, index: usize, cx: &mut Context<Self>) {
+        let Some(row) = self.transfers.get(index) else {
+            return;
+        };
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string(format_xmr(row.amount)));
+        self.status = l10n::t("Transaction amount copied.").into();
+        cx.notify();
+    }
+
     fn focus_history_search(
         &mut self,
         _: &FocusHistorySearch,
@@ -4631,6 +4640,13 @@ fn transfer_detail(row: &Transfer, index: usize, cx: &mut Context<Home>) -> impl
             l10n::t("Copy transaction ID"),
             cx.listener(move |this, _: &ClickEvent, _, cx| {
                 this.copy_transfer_txid(index, cx);
+            }),
+        ))
+        .child(action_button(
+            "copy-transfer-amount",
+            l10n::t("Copy amount"),
+            cx.listener(move |this, _: &ClickEvent, _, cx| {
+                this.copy_transfer_amount(index, cx);
             }),
         ))
 }
