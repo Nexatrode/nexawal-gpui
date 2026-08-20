@@ -2980,7 +2980,10 @@ impl Render for Home {
                         self.screen,
                         Screen::Wallet | Screen::Receive | Screen::Send | Screen::Settings
                     ),
-                |shell| shell.child(side_rail(self, cx)),
+                |shell| {
+                    let compact = window.viewport_size().width < px(760.);
+                    shell.child(side_rail(self, cx, compact))
+                },
             )
             .child(body);
 
@@ -3027,30 +3030,45 @@ impl Render for Home {
     }
 }
 
-fn side_rail(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
+fn side_rail(home: &Home, cx: &mut Context<Home>, compact: bool) -> impl IntoElement {
     div()
         .id("desktop-side-rail")
-        .w(px(156.))
+        .when(compact, |rail| rail.w(px(56.)))
+        .when(!compact, |rail| rail.w(px(156.)))
         .flex()
         .flex_col()
         .gap_2()
         .p_3()
         .rounded_lg()
         .bg(rgb(theme_card()))
-        .child(
-            div()
-                .px_2()
-                .pb_2()
-                .text_sm()
-                .font_weight(gpui::FontWeight::SEMIBOLD)
-                .text_color(rgb(theme_accent()))
-                .child("NexaWal"),
-        )
+        .when(!compact, |rail| {
+            rail.child(
+                div()
+                    .px_2()
+                    .pb_2()
+                    .text_sm()
+                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .text_color(rgb(theme_accent()))
+                    .child("NexaWal"),
+            )
+        })
+        .when(compact, |rail| {
+            rail.child(
+                div()
+                    .pb_2()
+                    .text_sm()
+                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .text_color(rgb(theme_accent()))
+                    .text_center()
+                    .child("N"),
+            )
+        })
         .child(side_nav_button(
             "rail-wallet",
             "●",
             l10n::t("Wallet"),
             home.screen == Screen::Wallet,
+            compact,
             cx.listener(|this, _: &ClickEvent, _, cx| this.go_wallet(cx)),
         ))
         .child(side_nav_button(
@@ -3058,6 +3076,7 @@ fn side_rail(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
             "↓",
             l10n::t("Receive"),
             home.screen == Screen::Receive,
+            compact,
             cx.listener(|this, _: &ClickEvent, _, cx| this.go_receive(cx)),
         ))
         .child(side_nav_button(
@@ -3065,6 +3084,7 @@ fn side_rail(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
             "↑",
             l10n::t("Send"),
             home.screen == Screen::Send,
+            compact,
             cx.listener(|this, _: &ClickEvent, _, cx| this.go_send(cx)),
         ))
         .child(side_nav_button(
@@ -3072,6 +3092,7 @@ fn side_rail(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
             "⚙",
             l10n::t("Settings"),
             home.screen == Screen::Settings,
+            compact,
             cx.listener(|this, _: &ClickEvent, _, cx| this.go_settings(cx)),
         ))
 }
@@ -3081,8 +3102,16 @@ fn side_nav_button(
     icon: &'static str,
     label: impl Into<SharedString>,
     selected: bool,
+    compact: bool,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
+    let label = label.into();
+    let button_text = if compact {
+        icon.to_string()
+    } else {
+        format!("{icon}  {label}")
+    };
+
     div()
         .id(id)
         .w_full()
@@ -3099,9 +3128,11 @@ fn side_nav_button(
         } else {
             theme_text()
         }))
+        .when(compact, |button| button.justify_center().text_lg())
+        .aria_label(label)
         .cursor(CursorStyle::PointingHand)
         .on_click(listener)
-        .child(format!("{icon}  {}", label.into()))
+        .child(button_text)
 }
 
 fn header(home: &Home) -> impl IntoElement {
@@ -4380,7 +4411,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 .text_xs()
                 .text_color(rgb(theme_muted()))
                 .child(l10n::t(
-                    "Classic matches the mobile/Catalyst feel; Neon / Techno keeps the original NexaWal style.",
+                    "Neon terminal look. Leave off for the standard theme (default).",
                 )),
         )
         .child(action_button(
