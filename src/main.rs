@@ -733,6 +733,18 @@ impl Home {
         self.transfers = rows;
     }
 
+    fn refresh_wallet_snapshots(&mut self, cx: &mut Context<Self>) {
+        if !self.opened {
+            self.status = l10n::t("Open a wallet before refreshing transfers.").into();
+            cx.notify();
+            return;
+        }
+        self.refresh_balance_snapshot();
+        self.refresh_transfers_snapshot();
+        self.status = l10n::t("Transfers and balance refreshed.").into();
+        cx.notify();
+    }
+
     fn select_transfer(&mut self, index: usize, cx: &mut Context<Self>) {
         if index >= self.transfers.len() {
             return;
@@ -4368,6 +4380,13 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 }),
             ))
         })
+        .child(action_button(
+            "history-refresh-transfers",
+            l10n::t("Refresh transfers"),
+            cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.refresh_wallet_snapshots(cx);
+            }),
+        ))
         .when(no_transfers, |list| {
             list.child(
                 div()
@@ -4382,14 +4401,7 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                     .child(l10n::t("No transfers found yet."))
                     .child(div().text_xs().child(l10n::t(
                         "New transactions will appear here after the wallet scan.",
-                    )))
-                    .child(action_button(
-                        "history-refresh",
-                        l10n::t("Refresh history"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.retry_refresh(cx);
-                        }),
-                    )),
+                    ))),
             )
         })
         .when(no_matches, |list| {
