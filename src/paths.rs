@@ -58,6 +58,22 @@ pub fn network_policy_path() -> PathBuf {
     data_dir().join("network_policy")
 }
 
+pub fn theme_path() -> PathBuf {
+    data_dir().join("theme")
+}
+
+pub fn load_theme() -> String {
+    fs::read_to_string(theme_path())
+        .ok()
+        .map(|value| value.trim().to_lowercase())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "classic".to_string())
+}
+
+pub fn save_theme(theme: &str) -> std::io::Result<()> {
+    write_bytes(theme_path(), theme.trim().as_bytes())
+}
+
 pub fn i2p_rpc_path() -> PathBuf {
     data_dir().join("i2p_rpc")
 }

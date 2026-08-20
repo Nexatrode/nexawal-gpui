@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::fs;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU8, Ordering as AtomicOrdering};
 use std::time::{Duration, Instant};
 
 #[cfg(target_os = "macos")]
@@ -74,6 +75,143 @@ const OUT: u32 = 0xF87171;
 const ACTIVE_SYNC_AUX_POLL_INTERVAL: Duration = Duration::from_secs(10);
 const ACTIVE_SYNC_CACHE_INTERVAL: Duration = Duration::from_secs(120);
 const ACTIVE_SYNC_CACHE_BLOCK_DELTA: u64 = 1_000;
+static ACTIVE_THEME: AtomicU8 = AtomicU8::new(0);
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Theme {
+    Classic,
+    Neon,
+}
+
+impl Theme {
+    fn from_stored(value: &str) -> Self {
+        if value.eq_ignore_ascii_case("neon") || value.eq_ignore_ascii_case("techno") {
+            Self::Neon
+        } else {
+            Self::Classic
+        }
+    }
+
+    fn next(self) -> Self {
+        match self {
+            Self::Classic => Self::Neon,
+            Self::Neon => Self::Classic,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Classic => "Classic",
+            Self::Neon => "Neon / Techno",
+        }
+    }
+
+    fn stored(self) -> &'static str {
+        match self {
+            Self::Classic => "classic",
+            Self::Neon => "neon",
+        }
+    }
+}
+
+fn apply_theme(theme: Theme) {
+    ACTIVE_THEME.store(
+        match theme {
+            Theme::Classic => 0,
+            Theme::Neon => 1,
+        },
+        AtomicOrdering::Relaxed,
+    );
+}
+
+fn active_theme() -> Theme {
+    if ACTIVE_THEME.load(AtomicOrdering::Relaxed) == 1 {
+        Theme::Neon
+    } else {
+        Theme::Classic
+    }
+}
+
+fn theme_bg() -> u32 {
+    match active_theme() {
+        Theme::Classic => 0x10161F,
+        Theme::Neon => BG,
+    }
+}
+
+fn theme_card() -> u32 {
+    match active_theme() {
+        Theme::Classic => 0x1A2330,
+        Theme::Neon => CARD,
+    }
+}
+
+fn theme_row() -> u32 {
+    match active_theme() {
+        Theme::Classic => 0x222D3B,
+        Theme::Neon => ROW,
+    }
+}
+
+fn theme_field() -> u32 {
+    match active_theme() {
+        Theme::Classic => 0x131B26,
+        Theme::Neon => FIELD,
+    }
+}
+
+fn theme_text() -> u32 {
+    match active_theme() {
+        Theme::Classic => 0xF3F6FA,
+        Theme::Neon => TEXT,
+    }
+}
+
+fn theme_muted() -> u32 {
+    match active_theme() {
+        Theme::Classic => 0xAAB7C8,
+        Theme::Neon => MUTED,
+    }
+}
+
+fn theme_accent() -> u32 {
+    match active_theme() {
+        Theme::Classic => 0x5B9BFF,
+        Theme::Neon => ACCENT,
+    }
+}
+
+fn theme_in() -> u32 {
+    match active_theme() {
+        Theme::Classic => 0x50D6A0,
+        Theme::Neon => IN,
+    }
+}
+
+fn theme_out() -> u32 {
+    match active_theme() {
+        Theme::Classic => 0xFF7B86,
+        Theme::Neon => OUT,
+    }
+}
+
+fn theme_border() -> u32 {
+    match active_theme() {
+        Theme::Classic => 0x3A4B63,
+        Theme::Neon => 0x2A3A2A,
+    }
+}
+
+fn theme_disabled() -> u32 {
+    match active_theme() {
+        Theme::Classic => 0x2A3545,
+        Theme::Neon => 0x2A332A,
+    }
+}
+
+fn theme_button_text() -> u32 {
+    0xFFFFFF
+}
 
 fn should_auto_unlock_stored() -> bool {
     let initial_seed = env_or("NEXAWAL_MNEMONIC", "");
@@ -170,6 +308,7 @@ struct Home {
     transfer_filter: TransferFilter,
     transfer_search: String,
     transfer_search_focus: FocusHandle,
+    theme: Theme,
     last_exported_scanned: Option<u64>,
     last_cache_persist_at: Option<Instant>,
     last_balance_poll_at: Option<Instant>,
@@ -225,6 +364,8 @@ struct Home {
 
 impl Home {
     fn new(cx: &mut Context<Self>) -> Self {
+        let theme = Theme::from_stored(&paths::load_theme());
+        apply_theme(theme);
         let has_stored = wallet_store::is_marked_stored();
         let needs_terms = paths::terms_need_accept();
         let initial_seed = env_or("NEXAWAL_MNEMONIC", "");
@@ -310,6 +451,7 @@ impl Home {
             transfer_filter: TransferFilter::All,
             transfer_search: String::new(),
             last_exported_scanned: None,
+            theme,
             last_cache_persist_at: None,
             last_balance_poll_at: None,
             last_transfers_poll_at: None,
@@ -1464,6 +1606,14 @@ impl Home {
         self.screen = Screen::Settings;
         self.active = Field::Node;
         self.status = l10n::t("Settings · node URL is saved locally.").into();
+        cx.notify();
+    }
+
+    fn toggle_theme(&mut self, cx: &mut Context<Self>) {
+        self.theme = self.theme.next();
+        apply_theme(self.theme);
+        let _ = paths::save_theme(self.theme.stored());
+        self.status = format!("Theme: {}.", self.theme.label()).into();
         cx.notify();
     }
 
@@ -2818,11 +2968,27 @@ impl Render for Home {
                 body.child(history(self, cx))
             });
 
+        let shell = div()
+            .flex()
+            .flex_row()
+            .flex_1()
+            .min_h(px(0.))
+            .gap_4()
+            .when(
+                self.opened
+                    && matches!(
+                        self.screen,
+                        Screen::Wallet | Screen::Receive | Screen::Send | Screen::Settings
+                    ),
+                |shell| shell.child(side_rail(self, cx)),
+            )
+            .child(body);
+
         div()
             .size_full()
             .relative()
-            .bg(rgb(BG))
-            .text_color(rgb(TEXT))
+            .bg(rgb(theme_bg()))
+            .text_color(rgb(theme_text()))
             .flex()
             .flex_col()
             .p_6()
@@ -2856,9 +3022,86 @@ impl Render for Home {
                 this.insert_typed(event, cx);
             }))
             .child(header(self))
-            .child(body)
+            .child(shell)
             .child(resize_handle())
     }
+}
+
+fn side_rail(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
+    div()
+        .id("desktop-side-rail")
+        .w(px(156.))
+        .flex()
+        .flex_col()
+        .gap_2()
+        .p_3()
+        .rounded_lg()
+        .bg(rgb(theme_card()))
+        .child(
+            div()
+                .px_2()
+                .pb_2()
+                .text_sm()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(rgb(theme_accent()))
+                .child("NexaWal"),
+        )
+        .child(side_nav_button(
+            "rail-wallet",
+            "●",
+            l10n::t("Wallet"),
+            home.screen == Screen::Wallet,
+            cx.listener(|this, _: &ClickEvent, _, cx| this.go_wallet(cx)),
+        ))
+        .child(side_nav_button(
+            "rail-receive",
+            "↓",
+            l10n::t("Receive"),
+            home.screen == Screen::Receive,
+            cx.listener(|this, _: &ClickEvent, _, cx| this.go_receive(cx)),
+        ))
+        .child(side_nav_button(
+            "rail-send",
+            "↑",
+            l10n::t("Send"),
+            home.screen == Screen::Send,
+            cx.listener(|this, _: &ClickEvent, _, cx| this.go_send(cx)),
+        ))
+        .child(side_nav_button(
+            "rail-settings",
+            "⚙",
+            l10n::t("Settings"),
+            home.screen == Screen::Settings,
+            cx.listener(|this, _: &ClickEvent, _, cx| this.go_settings(cx)),
+        ))
+}
+
+fn side_nav_button(
+    id: &'static str,
+    icon: &'static str,
+    label: impl Into<SharedString>,
+    selected: bool,
+    listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    div()
+        .id(id)
+        .w_full()
+        .px_2()
+        .py_2()
+        .rounded_md()
+        .bg(rgb(if selected {
+            theme_accent()
+        } else {
+            theme_field()
+        }))
+        .text_color(rgb(if selected {
+            theme_button_text()
+        } else {
+            theme_text()
+        }))
+        .cursor(CursorStyle::PointingHand)
+        .on_click(listener)
+        .child(format!("{icon}  {}", label.into()))
 }
 
 fn header(home: &Home) -> impl IntoElement {
@@ -2881,15 +3124,20 @@ fn header(home: &Home) -> impl IntoElement {
             div()
                 .text_xl()
                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                .text_color(rgb(ACCENT))
+                .text_color(rgb(theme_accent()))
                 .child("nexawal"),
         )
-        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
-            "{} · {} · {}",
-            home.core_version,
-            std::env::consts::OS,
-            std::env::consts::ARCH
-        )))
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(theme_muted()))
+                .child(format!(
+                    "{} · {} · {}",
+                    home.core_version,
+                    std::env::consts::OS,
+                    std::env::consts::ARCH
+                )),
+        )
 }
 
 fn resize_handle() -> impl IntoElement {
@@ -2917,8 +3165,8 @@ fn unlocking_card(home: &Home) -> impl IntoElement {
         .gap_4()
         .p_6()
         .rounded_lg()
-        .bg(rgb(CARD))
-        .child(div().text_3xl().text_color(rgb(ACCENT)).child("◉"))
+        .bg(rgb(theme_card()))
+        .child(div().text_3xl().text_color(rgb(theme_accent())).child("◉"))
         .child(
             div()
                 .text_xl()
@@ -2928,7 +3176,7 @@ fn unlocking_card(home: &Home) -> impl IntoElement {
         .child(
             div()
                 .text_sm()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .child(if home.require_device_auth {
                     l10n::t("Use biometrics or device credentials for wallet access and sending.")
                 } else {
@@ -2960,7 +3208,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
         .gap_3()
         .p_5()
         .rounded_lg()
-        .bg(rgb(CARD))
+        .bg(rgb(theme_card()))
         .when(home.has_stored, |card| {
             card.child(
                 div()
@@ -2970,8 +3218,8 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                     .p_4()
                     .rounded_md()
                     .border_1()
-                    .border_color(rgb(ACCENT))
-                    .bg(rgb(FIELD))
+                    .border_color(rgb(theme_accent()))
+                    .bg(rgb(theme_field()))
                 .child(
                     div()
                         .text_lg()
@@ -2981,7 +3229,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                     .child(
                         div()
                             .text_sm()
-                            .text_color(rgb(MUTED))
+                            .text_color(rgb(theme_muted()))
                             .child(format!(
                                 "Your recovery seed is stored in {}. Open it with the same wallet screens, settings, history, and local scan cache.",
                                 wallet_store::secure_store_name()
@@ -3031,7 +3279,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
         .when(show_restore_form, |card| {
             card
                 .child(
-                    div().text_xs().text_color(rgb(MUTED)).child(if home.network_policy == network::Policy::I2p {
+                    div().text_xs().text_color(rgb(theme_muted())).child(if home.network_policy == network::Policy::I2p {
                         l10n::t("Scan uses the I2P node from Settings")
                     } else {
                         l10n::t("Node URL")
@@ -3046,9 +3294,9 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                             .cursor(CursorStyle::IBeam)
                             .p_3()
                             .rounded_md()
-                            .bg(rgb(FIELD))
+                            .bg(rgb(theme_field()))
                             .border_1()
-                            .border_color(rgb(if node_focused { ACCENT } else { 0x2A3A2A }))
+                            .border_color(rgb(if node_focused { theme_accent() } else { theme_border() }))
                             .text_sm()
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                                 this.focus_field(Field::Node, window, cx);
@@ -3056,7 +3304,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                             .child(home.node_url.clone()),
                     )
                 })
-                .child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("Seed phrase")))
+                .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("Seed phrase")))
                 .child(
                     div()
                         .id("seed-field")
@@ -3066,11 +3314,11 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         .min_h(px(88.))
                         .p_3()
                         .rounded_md()
-                        .bg(rgb(FIELD))
+                        .bg(rgb(theme_field()))
                         .border_1()
-                        .border_color(rgb(if seed_focused { ACCENT } else { 0x2A3A2A }))
+                        .border_color(rgb(if seed_focused { theme_accent() } else { theme_border() }))
                         .text_sm()
-                        .text_color(rgb(if seed_muted { MUTED } else { TEXT }))
+                        .text_color(rgb(if seed_muted { theme_muted() } else { theme_text() }))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             this.focus_field(Field::Seed, window, cx);
                         }))
@@ -3079,14 +3327,14 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                 .child(
                     div()
                         .text_xs()
-                        .text_color(rgb(MUTED))
+                        .text_color(rgb(theme_muted()))
                         .child(format!("{} words", home.word_count())),
                 )
                 .when(home.created_seed, |card| {
                     card.child(
                         div()
                             .text_xs()
-                            .text_color(rgb(MUTED))
+                            .text_color(rgb(theme_muted()))
                             .child(l10n::t(
                                 "This is your recovery seed. Write it down on paper and store it somewhere safe. Anyone with these words can access your funds.",
                             )),
@@ -3110,7 +3358,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                     card.child(
                         div()
                             .text_xs()
-                            .text_color(rgb(MUTED))
+                            .text_color(rgb(theme_muted()))
                             .child(l10n::t(
                                 "Confirm you wrote it down: enter the requested words below.",
                             )),
@@ -3146,7 +3394,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         card.child(
                             div()
                                 .text_xs()
-                                .text_color(rgb(OUT))
+                                .text_color(rgb(theme_out()))
                                 .child(l10n::t("Word(s) don't match yet.")),
                         )
                     })
@@ -3154,7 +3402,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                 .child(
                     div()
                         .text_xs()
-                        .text_color(rgb(MUTED))
+                        .text_color(rgb(theme_muted()))
                         .child(if home.created_seed && home.height_fetching {
                             l10n::t("Fetching a fast restore height…")
                         } else if home.created_seed {
@@ -3172,9 +3420,9 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         .h(px(36.))
                         .px_3()
                         .rounded_md()
-                        .bg(rgb(FIELD))
+                        .bg(rgb(theme_field()))
                         .border_1()
-                        .border_color(rgb(if height_focused { ACCENT } else { 0x2A3A2A }))
+                        .border_color(rgb(if height_focused { theme_accent() } else { theme_border() }))
                         .flex()
                         .items_center()
                         .text_sm()
@@ -3219,8 +3467,8 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                                     .px_3()
                                     .py_2()
                                     .rounded_md()
-                                    .bg(rgb(0x2A332A))
-                                    .text_color(rgb(MUTED))
+                                    .bg(rgb(theme_disabled()))
+                                    .text_color(rgb(theme_muted()))
                                     .child(l10n::t("Open & sync")),
                             )
                         })
@@ -3258,7 +3506,7 @@ fn challenge_row(
         .child(
             div()
                 .text_sm()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .w(px(80.))
                 .child(format!("Word #{}", word_index + 1)),
         )
@@ -3273,11 +3521,15 @@ fn challenge_row(
                 .flex_1()
                 .p_3()
                 .rounded_md()
-                .bg(rgb(FIELD))
+                .bg(rgb(theme_field()))
                 .border_1()
-                .border_color(rgb(if focused { ACCENT } else { 0x2A3A2A }))
+                .border_color(rgb(if focused {
+                    theme_accent()
+                } else {
+                    theme_border()
+                }))
                 .text_sm()
-                .text_color(rgb(if muted { MUTED } else { TEXT }))
+                .text_color(rgb(if muted { theme_muted() } else { theme_text() }))
                 .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                     this.challenge_slot = slot;
                     this.focus_field(Field::Challenge, window, cx);
@@ -3297,35 +3549,40 @@ fn opened_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         .gap_2()
         .p_5()
         .rounded_lg()
-        .bg(rgb(CARD))
+        .bg(rgb(theme_card()))
         .child(
             div()
                 .id("copy-address-row")
                 .cursor(CursorStyle::PointingHand)
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.copy_address(cx)))
-                .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
-                    "{}  ·  {}",
-                    truncate_middle(&home.address, 12, 12),
-                    if home.address_copy_hint_active() {
-                        "copied"
-                    } else {
-                        "click to copy"
-                    }
-                ))),
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(theme_muted()))
+                        .child(format!(
+                            "{}  ·  {}",
+                            truncate_middle(&home.address, 12, 12),
+                            if home.address_copy_hint_active() {
+                                "copied"
+                            } else {
+                                "click to copy"
+                            }
+                        )),
+                ),
         )
         .child(div().text_3xl().child(format_xmr(home.total_piconero)))
         .when(home.fiat_line(home.total_piconero).is_some(), |card| {
             card.child(
                 div()
                     .text_sm()
-                    .text_color(rgb(MUTED))
+                    .text_color(rgb(theme_muted()))
                     .child(home.fiat_line(home.total_piconero).unwrap_or_default()),
             )
         })
         .child(
             div()
                 .text_sm()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .child(format!("Unlocked {}", format_xmr(home.unlocked_piconero))),
         )
         .child(action_button(
@@ -3371,7 +3628,7 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
             .gap_2()
             .p_5()
             .rounded_lg()
-            .bg(rgb(CARD))
+            .bg(rgb(theme_card()))
             .child(div().text_sm().child(l10n::t("Connecting to node")))
             .into_any_element();
     };
@@ -3411,11 +3668,11 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         _ => detail,
     };
     let dot = if error.is_some() && !running {
-        OUT
+        theme_out()
     } else if synced {
-        IN
+        theme_in()
     } else {
-        ACCENT
+        theme_accent()
     };
     let show_progress = !synced || running;
     let expanded = home.scan_details_expanded;
@@ -3427,7 +3684,7 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         .gap_2()
         .p_5()
         .rounded_lg()
-        .bg(rgb(CARD))
+        .bg(rgb(theme_card()))
         .child(
             div()
                 .id("sync-toggle")
@@ -3447,14 +3704,24 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                         .font_weight(gpui::FontWeight::SEMIBOLD)
                         .child(headline),
                 )
-                .child(div().text_xs().text_color(rgb(ACCENT)).child(if expanded {
-                    format!("{} {}", "v", l10n::t(sync_status::HIDE_SYNC_DETAILS))
-                } else {
-                    format!("{} {}", ">", l10n::t(sync_status::SHOW_SYNC_DETAILS))
-                })),
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(theme_accent()))
+                        .child(if expanded {
+                            format!("{} {}", "v", l10n::t(sync_status::HIDE_SYNC_DETAILS))
+                        } else {
+                            format!("{} {}", ">", l10n::t(sync_status::SHOW_SYNC_DETAILS))
+                        }),
+                ),
         )
         .when(expanded, |card| {
-            card.child(div().text_xs().text_color(rgb(MUTED)).child(detail.clone()))
+            card.child(
+                div()
+                    .text_xs()
+                    .text_color(rgb(theme_muted()))
+                    .child(detail.clone()),
+            )
         })
         .when(show_progress, |card| {
             card.child(
@@ -3462,14 +3729,14 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                     .w_full()
                     .h(px(6.))
                     .rounded_full()
-                    .bg(rgb(FIELD))
+                    .bg(rgb(theme_field()))
                     .overflow_hidden()
                     .child(
                         div()
                             .h_full()
                             .rounded_full()
                             .w(relative(fill))
-                            .bg(rgb(ACCENT)),
+                            .bg(rgb(theme_accent())),
                     ),
             )
         })
@@ -3506,7 +3773,7 @@ fn sync_kv(label: SharedString, value: String) -> impl IntoElement {
         .flex_row()
         .justify_between()
         .gap_3()
-        .child(div().text_xs().text_color(rgb(MUTED)).child(label))
+        .child(div().text_xs().text_color(rgb(theme_muted())).child(label))
         .child(div().text_xs().child(value))
 }
 
@@ -3547,11 +3814,11 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
         .gap_3()
         .p_5()
         .rounded_lg()
-        .bg(rgb(CARD))
+        .bg(rgb(theme_card()))
         .child(
             div()
                 .text_sm()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .child(l10n::t("Receive")),
         )
         .child(
@@ -3585,7 +3852,7 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .child(l10n::t("Label")),
         )
         .child(
@@ -3596,11 +3863,19 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                 .cursor(CursorStyle::IBeam)
                 .p_3()
                 .rounded_md()
-                .bg(rgb(FIELD))
+                .bg(rgb(theme_field()))
                 .border_1()
-                .border_color(rgb(if label_focused { ACCENT } else { 0x2A3A2A }))
+                .border_color(rgb(if label_focused {
+                    theme_accent()
+                } else {
+                    theme_border()
+                }))
                 .text_sm()
-                .text_color(rgb(if label_muted { MUTED } else { TEXT }))
+                .text_color(rgb(if label_muted {
+                    theme_muted()
+                } else {
+                    theme_text()
+                }))
                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                     this.focus_field(Field::RecvLabel, window, cx);
                 }))
@@ -3620,7 +3895,7 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                 .cursor(CursorStyle::PointingHand)
                 .p_3()
                 .rounded_md()
-                .bg(rgb(FIELD))
+                .bg(rgb(theme_field()))
                 .text_sm()
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.copy_address(cx)))
                 .child(home.receive_address.clone()),
@@ -3628,7 +3903,7 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .child(match home.recv_amount_mode {
                     AmountMode::Xmr => l10n::t("Amount (optional, XMR)").to_string(),
                     AmountMode::Fiat => format!("Amount (optional, {})", home.fiat_currency),
@@ -3642,11 +3917,19 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                 .cursor(CursorStyle::IBeam)
                 .p_3()
                 .rounded_md()
-                .bg(rgb(FIELD))
+                .bg(rgb(theme_field()))
                 .border_1()
-                .border_color(rgb(if amount_focused { ACCENT } else { 0x2A3A2A }))
+                .border_color(rgb(if amount_focused {
+                    theme_accent()
+                } else {
+                    theme_border()
+                }))
                 .text_sm()
-                .text_color(rgb(if amount_muted { MUTED } else { TEXT }))
+                .text_color(rgb(if amount_muted {
+                    theme_muted()
+                } else {
+                    theme_text()
+                }))
                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                     this.focus_field(Field::RecvAmount, window, cx);
                 }))
@@ -3667,14 +3950,14 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
             card.child(
                 div()
                     .text_xs()
-                    .text_color(rgb(MUTED))
+                    .text_color(rgb(theme_muted()))
                     .child(recv_secondary.clone().unwrap_or_default()),
             )
         })
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .child(l10n::t("Description (optional)")),
         )
         .child(
@@ -3685,26 +3968,31 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                 .cursor(CursorStyle::IBeam)
                 .p_3()
                 .rounded_md()
-                .bg(rgb(FIELD))
+                .bg(rgb(theme_field()))
                 .border_1()
-                .border_color(rgb(if desc_focused { ACCENT } else { 0x2A3A2A }))
+                .border_color(rgb(if desc_focused {
+                    theme_accent()
+                } else {
+                    theme_border()
+                }))
                 .text_sm()
-                .text_color(rgb(if desc_muted { MUTED } else { TEXT }))
+                .text_color(rgb(if desc_muted {
+                    theme_muted()
+                } else {
+                    theme_text()
+                }))
                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                     this.focus_field(Field::RecvDesc, window, cx);
                 }))
                 .child(desc_label),
         )
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(MUTED))
-                .child(if home.address_copy_hint_active() {
-                    "Copied.".to_string()
-                } else {
-                    uri
-                }),
-        )
+        .child(div().text_xs().text_color(rgb(theme_muted())).child(
+            if home.address_copy_hint_active() {
+                "Copied.".to_string()
+            } else {
+                uri
+            },
+        ))
         .child(action_button(
             "receive-copy",
             l10n::t("Copy address"),
@@ -3782,17 +4070,17 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
         .gap_3()
         .p_5()
         .rounded_lg()
-        .bg(rgb(CARD))
+        .bg(rgb(theme_card()))
         .child(
             div()
                 .text_sm()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .child(l10n::t("Send")),
         )
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .child(l10n::t("Destination")),
         )
         .child(
@@ -3804,11 +4092,19 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
                 .min_h(px(56.))
                 .p_3()
                 .rounded_md()
-                .bg(rgb(FIELD))
+                .bg(rgb(theme_field()))
                 .border_1()
-                .border_color(rgb(if dest_focused { ACCENT } else { 0x2A3A2A }))
+                .border_color(rgb(if dest_focused {
+                    theme_accent()
+                } else {
+                    theme_border()
+                }))
                 .text_sm()
-                .text_color(rgb(if dest_muted { MUTED } else { TEXT }))
+                .text_color(rgb(if dest_muted {
+                    theme_muted()
+                } else {
+                    theme_text()
+                }))
                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                     this.focus_field(Field::Dest, window, cx);
                 }))
@@ -3873,7 +4169,7 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .child(match home.send_amount_mode {
                     AmountMode::Xmr => l10n::t("Amount (XMR)").to_string(),
                     AmountMode::Fiat => format!("Amount ({})", home.fiat_currency),
@@ -3887,11 +4183,19 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
                 .cursor(CursorStyle::IBeam)
                 .p_3()
                 .rounded_md()
-                .bg(rgb(FIELD))
+                .bg(rgb(theme_field()))
                 .border_1()
-                .border_color(rgb(if amount_focused { ACCENT } else { 0x2A3A2A }))
+                .border_color(rgb(if amount_focused {
+                    theme_accent()
+                } else {
+                    theme_border()
+                }))
                 .text_sm()
-                .text_color(rgb(if amount_muted { MUTED } else { TEXT }))
+                .text_color(rgb(if amount_muted {
+                    theme_muted()
+                } else {
+                    theme_text()
+                }))
                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                     this.focus_field(Field::Amount, window, cx);
                 }))
@@ -3912,15 +4216,20 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
             card.child(
                 div()
                     .text_xs()
-                    .text_color(rgb(MUTED))
+                    .text_color(rgb(theme_muted()))
                     .child(send_secondary.clone().unwrap_or_default()),
             )
         })
-        .child(div().text_xs().text_color(rgb(MUTED)).child(fee_line))
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
+                .child(fee_line),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(theme_muted()))
                 .child(home.network_policy.label()),
         )
         .child(action_button(
@@ -3956,7 +4265,7 @@ fn terms_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         .gap_3()
         .p_5()
         .rounded_lg()
-        .bg(rgb(CARD))
+        .bg(rgb(theme_card()))
         .child(
             div()
                 .text_xl()
@@ -3966,7 +4275,7 @@ fn terms_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         .children(
             legal::SUMMARY
                 .iter()
-                .map(|line| div().text_sm().text_color(rgb(MUTED)).child(*line)),
+                .map(|line| div().text_sm().text_color(rgb(theme_muted())).child(*line)),
         )
         .child(action_button(
             "review-terms",
@@ -3996,8 +4305,8 @@ fn terms_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                     .px_3()
                     .py_2()
                     .rounded_md()
-                    .bg(rgb(0x2A332A))
-                    .text_color(rgb(MUTED))
+                    .bg(rgb(theme_disabled()))
+                    .text_color(rgb(theme_muted()))
                     .child(l10n::t("I Agree")),
             )
         })
@@ -4022,7 +4331,7 @@ fn legal_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         .gap_3()
         .p_5()
         .rounded_lg()
-        .bg(rgb(CARD))
+        .bg(rgb(theme_card()))
         .flex_1()
         .min_h(px(240.))
         .child(
@@ -4037,7 +4346,7 @@ fn legal_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 .flex_1()
                 .overflow_y_scroll()
                 .text_xs()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .child(home.legal_doc.body()),
         )
         .child(action_button(
@@ -4058,9 +4367,22 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
         .gap_3()
         .p_5()
         .rounded_lg()
-        .bg(rgb(CARD))
-        .child(div().text_sm().text_color(rgb(MUTED)).child(l10n::t("Settings")))
-        .child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("How to connect")))
+        .bg(rgb(theme_card()))
+        .child(div().text_sm().text_color(rgb(theme_muted())).child(l10n::t("Settings")))
+        .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("How to connect")))
+        .child(action_button(
+            "settings-theme",
+            format!("Theme: {}", home.theme.label()),
+            cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_theme(cx)),
+        ))
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(theme_muted()))
+                .child(l10n::t(
+                    "Classic matches the mobile/Catalyst feel; Neon / Techno keeps the original NexaWal style.",
+                )),
+        )
         .child(action_button(
             "net-policy",
             home.network_policy.label(),
@@ -4076,7 +4398,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
             cx.listener(|this, _: &ClickEvent, _, cx| this.probe_scan_node(cx)),
         ))
         .when_some(home.node_probe_status.clone(), |card, status| {
-            card.child(div().text_xs().text_color(rgb(MUTED)).child(status))
+            card.child(div().text_xs().text_color(rgb(theme_muted())).child(status))
         })
         .child(action_button(
             "settings-test-broadcast-node",
@@ -4088,10 +4410,10 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
             cx.listener(|this, _: &ClickEvent, _, cx| this.probe_broadcast_node(cx)),
         ))
         .when_some(home.broadcast_probe_status.clone(), |card, status| {
-            card.child(div().text_xs().text_color(rgb(MUTED)).child(status))
+            card.child(div().text_xs().text_color(rgb(theme_muted())).child(status))
         })
         .when(home.network_policy != network::Policy::I2p, |card| {
-            card.child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("Clearnet node")))
+            card.child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("Clearnet node")))
                 .child(
                     div()
                         .id("settings-node")
@@ -4100,9 +4422,9 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                         .cursor(CursorStyle::IBeam)
                         .p_3()
                         .rounded_md()
-                        .bg(rgb(FIELD))
+                        .bg(rgb(theme_field()))
                         .border_1()
-                        .border_color(rgb(if node_focused { ACCENT } else { 0x2A3A2A }))
+                        .border_color(rgb(if node_focused { theme_accent() } else { theme_border() }))
                         .text_sm()
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             this.focus_field(Field::Node, window, cx);
@@ -4111,7 +4433,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 )
         })
         .when(home.network_policy != network::Policy::Clearnet, |card| {
-            card.child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("I2P node (host:port)")))
+            card.child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("I2P node (host:port)")))
                 .child(
                     div()
                         .id("settings-i2p-node")
@@ -4120,9 +4442,9 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                         .cursor(CursorStyle::IBeam)
                         .p_3()
                         .rounded_md()
-                        .bg(rgb(FIELD))
+                        .bg(rgb(theme_field()))
                         .border_1()
-                        .border_color(rgb(if i2p_node_focused { ACCENT } else { 0x2A3A2A }))
+                        .border_color(rgb(if i2p_node_focused { theme_accent() } else { theme_border() }))
                         .text_sm()
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             this.focus_field(Field::I2pNode, window, cx);
@@ -4133,7 +4455,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                             home.i2p_rpc.clone()
                         }),
                 )
-                .child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("I2P HTTP proxy (host:port)")))
+                .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("I2P HTTP proxy (host:port)")))
                 .child(
                     div()
                         .id("settings-i2p-proxy")
@@ -4142,9 +4464,9 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                         .cursor(CursorStyle::IBeam)
                         .p_3()
                         .rounded_md()
-                        .bg(rgb(FIELD))
+                        .bg(rgb(theme_field()))
                         .border_1()
-                        .border_color(rgb(if i2p_proxy_focused { ACCENT } else { 0x2A3A2A }))
+                        .border_color(rgb(if i2p_proxy_focused { theme_accent() } else { theme_border() }))
                         .text_sm()
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             this.focus_field(Field::I2pProxy, window, cx);
@@ -4173,7 +4495,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .child(if device_auth::is_available() {
                     l10n::t("When on, Touch ID or your login password is required to unlock and send.")
                 } else {
@@ -4192,7 +4514,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .child(l10n::t(
                     "Stops the current sync, compares 25, 50, 75, 100, 125, 150, and 500-block batches in shuffled repeated samples, then saves JSON results.",
                 )),
@@ -4236,15 +4558,15 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
             .child(
                 div()
                     .text_xs()
-                    .text_color(rgb(MUTED))
+                    .text_color(rgb(theme_muted()))
                     .child("Optional. Fetches XMR/USD from api.kraken.com and, if needed, FX from api.frankfurter.dev. Those servers see your IP. Amounts and addresses are not sent."),
             )
         })
-        .child(div().text_xs().text_color(rgb(MUTED)).child(l10n::t("Scan maintenance")))
+        .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("Scan maintenance")))
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
                 .child(l10n::t("Clear the local cache without changing wallet keys, or rescan from a chosen block.")),
         )
         .child(
@@ -4256,9 +4578,9 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 .h(px(36.))
                 .px_3()
                 .rounded_md()
-                .bg(rgb(FIELD))
+                .bg(rgb(theme_field()))
                 .border_1()
-                .border_color(rgb(if rescan_height_focused { ACCENT } else { 0x2A3A2A }))
+                .border_color(rgb(if rescan_height_focused { theme_accent() } else { theme_border() }))
                 .flex()
                 .items_center()
                 .text_sm()
@@ -4303,9 +4625,9 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 div()
                     .p_3()
                     .rounded_md()
-                    .bg(rgb(FIELD))
+                    .bg(rgb(theme_field()))
                     .text_xs()
-                    .text_color(rgb(MUTED))
+                    .text_color(rgb(theme_muted()))
                     .child(message),
             )
             .child(
@@ -4376,7 +4698,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
 fn status_line(home: &Home) -> impl IntoElement {
     div()
         .text_sm()
-        .text_color(rgb(MUTED))
+        .text_color(rgb(theme_muted()))
         .child(home.status.clone())
 }
 
@@ -4426,20 +4748,20 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 .h(px(36.))
                 .px_3()
                 .rounded_md()
-                .bg(rgb(FIELD))
+                .bg(rgb(theme_field()))
                 .border_1()
                 .border_color(rgb(if home.active == Field::TransferSearch {
-                    ACCENT
+                    theme_accent()
                 } else {
-                    0x2A3A2A
+                    theme_border()
                 }))
                 .flex()
                 .items_center()
                 .text_sm()
                 .text_color(rgb(if home.transfer_search.is_empty() {
-                    MUTED
+                    theme_muted()
                 } else {
-                    TEXT
+                    theme_text()
                 }))
                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                     this.focus_field(Field::TransferSearch, window, cx);
@@ -4512,9 +4834,9 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 div()
                     .p_4()
                     .rounded_md()
-                    .bg(rgb(ROW))
+                    .bg(rgb(theme_row()))
                     .text_sm()
-                    .text_color(rgb(MUTED))
+                    .text_color(rgb(theme_muted()))
                     .flex()
                     .flex_col()
                     .gap_2()
@@ -4529,17 +4851,17 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 div()
                     .p_4()
                     .rounded_md()
-                    .bg(rgb(ROW))
+                    .bg(rgb(theme_row()))
                     .text_sm()
-                    .text_color(rgb(MUTED))
+                    .text_color(rgb(theme_muted()))
                     .child(l10n::t("No transfers match this filter.")),
             )
         })
         .children(visible_transfers.into_iter().map(|(idx, row)| {
             let color = match row.direction.as_str() {
-                "in" => IN,
-                "out" => OUT,
-                _ => MUTED,
+                "in" => theme_in(),
+                "out" => theme_out(),
+                _ => theme_muted(),
             };
             let label = match row.direction.as_str() {
                 "in" => "Received",
@@ -4566,12 +4888,12 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 .px_3()
                 .py_2()
                 .rounded_md()
-                .bg(rgb(ROW))
+                .bg(rgb(theme_row()))
                 .border_1()
                 .border_color(rgb(if home.selected_transfer == Some(idx) {
-                    ACCENT
+                    theme_accent()
                 } else {
-                    ROW
+                    theme_row()
                 }))
                 .cursor(CursorStyle::PointingHand)
                 .flex()
@@ -4592,18 +4914,25 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                                 .text_color(rgb(color))
                                 .child(format!("{label} {sign}{}", format_xmr(row.amount))),
                         )
-                        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
-                            "{} · {} · {}",
-                            height,
-                            &row.txid.chars().take(8).collect::<String>(),
-                            conf
-                        )))
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(rgb(theme_muted()))
+                                .child(format!(
+                                    "{} · {} · {}",
+                                    height,
+                                    &row.txid.chars().take(8).collect::<String>(),
+                                    conf
+                                )),
+                        )
                         .when_some(
                             home.fiat_snapshots.get(&row.txid).map(|snap| {
                                 fiat::recorded_approx(row.amount, snap.fiat_per_xmr, &snap.currency)
                             }),
                             |col, line| {
-                                col.child(div().text_xs().text_color(rgb(MUTED)).child(line))
+                                col.child(
+                                    div().text_xs().text_color(rgb(theme_muted())).child(line),
+                                )
                             },
                         ),
                 )
@@ -4685,9 +5014,17 @@ fn history_filter_button(
         .px_2()
         .py_1()
         .rounded_md()
-        .bg(rgb(if selected { ACCENT } else { FIELD }))
+        .bg(rgb(if selected {
+            theme_accent()
+        } else {
+            theme_field()
+        }))
         .text_xs()
-        .text_color(rgb(if selected { 0xffffff } else { MUTED }))
+        .text_color(rgb(if selected {
+            theme_button_text()
+        } else {
+            theme_muted()
+        }))
         .cursor(CursorStyle::PointingHand)
         .on_click(listener)
         .child(label.into())
@@ -4719,9 +5056,9 @@ fn transfer_detail(row: &Transfer, index: usize, cx: &mut Context<Home>) -> impl
         .id(("transfer-detail", index))
         .p_3()
         .rounded_md()
-        .bg(rgb(CARD))
+        .bg(rgb(theme_card()))
         .border_1()
-        .border_color(rgb(ACCENT))
+        .border_color(rgb(theme_accent()))
         .flex()
         .flex_col()
         .gap_1()
@@ -4731,38 +5068,43 @@ fn transfer_detail(row: &Transfer, index: usize, cx: &mut Context<Home>) -> impl
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .child(l10n::t("Transaction details")),
         )
-        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
-            "{}: {}",
-            l10n::t("Direction"),
-            direction
-        )))
-        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
-            "{}: {}",
-            l10n::t("Amount"),
-            format_xmr(row.amount)
-        )))
         .child(
             div()
                 .text_xs()
-                .text_color(rgb(MUTED))
+                .text_color(rgb(theme_muted()))
+                .child(format!("{}: {}", l10n::t("Direction"), direction)),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(theme_muted()))
+                .child(format!("{}: {}", l10n::t("Amount"), format_xmr(row.amount))),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(theme_muted()))
                 .child(format!("{}: {}", l10n::t("Fee"), fee)),
         )
-        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
-            "{}: {}",
-            l10n::t("Block"),
-            height
-        )))
-        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
-            "{}: {}",
-            l10n::t("Timestamp"),
-            timestamp
-        )))
-        .child(div().text_xs().text_color(rgb(MUTED)).child(format!(
-            "{}: {}",
-            l10n::t("Status"),
-            status
-        )))
-        .child(div().text_xs().text_color(rgb(TEXT)).child(format!(
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(theme_muted()))
+                .child(format!("{}: {}", l10n::t("Block"), height)),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(theme_muted()))
+                .child(format!("{}: {}", l10n::t("Timestamp"), timestamp)),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(theme_muted()))
+                .child(format!("{}: {}", l10n::t("Status"), status)),
+        )
+        .child(div().text_xs().text_color(rgb(theme_text())).child(format!(
             "{}: {}",
             l10n::t("Transaction ID"),
             row.txid
@@ -4863,8 +5205,8 @@ fn action_button(
         .px_3()
         .py_2()
         .rounded_md()
-        .bg(rgb(ACCENT))
-        .text_color(rgb(0xffffff))
+        .bg(rgb(theme_accent()))
+        .text_color(rgb(theme_button_text()))
         .on_click(listener)
         .child(label.into())
 }

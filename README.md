@@ -33,6 +33,13 @@ Scan cache is stored at `~/Library/Application Support/nexawal/main_wallet.cache
 
 On macOS, device authentication defaults on when a stored wallet is first detected. Launch shows an **Unlocking wallet…** screen, requests Touch ID (with the Mac login password fallback supplied by macOS), and opens directly into the wallet after success. Cancelling or failing authentication reveals the manual retry and seed-recovery screen. An explicit device-authentication choice in Settings is preserved.
 
+The desktop shell uses a side rail with the same **Wallet**, **Receive**, **Send**,
+and **Settings** destinations as the mobile apps. **Classic** is the default
+palette, while **Neon / Techno** preserves the original NexaWal look; switch
+between them from Settings. The selected theme is stored in the platform's
+NexaWal data directory and applies to the shared wallet, receive, send, and
+settings components.
+
 Keyring v3 does not enable a native backend by default. This repository enables each platform backend explicitly; builds before this change used a temporary in-memory backend and require entering the seed one final time to migrate it into persistent secure storage.
 
 ## Run
