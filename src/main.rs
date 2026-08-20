@@ -763,6 +763,67 @@ impl Home {
         cx.notify();
     }
 
+    fn export_transfer_history(&mut self, cx: &mut Context<Self>) {
+        let filter = self.transfer_filter;
+        let search = self.transfer_search.trim().to_lowercase();
+        let rows: Vec<Transfer> = self
+            .transfers
+            .iter()
+            .filter(|row| {
+                transfer_matches_filter(row, filter) && transfer_matches_search(row, &search)
+            })
+            .cloned()
+            .collect();
+        if rows.is_empty() {
+            self.status = l10n::t("There are no visible transfers to export.").into();
+            cx.notify();
+            return;
+        }
+
+        let csv = transfer_history_csv(&rows);
+        let save_dialog = cx.prompt_for_new_path(&paths::data_dir(), Some("nexawal-history.csv"));
+        self.status = l10n::t("Choose where to save the transaction CSV…").into();
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            let picked = save_dialog.await;
+            let path = match picked {
+                Ok(Ok(Some(path))) => path,
+                Ok(Ok(None)) => {
+                    let _ = this.update(cx, |this, cx| {
+                        this.status = l10n::t("Transaction export cancelled.").into();
+                        cx.notify();
+                    });
+                    return;
+                }
+                _ => {
+                    let _ = this.update(cx, |this, cx| {
+                        this.status = l10n::t("Could not open the save dialog.").into();
+                        cx.notify();
+                    });
+                    return;
+                }
+            };
+            let write_path = path.clone();
+            let result = cx
+                .background_executor()
+                .spawn(async move { fs::write(write_path, csv) })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.status = match result {
+                    Ok(()) => format!(
+                        "Exported {} visible transfer(s) to {}.",
+                        rows.len(),
+                        path.display()
+                    )
+                    .into(),
+                    Err(err) => format!("Transaction export failed: {err}").into(),
+                };
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     fn toggle_send_from_subaddress(&mut self, cx: &mut Context<Self>) {
         if self.send_busy {
             return;
@@ -4266,6 +4327,15 @@ fn history(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 }),
             ))
         })
+        .when(!home.transfers.is_empty(), |list| {
+            list.child(action_button(
+                "history-export-csv",
+                l10n::t("Export CSV"),
+                cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.export_transfer_history(cx);
+                }),
+            ))
+        })
         .when(no_transfers, |list| {
             list.child(
                 div()
@@ -4389,6 +4459,55 @@ fn transfer_matches_filter(row: &Transfer, filter: TransferFilter) -> bool {
 
 fn transfer_matches_search(row: &Transfer, search: &str) -> bool {
     search.is_empty() || row.txid.to_lowercase().contains(search)
+}
+
+fn transfer_history_csv(rows: &[Transfer]) -> String {
+    let mut csv = String::from(
+        "direction,amount_xmr,amount_piconero,fee_xmr,fee_piconero,block,timestamp_utc,confirmations,status,txid\n",
+    );
+    for row in rows {
+        let status = if row.is_pending || row.confirmations == 0 {
+            "pending"
+        } else {
+            "confirmed"
+        };
+        let fee_xmr = row.fee.map(format_xmr).unwrap_or_default();
+        let fee_piconero = row.fee.map(|fee| fee.to_string()).unwrap_or_default();
+        let height = row
+            .height
+            .map(|height| height.to_string())
+            .unwrap_or_default();
+        let timestamp = format_timestamp(row.timestamp);
+        let values = [
+            row.direction.clone(),
+            format_xmr(row.amount),
+            row.amount.to_string(),
+            fee_xmr,
+            fee_piconero,
+            height,
+            timestamp,
+            row.confirmations.to_string(),
+            status.to_string(),
+            row.txid.clone(),
+        ];
+        csv.push_str(
+            &values
+                .iter()
+                .map(|value| csv_escape(value))
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+        csv.push('\n');
+    }
+    csv
+}
+
+fn csv_escape(value: &str) -> String {
+    if value.contains([',', '"', '\n', '\r']) {
+        format!("\"{}\"", value.replace('"', "\"\""))
+    } else {
+        value.to_string()
+    }
 }
 
 fn history_filter_button(
@@ -4532,7 +4651,8 @@ fn civil_date_from_days(days_since_unix_epoch: i64) -> (i32, u32, u32) {
 
 #[cfg(test)]
 mod transfer_detail_tests {
-    use super::format_timestamp;
+    use super::{format_timestamp, transfer_history_csv};
+    use monerowalletcore::api::Transfer;
 
     #[test]
     fn formats_unix_epoch_and_known_block_time() {
@@ -4541,6 +4661,24 @@ mod transfer_detail_tests {
             format_timestamp(Some(1_735_689_600)),
             "2025-01-01 00:00:00 UTC"
         );
+    }
+
+    #[test]
+    fn exports_transfer_csv_without_losing_quoted_values() {
+        let rows = vec![Transfer {
+            txid: "abc,\"quoted\"".into(),
+            direction: "in".into(),
+            amount: 1_000_000_000_000,
+            fee: Some(2),
+            height: Some(42),
+            timestamp: Some(1_735_689_600),
+            confirmations: 3,
+            is_pending: false,
+        }];
+        let csv = transfer_history_csv(&rows);
+        assert!(csv.starts_with("direction,amount_xmr,amount_piconero"));
+        assert!(csv.contains("\"abc,\"\"quoted\"\"\""));
+        assert!(csv.contains(",confirmed,"));
     }
 }
 
