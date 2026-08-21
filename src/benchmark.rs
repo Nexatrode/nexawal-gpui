@@ -13,7 +13,7 @@ use serde_json::{Value, json};
 
 use crate::{paths, scan_tuning};
 
-const PROFILE_NAMES: [&str; 8] = [
+const DEFAULT_PROFILE_NAMES: [&str; 8] = [
     "fast",
     "cuprate",
     "batch-150",
@@ -22,6 +22,18 @@ const PROFILE_NAMES: [&str; 8] = [
     "batch-75",
     "batch-100",
     "batch-125",
+];
+const PROFILE_NAMES: [&str; 10] = [
+    "fast",
+    "cuprate",
+    "batch-150",
+    "batch-25",
+    "batch-50",
+    "batch-75",
+    "batch-100",
+    "batch-125",
+    "serial-75",
+    "parallel-75",
 ];
 const DEFAULT_REPETITIONS: usize = 3;
 const DEFAULT_WINDOW_SECS: u64 = 6;
@@ -918,7 +930,7 @@ fn benchmark_stall_bps() -> f64 {
 
 fn benchmark_profiles() -> Vec<&'static str> {
     let Some(raw) = std::env::var("NEXAWAL_BENCHMARK_PROFILES").ok() else {
-        return PROFILE_NAMES.to_vec();
+        return DEFAULT_PROFILE_NAMES.to_vec();
     };
 
     let selected = raw
@@ -938,7 +950,7 @@ fn benchmark_profiles() -> Vec<&'static str> {
         });
 
     if selected.is_empty() {
-        PROFILE_NAMES.to_vec()
+        DEFAULT_PROFILE_NAMES.to_vec()
     } else {
         selected
     }
@@ -1047,6 +1059,8 @@ mod tests {
             assert!(profiles.contains(&"batch-75"));
             assert!(profiles.contains(&"batch-100"));
             assert!(profiles.contains(&"batch-125"));
+            assert!(profiles.contains(&"serial-75"));
+            assert!(profiles.contains(&"parallel-75"));
         }
     }
 

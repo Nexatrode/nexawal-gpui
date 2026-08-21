@@ -23,6 +23,8 @@ enum ScanProfile {
     Batch75,
     Batch100,
     Batch125,
+    Serial75,
+    Parallel75,
 }
 
 impl ScanProfile {
@@ -36,6 +38,7 @@ impl ScanProfile {
             Self::Batch75 => BATCH_75,
             Self::Batch100 => BATCH_100,
             Self::Batch125 => BATCH_125,
+            Self::Serial75 | Self::Parallel75 => BATCH_75,
         }
     }
 
@@ -49,6 +52,16 @@ impl ScanProfile {
             Self::Batch75 => "batch-75",
             Self::Batch100 => "batch-100",
             Self::Batch125 => "batch-125",
+            Self::Serial75 => "serial-75",
+            Self::Parallel75 => "parallel-75",
+        }
+    }
+
+    fn scan_parallelism(self) -> Option<&'static str> {
+        match self {
+            Self::Serial75 => Some("1"),
+            Self::Parallel75 => Some("auto"),
+            _ => None,
         }
     }
 }
@@ -69,6 +82,8 @@ fn profile_from_name(name: &str) -> Option<ScanProfile> {
         "batch-75" | "batch_75" | "75" => Some(ScanProfile::Batch75),
         "batch-100" | "batch_100" | "100" => Some(ScanProfile::Batch100),
         "batch-125" | "batch_125" | "125" => Some(ScanProfile::Batch125),
+        "serial-75" | "serial_75" => Some(ScanProfile::Serial75),
+        "parallel-75" | "parallel_75" => Some(ScanProfile::Parallel75),
         _ => None,
     }
 }
@@ -99,10 +114,17 @@ fn set_range_batch(batch: &str) {
 fn apply_profile(profile: ScanProfile) {
     let batch = profile.batch();
     set_range_batch(batch);
+    unsafe {
+        match profile.scan_parallelism() {
+            Some(value) => std::env::set_var("WALLETCORE_SCAN_PAR", value),
+            None => std::env::remove_var("WALLETCORE_SCAN_PAR"),
+        }
+    }
     println!(
-        "🧪 walletcore scan tuning profile={} batch={}",
+        "🧪 walletcore scan tuning profile={} batch={} scan_threads={}",
         profile.label(),
-        batch
+        batch,
+        profile.scan_parallelism().unwrap_or("auto")
     );
 }
 
@@ -155,6 +177,7 @@ pub fn batch_for(name: &str) -> Option<&'static str> {
 /// Remove temporary benchmark profile variables so normal scans return to WalletCore defaults.
 pub fn clear_profile_override() {
     unsafe {
+        std::env::remove_var("WALLETCORE_SCAN_PAR");
         std::env::remove_var("WALLETCORE_BULK_MODE");
         std::env::remove_var("WALLETCORE_BULK_FETCH_BATCH");
         std::env::remove_var("WALLETCORE_UPSTREAM_BLOCK_BATCH");
@@ -191,5 +214,15 @@ mod tests {
             "contiguous_scannable_blocks_error: response body closed before all bytes were read"
         ));
         assert!(!is_recoverable_fetch_error("wallet not opened"));
+    }
+
+    #[test]
+    fn benchmark_parallelism_profiles_share_the_same_batch() {
+        let serial = profile_from_name("serial-75").expect("serial profile");
+        let parallel = profile_from_name("parallel-75").expect("parallel profile");
+        assert_eq!(serial.batch(), BATCH_75);
+        assert_eq!(parallel.batch(), BATCH_75);
+        assert_eq!(serial.scan_parallelism(), Some("1"));
+        assert_eq!(parallel.scan_parallelism(), Some("auto"));
     }
 }
