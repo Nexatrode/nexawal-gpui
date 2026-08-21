@@ -29,6 +29,8 @@ enum ScanProfile {
     Batch125,
     Serial75,
     Parallel75,
+    DecodeSerial75,
+    DecodeParallel75,
     DecodeSerial500,
     DecodeParallel500,
 }
@@ -46,7 +48,9 @@ impl ScanProfile {
             Self::Batch75 => BATCH_75,
             Self::Batch100 => BATCH_100,
             Self::Batch125 => BATCH_125,
-            Self::Serial75 | Self::Parallel75 => BATCH_75,
+            Self::Serial75 | Self::Parallel75 | Self::DecodeSerial75 | Self::DecodeParallel75 => {
+                BATCH_75
+            }
             Self::DecodeSerial500 | Self::DecodeParallel500 => FAST_BATCH,
         }
     }
@@ -65,6 +69,8 @@ impl ScanProfile {
             Self::Batch125 => "batch-125",
             Self::Serial75 => "serial-75",
             Self::Parallel75 => "parallel-75",
+            Self::DecodeSerial75 => "decode-serial-75",
+            Self::DecodeParallel75 => "decode-parallel-75",
             Self::DecodeSerial500 => "decode-serial-500",
             Self::DecodeParallel500 => "decode-parallel-500",
         }
@@ -80,8 +86,8 @@ impl ScanProfile {
 
     fn range_decode_parallelism(self) -> Option<&'static str> {
         match self {
-            Self::DecodeSerial500 => Some("0"),
-            Self::DecodeParallel500 => Some("1"),
+            Self::DecodeSerial75 | Self::DecodeSerial500 => Some("0"),
+            Self::DecodeParallel75 | Self::DecodeParallel500 => Some("1"),
             _ => None,
         }
     }
@@ -107,6 +113,8 @@ fn profile_from_name(name: &str) -> Option<ScanProfile> {
         "batch-125" | "batch_125" | "125" => Some(ScanProfile::Batch125),
         "serial-75" | "serial_75" => Some(ScanProfile::Serial75),
         "parallel-75" | "parallel_75" => Some(ScanProfile::Parallel75),
+        "decode-serial-75" | "decode_serial_75" => Some(ScanProfile::DecodeSerial75),
+        "decode-parallel-75" | "decode_parallel_75" => Some(ScanProfile::DecodeParallel75),
         "decode-serial-500" | "decode_serial_500" => Some(ScanProfile::DecodeSerial500),
         "decode-parallel-500" | "decode_parallel_500" => Some(ScanProfile::DecodeParallel500),
         _ => None,
@@ -264,14 +272,19 @@ mod tests {
 
     #[test]
     fn decode_profiles_only_change_range_decoding() {
-        let serial = profile_from_name("decode-serial-500").expect("serial decode profile");
-        let parallel = profile_from_name("decode-parallel-500").expect("parallel decode profile");
-        assert_eq!(serial.batch(), FAST_BATCH);
-        assert_eq!(parallel.batch(), FAST_BATCH);
-        assert_eq!(serial.scan_parallelism(), None);
-        assert_eq!(parallel.scan_parallelism(), None);
-        assert_eq!(serial.range_decode_parallelism(), Some("0"));
-        assert_eq!(parallel.range_decode_parallelism(), Some("1"));
+        for (serial_name, parallel_name, expected_batch) in [
+            ("decode-serial-75", "decode-parallel-75", BATCH_75),
+            ("decode-serial-500", "decode-parallel-500", FAST_BATCH),
+        ] {
+            let serial = profile_from_name(serial_name).expect("serial decode profile");
+            let parallel = profile_from_name(parallel_name).expect("parallel decode profile");
+            assert_eq!(serial.batch(), expected_batch);
+            assert_eq!(parallel.batch(), expected_batch);
+            assert_eq!(serial.scan_parallelism(), None);
+            assert_eq!(parallel.scan_parallelism(), None);
+            assert_eq!(serial.range_decode_parallelism(), Some("0"));
+            assert_eq!(parallel.range_decode_parallelism(), Some("1"));
+        }
     }
 
     #[test]

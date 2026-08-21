@@ -33,7 +33,7 @@ const DEFAULT_PROFILE_NAMES: [&str; 8] = [
     "batch-100",
     "batch-125",
 ];
-const PROFILE_NAMES: [&str; 14] = [
+const PROFILE_NAMES: [&str; 16] = [
     "fast",
     "cuprate",
     "batch-750",
@@ -46,6 +46,8 @@ const PROFILE_NAMES: [&str; 14] = [
     "batch-125",
     "serial-75",
     "parallel-75",
+    "decode-serial-75",
+    "decode-parallel-75",
     "decode-serial-500",
     "decode-parallel-500",
 ];
@@ -1352,6 +1354,8 @@ mod tests {
             assert!(profiles.contains(&"batch-125"));
             assert!(profiles.contains(&"serial-75"));
             assert!(profiles.contains(&"parallel-75"));
+            assert!(profiles.contains(&"decode-serial-75"));
+            assert!(profiles.contains(&"decode-parallel-75"));
             assert!(profiles.contains(&"decode-serial-500"));
             assert!(profiles.contains(&"decode-parallel-500"));
         }
