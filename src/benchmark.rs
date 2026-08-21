@@ -38,7 +38,10 @@ const PROFILE_NAMES: [&str; 10] = [
 const DEFAULT_REPETITIONS: usize = 3;
 const DEFAULT_WINDOW_SECS: u64 = 6;
 const DEFAULT_COOLDOWN_SECS: u64 = 5;
-const CANCEL_WAIT: Duration = Duration::from_secs(3);
+// WalletCore allows an individual contiguous block fetch to run for up to 30 seconds. A
+// benchmark sample must wait longer than that before starting another wallet, otherwise a slow
+// cancellation can turn a sequential comparison into competing background scans.
+const CANCEL_WAIT: Duration = Duration::from_secs(45);
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
 const DEFAULT_STALL_BPS: f64 = 40.0;
 
@@ -153,11 +156,24 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
     let mut results = Vec::with_capacity(profiles.len() * nodes.len() * repetitions);
     let mut sample_count = 0usize;
 
-    // The caller has already requested cancellation. Give WalletCore a short grace
-    // period so the benchmark does not compete with the user's prior scan.
-    wait_for_idle("main_wallet", CANCEL_WAIT);
+    // The caller has already requested cancellation. Do not benchmark alongside the real wallet:
+    // a cleanup timeout is a failed precondition, not permission to start another scanner.
+    if !wait_for_idle("main_wallet", CANCEL_WAIT) {
+        unsafe {
+            std::env::remove_var("WALLETCORE_RPC_TELEMETRY_PATH");
+        }
+        scan_tuning::clear_profile_override();
+        return BenchmarkReport {
+            results_path,
+            rpc_results_path: rpc_telemetry_path.display().to_string(),
+            summary: format!(
+                "0 samples · cleanup-timeout: main wallet did not stop within {} seconds",
+                CANCEL_WAIT.as_secs()
+            ),
+        };
+    }
 
-    for (node_index, target) in nodes.iter().enumerate() {
+    'benchmark: for (node_index, target) in nodes.iter().enumerate() {
         for repetition in 0..repetitions {
             let profile_order = shuffled_profiles(&profiles, run_id, node_index, repetition);
             for (order, profile_name) in profile_order.iter().enumerate() {
@@ -177,6 +193,7 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
                     order + 1,
                 );
                 sample_count += 1;
+                let abort_suite = result.outcome == "cleanup-timeout";
                 let line = json!({
                     "timestamp_ms": result.started_at_ms,
                     "node": target,
@@ -214,6 +231,9 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
                 });
                 let _ = paths::append_scan_benchmark(&line.to_string());
                 results.push(result);
+                if abort_suite {
+                    break 'benchmark;
+                }
             }
         }
     }
@@ -418,7 +438,13 @@ fn run_audit_target(
                         if outcome == "timeout" {
                             let _ = api::refresh_cancel(wallet_id);
                         }
-                        wait_for_idle(wallet_id, CANCEL_WAIT);
+                        if !wait_for_idle(wallet_id, CANCEL_WAIT) {
+                            outcome = "cleanup-timeout";
+                            error = Some(format!(
+                                "wallet refresh did not stop within {} seconds",
+                                CANCEL_WAIT.as_secs()
+                            ));
+                        }
                     }
                 }
             }
@@ -753,7 +779,13 @@ fn run_profile(
 
     let elapsed_ms = sample_started.elapsed().as_millis();
     let _ = api::refresh_cancel(wallet_id);
-    wait_for_idle(wallet_id, CANCEL_WAIT);
+    if !wait_for_idle(wallet_id, CANCEL_WAIT) {
+        outcome = "cleanup-timeout";
+        error = Some(format!(
+            "wallet refresh did not stop within {} seconds; remaining benchmark samples were not started",
+            CANCEL_WAIT.as_secs()
+        ));
+    }
 
     let metrics = collect_metrics(&log_path, log_offset, rpc_path.as_deref(), rpc_offset);
 
@@ -1010,14 +1042,15 @@ fn node_label(url: &str) -> String {
         .to_string()
 }
 
-fn wait_for_idle(wallet_id: &str, timeout: Duration) {
+fn wait_for_idle(wallet_id: &str, timeout: Duration) -> bool {
     let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
         if !matches!(api::refresh_job(wallet_id), RefreshJob::Running) {
-            return;
+            return true;
         }
         thread::sleep(POLL_INTERVAL);
     }
+    !matches!(api::refresh_job(wallet_id), RefreshJob::Running)
 }
 
 fn now_ms() -> u128 {
@@ -1030,6 +1063,14 @@ fn now_ms() -> u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn idle_wait_reports_success_without_sleeping() {
+        assert!(wait_for_idle(
+            "nexawal-benchmark-never-started",
+            Duration::ZERO
+        ));
+    }
 
     #[test]
     fn production_targets_include_both_nodes() {
