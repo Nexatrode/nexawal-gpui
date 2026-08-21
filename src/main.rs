@@ -89,6 +89,8 @@ const OUT: u32 = 0xFF5959;
 const ACTIVE_SYNC_AUX_POLL_INTERVAL: Duration = Duration::from_secs(10);
 const ACTIVE_SYNC_CACHE_INTERVAL: Duration = Duration::from_secs(120);
 const ACTIVE_SYNC_CACHE_BLOCK_DELTA: u64 = 1_000;
+const REFRESH_STOP_TIMEOUT: Duration = Duration::from_secs(10);
+const SHUTDOWN_REFRESH_WAIT: Duration = Duration::from_secs(2);
 static ACTIVE_THEME: AtomicU8 = AtomicU8::new(0);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -376,6 +378,7 @@ struct Home {
     polling: bool,
     scan_needs_retry: bool,
     scan_was_running: bool,
+    scan_restart_generation: u64,
     last_scan_error: Option<String>,
     scan_rate: sync_status::ScanRate,
     scan_details_expanded: bool,
@@ -527,6 +530,7 @@ impl Home {
             polling: false,
             scan_needs_retry: false,
             scan_was_running: false,
+            scan_restart_generation: 0,
             last_scan_error: None,
             scan_rate: sync_status::ScanRate::default(),
             scan_details_expanded: paths::load_sync_details_expanded(),
@@ -1189,6 +1193,7 @@ impl Home {
     }
 
     fn apply_network(&mut self, cx: &mut Context<Self>) {
+        let _ = paths::save_node_url(&self.node_url);
         let _ = paths::save_network_policy(self.network_policy);
         let _ = paths::save_i2p_rpc(&self.i2p_rpc);
         let _ = paths::save_i2p_proxy(&self.i2p_proxy);
@@ -1201,12 +1206,59 @@ impl Home {
         )
         .into();
         if self.opened {
-            let _ = api::refresh_cancel(WALLET_ID);
-            if let Err(err) = self.start_fast_scan() {
-                self.status = format!("Saved network, but rescan failed: {err}").into();
-            }
+            self.restart_scan_after_cancel(cx);
         }
         cx.notify();
+    }
+
+    fn restart_scan_after_cancel(&mut self, cx: &mut Context<Self>) {
+        self.scan_restart_generation = self.scan_restart_generation.wrapping_add(1);
+        let generation = self.scan_restart_generation;
+        if !matches!(api::refresh_job(WALLET_ID), RefreshJob::Running) {
+            if let Err(err) = self.start_fast_scan() {
+                self.status = format!("Saved network, but rescan failed: {err}").into();
+                self.scan_needs_retry = true;
+            }
+            return;
+        }
+
+        let _ = api::refresh_cancel(WALLET_ID);
+        self.status = l10n::t("Stopping the previous scan before changing nodes…").into();
+        cx.spawn(async move |this, cx| {
+            let started = Instant::now();
+            while matches!(api::refresh_job(WALLET_ID), RefreshJob::Running)
+                && started.elapsed() < REFRESH_STOP_TIMEOUT
+            {
+                cx.background_executor()
+                    .timer(Duration::from_millis(50))
+                    .await;
+            }
+            let stopped = !matches!(api::refresh_job(WALLET_ID), RefreshJob::Running);
+            let _ = this.update(cx, |this, cx| {
+                // Multiple quick Apply clicks collapse into one restart using the final
+                // saved settings.
+                if generation != this.scan_restart_generation {
+                    return;
+                }
+                if !stopped {
+                    this.scan_needs_retry = true;
+                    this.status = l10n::t(
+                        "The previous scan is still stopping. Wait a moment, then use Retry sync.",
+                    )
+                    .into();
+                } else if let Err(err) = this.start_fast_scan() {
+                    this.scan_needs_retry = true;
+                    this.status = format!("Saved network, but rescan failed: {err}").into();
+                } else {
+                    this.scan_needs_retry = false;
+                    this.status =
+                        format!("Saved network. Syncing with {}…", this.scan_node_url()).into();
+                    this.start_poll(cx);
+                }
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     fn request_clear_scan_cache(&mut self, cx: &mut Context<Self>) {
@@ -1290,7 +1342,47 @@ impl Home {
             return;
         }
         let height = self.rescan_height();
-        let _ = api::refresh_cancel(WALLET_ID);
+        self.scan_restart_generation = self.scan_restart_generation.wrapping_add(1);
+        let generation = self.scan_restart_generation;
+        if matches!(api::refresh_job(WALLET_ID), RefreshJob::Running) {
+            let _ = api::refresh_cancel(WALLET_ID);
+            self.status =
+                l10n::t("Stopping the current scan before resetting wallet history…").into();
+            cx.notify();
+            cx.spawn(async move |this, cx| {
+                let started = Instant::now();
+                while matches!(api::refresh_job(WALLET_ID), RefreshJob::Running)
+                    && started.elapsed() < REFRESH_STOP_TIMEOUT
+                {
+                    cx.background_executor()
+                        .timer(Duration::from_millis(50))
+                        .await;
+                }
+                let stopped = !matches!(api::refresh_job(WALLET_ID), RefreshJob::Running);
+                let _ = this.update(cx, |this, cx| {
+                    if generation != this.scan_restart_generation {
+                        return;
+                    }
+                    if stopped {
+                        this.finish_rescan_from_height(height, cx);
+                    } else {
+                        this.scan_needs_retry = true;
+                        this.status = l10n::t(
+                            "The previous scan is still stopping. Rescan was not started; try again.",
+                        )
+                        .into();
+                        cx.notify();
+                    }
+                });
+            })
+            .detach();
+            return;
+        }
+
+        self.finish_rescan_from_height(height, cx);
+    }
+
+    fn finish_rescan_from_height(&mut self, height: u64, cx: &mut Context<Self>) {
         if let Err(err) = api::force_rescan_from_height(WALLET_ID, height) {
             self.status = format!("Could not prepare rescan: {err}").into();
             cx.notify();
@@ -1498,7 +1590,6 @@ impl Home {
             }
             Field::Node => {
                 self.node_url = text;
-                let _ = paths::save_node_url(&self.node_url);
             }
             Field::RecvAmount => self.recv_amount = text,
             Field::RecvDesc => self.recv_desc = text,
@@ -5394,6 +5485,31 @@ fn quit(_: &Quit, cx: &mut App) {
     cx.quit();
 }
 
+fn prepare_wallet_shutdown(cx: &mut App) -> gpui::Task<()> {
+    if api::sync_status(WALLET_ID).is_err() {
+        return gpui::Task::ready(());
+    }
+
+    let _ = api::refresh_cancel(WALLET_ID);
+    let executor = cx.background_executor().clone();
+    cx.background_spawn(async move {
+        let started = Instant::now();
+        while matches!(api::refresh_job(WALLET_ID), RefreshJob::Running)
+            && started.elapsed() < SHUTDOWN_REFRESH_WAIT
+        {
+            executor.timer(Duration::from_millis(50)).await;
+        }
+
+        // WalletCore only exposes completed-batch state, so this snapshot is
+        // coherent even if an unresponsive RPC request outlives the grace period.
+        if let Ok(blob) = api::export_cache(WALLET_ID)
+            && !blob.is_empty()
+        {
+            let _ = paths::save_cache(&blob);
+        }
+    })
+}
+
 fn hide(_: &Hide, cx: &mut App) {
     cx.hide();
 }
@@ -5529,6 +5645,7 @@ fn main() {
         cx.on_action(show_all);
         cx.on_action(show_app);
         cx.on_action(minimize);
+        cx.on_app_quit(prepare_wallet_shutdown).detach();
         install_menus(cx);
         cx.bind_keys([
             KeyBinding::new("cmd-q", Quit, None),

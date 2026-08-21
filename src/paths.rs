@@ -344,15 +344,38 @@ pub fn ensure_fiat_opted_in_at() -> u64 {
 }
 
 pub(crate) fn write_bytes(path: PathBuf, bytes: &[u8]) -> std::io::Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(path, bytes)
+    use std::io::Write;
+    use std::path::Path;
+
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent)?;
+
+    // Write beside the destination so persist() is an atomic rename on the same
+    // filesystem. A crash can leave the previous complete file or the new complete
+    // file, never a truncated wallet cache/preferences file.
+    let mut temporary = tempfile::Builder::new()
+        .prefix(".nexawal-write-")
+        .tempfile_in(parent)?;
+    temporary.write_all(bytes)?;
+    temporary.as_file_mut().sync_all()?;
+    temporary.persist(&path).map_err(|error| error.error)?;
+
+    // Also make the directory entry durable where the platform supports fsync on
+    // directories. Windows does not expose directories as ordinary files.
+    #[cfg(unix)]
+    fs::File::open(parent)?.sync_all()?;
+
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::parse_bool_preference;
+    use std::fs;
+
+    use super::{parse_bool_preference, write_bytes};
 
     #[test]
     fn device_auth_preference_is_tristate() {
@@ -362,5 +385,14 @@ mod tests {
         assert_eq!(parse_bool_preference("false"), Some(false));
         assert_eq!(parse_bool_preference(""), None);
         assert_eq!(parse_bool_preference("invalid"), None);
+    }
+
+    #[test]
+    fn atomic_write_replaces_the_complete_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("wallet.cache");
+        write_bytes(path.clone(), b"first complete cache").unwrap();
+        write_bytes(path.clone(), b"second complete cache").unwrap();
+        assert_eq!(fs::read(path).unwrap(), b"second complete cache");
     }
 }
