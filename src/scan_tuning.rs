@@ -3,6 +3,8 @@
 use std::env;
 
 const FAST_BATCH: &str = "500";
+const BATCH_750: &str = "750";
+const BATCH_1000: &str = "1000";
 const BATCH_150: &str = "150";
 const BATCH_25: &str = "25";
 const BATCH_50: &str = "50";
@@ -17,6 +19,8 @@ pub const STALL_SECS: u64 = 125;
 enum ScanProfile {
     Fast,
     CuprateSafe,
+    Batch750,
+    Batch1000,
     Batch150,
     Batch25,
     Batch50,
@@ -32,6 +36,8 @@ impl ScanProfile {
         match self {
             Self::Fast => FAST_BATCH,
             Self::CuprateSafe => CUPRATE_BATCH,
+            Self::Batch750 => BATCH_750,
+            Self::Batch1000 => BATCH_1000,
             Self::Batch150 => BATCH_150,
             Self::Batch25 => BATCH_25,
             Self::Batch50 => BATCH_50,
@@ -46,6 +52,8 @@ impl ScanProfile {
         match self {
             Self::Fast => "fast",
             Self::CuprateSafe => "cuprate",
+            Self::Batch750 => "batch-750",
+            Self::Batch1000 => "batch-1000",
             Self::Batch150 => "batch-150",
             Self::Batch25 => "batch-25",
             Self::Batch50 => "batch-50",
@@ -75,6 +83,8 @@ fn profile_from_name(name: &str) -> Option<ScanProfile> {
     match name.to_ascii_lowercase().as_str() {
         "fast" => Some(ScanProfile::Fast),
         "cuprate" | "cuprate_safe" | "cuprate-safe" => Some(ScanProfile::CuprateSafe),
+        "batch-750" | "batch_750" | "750" => Some(ScanProfile::Batch750),
+        "batch-1000" | "batch_1000" | "1000" => Some(ScanProfile::Batch1000),
         "stall" | "fallback" | "stall_fallback" | "stall-fallback" | "batch-150" | "batch_150"
         | "150" => Some(ScanProfile::Batch150),
         "batch-25" | "batch_25" | "25" => Some(ScanProfile::Batch25),
@@ -224,5 +234,13 @@ mod tests {
         assert_eq!(parallel.batch(), BATCH_75);
         assert_eq!(serial.scan_parallelism(), Some("1"));
         assert_eq!(parallel.scan_parallelism(), Some("auto"));
+    }
+
+    #[test]
+    fn large_response_profiles_are_diagnostic_only_named_batches() {
+        assert_eq!(profile_from_name("batch-750").unwrap().batch(), BATCH_750);
+        assert_eq!(profile_from_name("batch-1000").unwrap().batch(), BATCH_1000);
+        assert_eq!(profile_from_name("750").unwrap().label(), "batch-750");
+        assert_eq!(profile_from_name("1000").unwrap().label(), "batch-1000");
     }
 }

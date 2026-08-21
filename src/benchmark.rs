@@ -23,9 +23,11 @@ const DEFAULT_PROFILE_NAMES: [&str; 8] = [
     "batch-100",
     "batch-125",
 ];
-const PROFILE_NAMES: [&str; 10] = [
+const PROFILE_NAMES: [&str; 12] = [
     "fast",
     "cuprate",
+    "batch-750",
+    "batch-1000",
     "batch-150",
     "batch-25",
     "batch-50",
@@ -1094,6 +1096,8 @@ mod tests {
             let profiles = shuffled_profiles(&PROFILE_NAMES, 42, 0, repetition);
             assert!(profiles.contains(&"fast"));
             assert!(profiles.contains(&"cuprate"));
+            assert!(profiles.contains(&"batch-750"));
+            assert!(profiles.contains(&"batch-1000"));
             assert!(profiles.contains(&"batch-150"));
             assert!(profiles.contains(&"batch-25"));
             assert!(profiles.contains(&"batch-50"));
