@@ -23,7 +23,7 @@ const DEFAULT_PROFILE_NAMES: [&str; 8] = [
     "batch-100",
     "batch-125",
 ];
-const PROFILE_NAMES: [&str; 12] = [
+const PROFILE_NAMES: [&str; 14] = [
     "fast",
     "cuprate",
     "batch-750",
@@ -36,6 +36,8 @@ const PROFILE_NAMES: [&str; 12] = [
     "batch-125",
     "serial-75",
     "parallel-75",
+    "decode-serial-500",
+    "decode-parallel-500",
 ];
 const DEFAULT_REPETITIONS: usize = 3;
 const DEFAULT_WINDOW_SECS: u64 = 6;
@@ -117,6 +119,11 @@ struct ProfileResult {
     rpc_elapsed_ms: u128,
     rpc_errors: u64,
     retries: u64,
+    range_decode_events: u64,
+    range_decode_blocks: u64,
+    range_decode_transactions: u64,
+    range_decode_ms: u128,
+    range_finalize_ms: u128,
     stalled: bool,
     outcome: &'static str,
     error: Option<String>,
@@ -134,6 +141,11 @@ struct SampleMetrics {
     rpc_elapsed_ms: u128,
     rpc_errors: u64,
     retries: u64,
+    range_decode_events: u64,
+    range_decode_blocks: u64,
+    range_decode_transactions: u64,
+    range_decode_ms: u128,
+    range_finalize_ms: u128,
 }
 
 #[derive(Debug, Default)]
@@ -219,6 +231,11 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
                     "rpc_elapsed_ms": result.rpc_elapsed_ms,
                     "rpc_errors": result.rpc_errors,
                     "retries": result.retries,
+                    "range_decode_events": result.range_decode_events,
+                    "range_decode_blocks": result.range_decode_blocks,
+                    "range_decode_transactions": result.range_decode_transactions,
+                    "range_decode_ms": result.range_decode_ms,
+                    "range_finalize_ms": result.range_finalize_ms,
                     "cooldown_secs": cooldown.as_secs(),
                     "stalled": result.stalled,
                     "sample_quality": if result.stalled {
@@ -825,6 +842,11 @@ fn run_profile(
         rpc_elapsed_ms: metrics.rpc_elapsed_ms,
         rpc_errors: metrics.rpc_errors,
         retries: metrics.retries,
+        range_decode_events: metrics.range_decode_events,
+        range_decode_blocks: metrics.range_decode_blocks,
+        range_decode_transactions: metrics.range_decode_transactions,
+        range_decode_ms: metrics.range_decode_ms,
+        range_finalize_ms: metrics.range_finalize_ms,
         stalled,
         outcome,
         error,
@@ -865,6 +887,11 @@ fn failed_result(
         rpc_elapsed_ms: 0,
         rpc_errors: 0,
         retries: 0,
+        range_decode_events: 0,
+        range_decode_blocks: 0,
+        range_decode_transactions: 0,
+        range_decode_ms: 0,
+        range_finalize_ms: 0,
         stalled: false,
         outcome,
         error: Some(error),
@@ -944,6 +971,29 @@ fn collect_metrics(
                 }
                 Some("retry") => {
                     metrics.retries = metrics.retries.saturating_add(1);
+                }
+                Some("range_decode") => {
+                    metrics.range_decode_events = metrics.range_decode_events.saturating_add(1);
+                    metrics.range_decode_blocks = metrics
+                        .range_decode_blocks
+                        .saturating_add(value.get("blocks").and_then(Value::as_u64).unwrap_or(0));
+                    metrics.range_decode_transactions =
+                        metrics.range_decode_transactions.saturating_add(
+                            value
+                                .get("transactions")
+                                .and_then(Value::as_u64)
+                                .unwrap_or(0),
+                        );
+                    metrics.range_decode_ms = metrics.range_decode_ms.saturating_add(u128::from(
+                        value.get("decode_ms").and_then(Value::as_u64).unwrap_or(0),
+                    ));
+                    metrics.range_finalize_ms =
+                        metrics.range_finalize_ms.saturating_add(u128::from(
+                            value
+                                .get("finalize_ms")
+                                .and_then(Value::as_u64)
+                                .unwrap_or(0),
+                        ));
                 }
                 _ => {}
             }
@@ -1106,6 +1156,8 @@ mod tests {
             assert!(profiles.contains(&"batch-125"));
             assert!(profiles.contains(&"serial-75"));
             assert!(profiles.contains(&"parallel-75"));
+            assert!(profiles.contains(&"decode-serial-500"));
+            assert!(profiles.contains(&"decode-parallel-500"));
         }
     }
 

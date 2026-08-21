@@ -29,6 +29,8 @@ enum ScanProfile {
     Batch125,
     Serial75,
     Parallel75,
+    DecodeSerial500,
+    DecodeParallel500,
 }
 
 impl ScanProfile {
@@ -45,6 +47,7 @@ impl ScanProfile {
             Self::Batch100 => BATCH_100,
             Self::Batch125 => BATCH_125,
             Self::Serial75 | Self::Parallel75 => BATCH_75,
+            Self::DecodeSerial500 | Self::DecodeParallel500 => FAST_BATCH,
         }
     }
 
@@ -62,6 +65,8 @@ impl ScanProfile {
             Self::Batch125 => "batch-125",
             Self::Serial75 => "serial-75",
             Self::Parallel75 => "parallel-75",
+            Self::DecodeSerial500 => "decode-serial-500",
+            Self::DecodeParallel500 => "decode-parallel-500",
         }
     }
 
@@ -69,6 +74,14 @@ impl ScanProfile {
         match self {
             Self::Serial75 => Some("1"),
             Self::Parallel75 => Some("auto"),
+            _ => None,
+        }
+    }
+
+    fn range_decode_parallelism(self) -> Option<&'static str> {
+        match self {
+            Self::DecodeSerial500 => Some("0"),
+            Self::DecodeParallel500 => Some("1"),
             _ => None,
         }
     }
@@ -94,6 +107,8 @@ fn profile_from_name(name: &str) -> Option<ScanProfile> {
         "batch-125" | "batch_125" | "125" => Some(ScanProfile::Batch125),
         "serial-75" | "serial_75" => Some(ScanProfile::Serial75),
         "parallel-75" | "parallel_75" => Some(ScanProfile::Parallel75),
+        "decode-serial-500" | "decode_serial_500" => Some(ScanProfile::DecodeSerial500),
+        "decode-parallel-500" | "decode_parallel_500" => Some(ScanProfile::DecodeParallel500),
         _ => None,
     }
 }
@@ -105,6 +120,7 @@ fn set_range_batch(batch: &str) {
         std::env::remove_var("WALLETCORE_BULK_FETCH");
         std::env::remove_var("WALLETCORE_WALLET2_FAST_FALLBACK");
         std::env::remove_var("WALLETCORE_BULK_BIN_DEBUG");
+        std::env::remove_var("WALLETCORE_RANGE_DECODE_PAR");
         std::env::set_var("WALLETCORE_BULK_MODE", "range");
         std::env::set_var("WALLETCORE_BULK_FETCH_BATCH", batch);
         std::env::set_var("WALLETCORE_UPSTREAM_BLOCK_BATCH", batch);
@@ -129,12 +145,20 @@ fn apply_profile(profile: ScanProfile) {
             Some(value) => std::env::set_var("WALLETCORE_SCAN_PAR", value),
             None => std::env::remove_var("WALLETCORE_SCAN_PAR"),
         }
+        match profile.range_decode_parallelism() {
+            Some(value) => std::env::set_var("WALLETCORE_RANGE_DECODE_PAR", value),
+            None => std::env::remove_var("WALLETCORE_RANGE_DECODE_PAR"),
+        }
     }
     println!(
-        "🧪 walletcore scan tuning profile={} batch={} scan_threads={}",
+        "🧪 walletcore scan tuning profile={} batch={} scan_threads={} range_decode={}",
         profile.label(),
         batch,
-        profile.scan_parallelism().unwrap_or("auto")
+        profile.scan_parallelism().unwrap_or("auto"),
+        match profile.range_decode_parallelism() {
+            Some("1") => "parallel-shared",
+            _ => "serial",
+        }
     );
 }
 
@@ -144,6 +168,7 @@ fn apply_walletcore_defaults() {
         std::env::remove_var("WALLETCORE_SCAN_BATCH");
         std::env::remove_var("WALLETCORE_WALLET2_FAST_FALLBACK");
         std::env::remove_var("WALLETCORE_BULK_BIN_DEBUG");
+        std::env::remove_var("WALLETCORE_RANGE_DECODE_PAR");
         std::env::set_var(
             "WALLETCORE_REFRESH_TELEMETRY",
             REFRESH_TELEMETRY_DEFAULT.to_string(),
@@ -191,6 +216,7 @@ pub fn clear_profile_override() {
         std::env::remove_var("WALLETCORE_BULK_MODE");
         std::env::remove_var("WALLETCORE_BULK_FETCH_BATCH");
         std::env::remove_var("WALLETCORE_UPSTREAM_BLOCK_BATCH");
+        std::env::remove_var("WALLETCORE_RANGE_DECODE_PAR");
     }
 }
 
@@ -234,6 +260,18 @@ mod tests {
         assert_eq!(parallel.batch(), BATCH_75);
         assert_eq!(serial.scan_parallelism(), Some("1"));
         assert_eq!(parallel.scan_parallelism(), Some("auto"));
+    }
+
+    #[test]
+    fn decode_profiles_only_change_range_decoding() {
+        let serial = profile_from_name("decode-serial-500").expect("serial decode profile");
+        let parallel = profile_from_name("decode-parallel-500").expect("parallel decode profile");
+        assert_eq!(serial.batch(), FAST_BATCH);
+        assert_eq!(parallel.batch(), FAST_BATCH);
+        assert_eq!(serial.scan_parallelism(), None);
+        assert_eq!(parallel.scan_parallelism(), None);
+        assert_eq!(serial.range_decode_parallelism(), Some("0"));
+        assert_eq!(parallel.range_decode_parallelism(), Some("1"));
     }
 
     #[test]

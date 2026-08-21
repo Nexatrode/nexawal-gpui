@@ -103,12 +103,16 @@ checkpoint. Set `NEXAWAL_BENCHMARK_PROFILES` to a comma-separated subset such as
 `batch-75` for a focused confirmation run; an invalid or empty selection keeps all
 profiles. The diagnostic-only `serial-75` and `parallel-75` profiles compare the
 same 75-block RPC path with one scanner worker versus WalletCore's bounded automatic
-worker count. Samples below 40 blocks/sec are marked `stalled` and excluded from the
-usable average; override that threshold with
+worker count. The diagnostic-only `decode-serial-500` and `decode-parallel-500`
+profiles keep the 500-block request and ownership scanner identical while comparing
+ordered serial block/transaction decoding against decoding on the scanner's shared,
+bounded Rayon pool. Samples below 40 blocks/sec are marked `stalled` and excluded
+from the usable average; override that threshold with
 `NEXAWAL_BENCHMARK_STALL_BPS` when testing a slower connection. Each JSONL record
 also includes WalletCore batch timing, actual returned blocks, binary-RPC request and
-response byte totals, RPC errors, and retry counts. The raw opt-in binary-RPC trace is
-kept in `scan_benchmark_rpc_<run-id>.jsonl` beside the benchmark results.
+response byte totals, range decode/finalization time, RPC errors, and retry counts. The
+raw opt-in binary-RPC trace is kept in `scan_benchmark_rpc_<run-id>.jsonl` beside the
+benchmark results.
 
 ### Deterministic sync audit
 
