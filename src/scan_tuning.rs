@@ -187,10 +187,10 @@ fn apply_walletcore_defaults() {
             std::env::set_var("WALLETCORE_SCAN_LOG", "0");
         }
     }
-    println!("🧪 walletcore scan tuning: using WalletCore defaults (range/75/75)");
+    println!("🧪 walletcore scan tuning: using platform-aware WalletCore defaults");
 }
 
-/// Normal scan path: use WalletCore's shared range/75/75 defaults.
+/// Normal scan path: use WalletCore's platform-aware range and decode defaults.
 #[allow(dead_code)]
 pub fn apply() {
     apply_walletcore_defaults();

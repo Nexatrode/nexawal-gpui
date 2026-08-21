@@ -76,10 +76,11 @@ cargo build --release
 
 ### Scan benchmark
 
-Normal scans use WalletCore's shared `range/75/75` defaults. The optional
-`NEXAWAL_SCAN_PROFILE` environment variable can explicitly select a diagnostic
-profile; normal scan failures are surfaced for a manual retry instead of silently
-switching batch sizes.
+Normal scans use WalletCore's platform-aware defaults: desktop targets request up to
+500 blocks and decode responses on the shared bounded scanner pool, while mobile
+WalletCore builds retain the smaller 75-block serial response decoder. The optional
+`NEXAWAL_SCAN_PROFILE` environment variable can explicitly select a diagnostic profile;
+normal scan failures are surfaced for a manual retry instead of silently switching batch sizes.
 
 Settings includes scan maintenance controls: **Clear scan cache** removes the
 desktop checkpoint without changing wallet keys, while **Rescan from height**
