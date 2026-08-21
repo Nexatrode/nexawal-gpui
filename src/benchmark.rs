@@ -5,8 +5,18 @@
 
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::Write;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+#[cfg(target_os = "macos")]
+use objc2::rc::Retained;
+#[cfg(target_os = "macos")]
+use objc2::runtime::ProtocolObject;
+#[cfg(target_os = "macos")]
+use objc2_foundation::{
+    NSActivityOptions, NSObjectProtocol, NSProcessInfo, NSProcessInfoThermalState, NSString,
+};
 
 use monerowalletcore::api::{self, RefreshJob};
 use serde_json::{Value, json};
@@ -48,6 +58,149 @@ const DEFAULT_COOLDOWN_SECS: u64 = 5;
 const CANCEL_WAIT: Duration = Duration::from_secs(45);
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
 const DEFAULT_STALL_BPS: f64 = 40.0;
+const BENCHMARK_THREAD_NAME: &str = "nexawal-scan-benchmark";
+
+#[derive(Debug)]
+struct BenchmarkWorkerContext {
+    thread_name: String,
+    qos_requested: &'static str,
+    qos_effective: &'static str,
+    qos_priority: i32,
+    qos_set_result: i32,
+    activity: &'static str,
+}
+
+#[cfg(target_os = "macos")]
+struct BenchmarkActivityGuard {
+    process_info: Retained<NSProcessInfo>,
+    activity: Retained<ProtocolObject<dyn NSObjectProtocol>>,
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for BenchmarkActivityGuard {
+    fn drop(&mut self) {
+        // SAFETY: `activity` was returned by this exact NSProcessInfo instance's
+        // beginActivityWithOptions:reason: call and remains retained until this drop.
+        unsafe {
+            self.process_info.endActivity(&self.activity);
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+struct BenchmarkActivityGuard;
+
+#[cfg(target_os = "macos")]
+fn qos_name(qos: libc::qos_class_t) -> &'static str {
+    use libc::qos_class_t::*;
+    match qos {
+        QOS_CLASS_USER_INTERACTIVE => "user-interactive",
+        QOS_CLASS_USER_INITIATED => "user-initiated",
+        QOS_CLASS_DEFAULT => "default",
+        QOS_CLASS_UTILITY => "utility",
+        QOS_CLASS_BACKGROUND => "background",
+        QOS_CLASS_UNSPECIFIED => "unspecified",
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn configure_worker_context() -> (BenchmarkActivityGuard, BenchmarkWorkerContext) {
+    let requested_qos = libc::qos_class_t::QOS_CLASS_USER_INITIATED;
+    // SAFETY: These pthread functions operate on the current live thread. The class and relative
+    // priority are valid values documented by Darwin; output pointers remain valid for the call.
+    let qos_set_result = unsafe { libc::pthread_set_qos_class_self_np(requested_qos, 0) };
+    let mut effective_qos = libc::qos_class_t::QOS_CLASS_UNSPECIFIED;
+    let mut qos_priority = 0;
+    let qos_get_result = unsafe {
+        libc::pthread_get_qos_class_np(libc::pthread_self(), &mut effective_qos, &mut qos_priority)
+    };
+    if qos_get_result != 0 {
+        effective_qos = libc::qos_class_t::QOS_CLASS_UNSPECIFIED;
+        qos_priority = 0;
+    }
+
+    let process_info = NSProcessInfo::processInfo();
+    let reason = NSString::from_str("NexaWal scan benchmark");
+    let activity =
+        process_info.beginActivityWithOptions_reason(NSActivityOptions::UserInitiated, &reason);
+    let context = BenchmarkWorkerContext {
+        thread_name: thread::current().name().unwrap_or("unnamed").to_string(),
+        qos_requested: qos_name(requested_qos),
+        qos_effective: qos_name(effective_qos),
+        qos_priority,
+        qos_set_result,
+        activity: "user-initiated",
+    };
+    (
+        BenchmarkActivityGuard {
+            process_info,
+            activity,
+        },
+        context,
+    )
+}
+
+#[cfg(not(target_os = "macos"))]
+fn configure_worker_context() -> (BenchmarkActivityGuard, BenchmarkWorkerContext) {
+    (
+        BenchmarkActivityGuard,
+        BenchmarkWorkerContext {
+            thread_name: thread::current().name().unwrap_or("unnamed").to_string(),
+            qos_requested: "platform-default",
+            qos_effective: "platform-default",
+            qos_priority: 0,
+            qos_set_result: 0,
+            activity: "not-required",
+        },
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn platform_thermal_state() -> &'static str {
+    match NSProcessInfo::processInfo().thermalState() {
+        NSProcessInfoThermalState::Nominal => "nominal",
+        NSProcessInfoThermalState::Fair => "fair",
+        NSProcessInfoThermalState::Serious => "serious",
+        NSProcessInfoThermalState::Critical => "critical",
+        _ => "unknown",
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn platform_thermal_state() -> &'static str {
+    "unavailable"
+}
+
+#[cfg(target_os = "macos")]
+fn platform_low_power_mode() -> Option<bool> {
+    Some(NSProcessInfo::processInfo().isLowPowerModeEnabled())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn platform_low_power_mode() -> Option<bool> {
+    None
+}
+
+fn append_benchmark_worker_event(path: &std::path::Path, context: &BenchmarkWorkerContext) {
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let event = json!({
+        "timestamp_ms": now_ms(),
+        "event": "benchmark_worker",
+        "thread_name": context.thread_name,
+        "qos_requested": context.qos_requested,
+        "qos_effective": context.qos_effective,
+        "qos_priority": context.qos_priority,
+        "qos_set_result": context.qos_set_result,
+        "activity": context.activity,
+        "thermal_state": platform_thermal_state(),
+        "low_power_mode": platform_low_power_mode(),
+    });
+    if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(file, "{event}");
+    }
+}
 
 #[derive(Debug)]
 pub struct BenchmarkReport {
@@ -65,6 +218,17 @@ pub struct SyncAuditReport {
 
 pub fn run_id() -> u64 {
     now_ms() as u64 ^ u64::from(std::process::id())
+}
+
+pub fn spawn_worker(
+    node_url: String,
+    mnemonic: String,
+    start_height: u64,
+    run_id: u64,
+) -> std::io::Result<thread::JoinHandle<BenchmarkReport>> {
+    thread::Builder::new()
+        .name(BENCHMARK_THREAD_NAME.to_string())
+        .spawn(move || run(node_url, mnemonic, start_height, run_id))
 }
 
 pub fn targets_for(current: &str) -> Vec<String> {
@@ -158,9 +322,11 @@ struct SummaryStats {
 }
 
 pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -> BenchmarkReport {
+    let (_activity_guard, worker_context) = configure_worker_context();
     let results_path = paths::scan_benchmark_path().display().to_string();
     let rpc_telemetry_path = paths::scan_benchmark_rpc_path(run_id);
     let _ = fs::remove_file(&rpc_telemetry_path);
+    append_benchmark_worker_event(&rpc_telemetry_path, &worker_context);
     unsafe {
         std::env::set_var("WALLETCORE_RPC_TELEMETRY_PATH", &rpc_telemetry_path);
     }
@@ -236,6 +402,14 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
                     "range_decode_transactions": result.range_decode_transactions,
                     "range_decode_ms": result.range_decode_ms,
                     "range_finalize_ms": result.range_finalize_ms,
+                    "benchmark_thread": worker_context.thread_name,
+                    "benchmark_qos_requested": worker_context.qos_requested,
+                    "benchmark_qos_effective": worker_context.qos_effective,
+                    "benchmark_qos_priority": worker_context.qos_priority,
+                    "benchmark_qos_set_result": worker_context.qos_set_result,
+                    "benchmark_activity": worker_context.activity,
+                    "thermal_state": platform_thermal_state(),
+                    "low_power_mode": platform_low_power_mode(),
                     "cooldown_secs": cooldown.as_secs(),
                     "stalled": result.stalled,
                     "sample_quality": if result.stalled {
@@ -279,8 +453,10 @@ pub fn run(node_url: String, mnemonic: String, start_height: u64, run_id: u64) -
         }
     }
     let summary = format!(
-        "{} samples · {}",
+        "{} samples · worker {}/{} · {}",
         results.len(),
+        worker_context.qos_effective,
+        worker_context.activity,
         averages
             .into_iter()
             .map(|(key, stats)| {
@@ -1115,6 +1291,26 @@ fn now_ms() -> u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn mac_benchmark_worker_uses_user_initiated_qos_and_activity() {
+        let context = thread::Builder::new()
+            .name(BENCHMARK_THREAD_NAME.to_string())
+            .spawn(|| {
+                let (_activity_guard, context) = configure_worker_context();
+                context
+            })
+            .expect("benchmark worker")
+            .join()
+            .expect("benchmark worker should not panic");
+
+        assert_eq!(context.thread_name, BENCHMARK_THREAD_NAME);
+        assert_eq!(context.qos_set_result, 0);
+        assert_eq!(context.qos_requested, "user-initiated");
+        assert_eq!(context.qos_effective, "user-initiated");
+        assert_eq!(context.activity, "user-initiated");
+    }
 
     #[test]
     fn idle_wait_reports_success_without_sleeping() {

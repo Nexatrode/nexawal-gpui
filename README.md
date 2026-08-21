@@ -112,7 +112,9 @@ from the usable average; override that threshold with
 also includes WalletCore batch timing, actual returned blocks, binary-RPC request and
 response byte totals, range decode/finalization time, RPC errors, and retry counts. The
 raw opt-in binary-RPC trace is kept in `scan_benchmark_rpc_<run-id>.jsonl` beside the
-benchmark results.
+benchmark results. On macOS the suite runs on a dedicated user-initiated worker while an
+`NSProcessInfo` activity prevents App Nap; each record includes effective pthread QoS,
+thermal state, and Low Power Mode state for diagnosing local scheduling slowdowns.
 
 ### Deterministic sync audit
 

@@ -2463,17 +2463,33 @@ impl Home {
         .into();
         cx.notify();
 
+        // Spawn directly from the UI action so macOS does not inherit GPUI background-executor
+        // scheduling for the CPU-heavy suite. The worker itself installs a user-initiated
+        // NSProcessInfo activity and verifies its pthread QoS before running any samples.
+        let benchmark_worker = match benchmark::spawn_worker(node, mnemonic, start_height, run_id) {
+            Ok(worker) => worker,
+            Err(error) => {
+                self.benchmark_running = false;
+                self.status = format!("Could not start scan benchmark worker: {error}").into();
+                cx.notify();
+                return;
+            }
+        };
+
         cx.spawn(async move |this, cx| {
-            let report = cx
+            let report_result = cx
                 .background_executor()
-                .spawn(async move { benchmark::run(node, mnemonic, start_height, run_id) })
+                .spawn(async move { benchmark_worker.join() })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 this.benchmark_running = false;
-                let status = format!(
-                    "Benchmark complete · {}. Results saved to {} · RPC trace {}",
-                    report.summary, report.results_path, report.rpc_results_path
-                );
+                let status = match report_result {
+                    Ok(report) => format!(
+                        "Benchmark complete · {}. Results saved to {} · RPC trace {}",
+                        report.summary, report.results_path, report.rpc_results_path
+                    ),
+                    Err(_) => "Scan benchmark worker stopped unexpectedly.".to_string(),
+                };
                 this.benchmark_status = Some(status.clone().into());
                 this.status = status.into();
                 this.poll_core();
