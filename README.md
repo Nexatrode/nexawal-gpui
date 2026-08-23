@@ -47,6 +47,15 @@ display); later launches restore the last usable size, position, and maximized
 state. The wallet page uses the main window scroll area for its balance, sync,
 and recent-transaction cards, avoiding a nested history scroller.
 
+Receive follows the mobile payment-request flow: QR and payment URI first,
+optional amount and description next, then share/copy actions and subaddress
+management. Send separates the destination, amount, spend source, and actions;
+the final Send action remains disabled until a fee preview succeeds. Settings is
+grouped into appearance, connection, security, fiat, recovery, advanced, about,
+and danger-zone sections. Connection edits are staged until **Use this node** is
+chosen, which applies the saved mode and endpoint through the normal safe scan
+cancel/restart path.
+
 Keyring v3 does not enable a native backend by default. This repository enables each platform backend explicitly; builds before this change used a temporary in-memory backend and require entering the seed one final time to migrate it into persistent secure storage.
 
 ## Run

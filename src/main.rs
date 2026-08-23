@@ -1201,7 +1201,12 @@ impl Home {
     fn cycle_network_policy(&mut self, cx: &mut Context<Self>) {
         self.network_policy = self.network_policy.next();
         let _ = paths::save_network_policy(self.network_policy);
-        self.apply_network(cx);
+        self.status = format!(
+            "Connection mode: {}. Choose Use this node to apply it.",
+            self.network_policy.label()
+        )
+        .into();
+        cx.notify();
     }
 
     fn apply_network(&mut self, cx: &mut Context<Self>) {
@@ -4256,154 +4261,193 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
     div()
         .flex()
         .flex_col()
-        .gap_3()
-        .p_5()
-        .rounded_lg()
-        .bg(rgb(theme_card()))
-        .child(
-            div()
-                .text_sm()
-                .text_color(rgb(theme_muted()))
-                .child(l10n::t("Receive")),
-        )
-        .child(
+        .gap_4()
+        .child(page_title(l10n::t("Receive XMR")))
+        .child(section_card(
+            l10n::t("Receive"),
             div()
                 .flex()
-                .flex_row()
+                .flex_col()
+                .items_center()
+                .gap_3()
+                .when_some(home.qr_image.clone(), |content, image| {
+                    content.child(
+                        div().p_3().rounded_lg().bg(rgb(0xFFFFFF)).child(
+                            img(ImageSource::Render(image))
+                                .w(px(260.))
+                                .h(px(260.))
+                                .object_fit(ObjectFit::Contain),
+                        ),
+                    )
+                })
+                .child(
+                    div()
+                        .id("receive-payment-uri")
+                        .w_full()
+                        .cursor(CursorStyle::PointingHand)
+                        .p_3()
+                        .rounded_md()
+                        .bg(rgb(theme_field()))
+                        .text_sm()
+                        .text_color(rgb(theme_muted()))
+                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.copy_receive_uri(cx);
+                        }))
+                        .child(uri.clone()),
+                ),
+        ))
+        .child(section_card(
+            l10n::t("Payment Request (optional)"),
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(div().text_xs().text_color(rgb(theme_muted())).child(
+                    match home.recv_amount_mode {
+                        AmountMode::Xmr => l10n::t("Amount (optional, XMR)").to_string(),
+                        AmountMode::Fiat => {
+                            format!("Amount (optional, {})", home.fiat_currency)
+                        }
+                    },
+                ))
+                .child(field_input(
+                    home,
+                    window,
+                    cx,
+                    Field::RecvAmount,
+                    "recv-amount",
+                    "Optional amount",
+                    false,
+                    false,
+                ))
+                .when(home.live_rate().is_some(), |content| {
+                    content.child(secondary_action_button(
+                        "recv-unit",
+                        if home.recv_amount_mode == AmountMode::Xmr {
+                            l10n::t("Type in fiat")
+                        } else {
+                            l10n::t("Type in XMR")
+                        },
+                        cx.listener(|this, _: &ClickEvent, _, cx| this.swap_amount_mode(false, cx)),
+                    ))
+                })
+                .when_some(recv_secondary.clone(), |content, secondary| {
+                    content.child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(theme_muted()))
+                            .child(secondary),
+                    )
+                })
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(theme_muted()))
+                        .child(l10n::t("Description (optional)")),
+                )
+                .child(field_input(
+                    home,
+                    window,
+                    cx,
+                    Field::RecvDesc,
+                    "recv-desc",
+                    "Optional description",
+                    false,
+                    false,
+                )),
+        ))
+        .child(section_card(
+            l10n::t("Actions"),
+            div()
+                .flex()
+                .flex_col()
                 .gap_2()
-                .child(action_button(
-                    "recv-prev",
-                    l10n::t("Prev"),
-                    cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.cycle_receive_address(false, cx);
-                    }),
+                .child(wide_primary_action_button(
+                    "receive-copy-uri",
+                    l10n::t("Share Payment Link"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.copy_receive_uri(cx)),
                 ))
-                .child(div().px_3().py_2().child(home.receive_book.display_label()))
-                .child(action_button(
-                    "recv-next",
-                    l10n::t("Next"),
-                    cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.cycle_receive_address(true, cx);
-                    }),
+                .child(wide_secondary_action_button(
+                    "receive-copy",
+                    if home.address_copy_hint_active() {
+                        l10n::t("Copied")
+                    } else {
+                        l10n::t("Copy Address")
+                    },
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.copy_address(cx)),
+                )),
+        ))
+        .child(section_card(
+            l10n::t("Receive Address"),
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .justify_between()
+                        .gap_2()
+                        .child(secondary_action_button(
+                            "recv-prev",
+                            l10n::t("Prev"),
+                            cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.cycle_receive_address(false, cx);
+                            }),
+                        ))
+                        .child(
+                            div()
+                                .flex_1()
+                                .px_3()
+                                .py_2()
+                                .text_center()
+                                .child(home.receive_book.display_label()),
+                        )
+                        .child(secondary_action_button(
+                            "recv-next",
+                            l10n::t("Next"),
+                            cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.cycle_receive_address(true, cx);
+                            }),
+                        )),
+                )
+                .child(
+                    div()
+                        .id("receive-address")
+                        .cursor(CursorStyle::PointingHand)
+                        .p_3()
+                        .rounded_md()
+                        .bg(rgb(theme_field()))
+                        .text_sm()
+                        .text_color(rgb(theme_muted()))
+                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.copy_address(cx)))
+                        .child(home.receive_address.clone()),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(theme_muted()))
+                        .child(l10n::t("Label")),
+                )
+                .child(field_input(
+                    home,
+                    window,
+                    cx,
+                    Field::RecvLabel,
+                    "recv-label",
+                    "Label (optional)",
+                    false,
+                    false,
                 ))
-                .child(action_button(
+                .child(wide_secondary_action_button(
                     "recv-new",
-                    l10n::t("New address"),
+                    l10n::t("New Address"),
                     cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.create_receive_subaddress(cx);
                     }),
                 )),
-        )
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(theme_muted()))
-                .child(l10n::t("Label")),
-        )
-        .child(field_input(
-            home,
-            window,
-            cx,
-            Field::RecvLabel,
-            "recv-label",
-            "Label (optional)",
-            false,
-            false,
-        ))
-        .when_some(home.qr_image.clone(), |card, image| {
-            card.child(
-                img(ImageSource::Render(image))
-                    .w(px(220.))
-                    .h(px(220.))
-                    .object_fit(ObjectFit::Contain),
-            )
-        })
-        .child(
-            div()
-                .id("receive-address")
-                .cursor(CursorStyle::PointingHand)
-                .p_3()
-                .rounded_md()
-                .bg(rgb(theme_field()))
-                .text_sm()
-                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.copy_address(cx)))
-                .child(home.receive_address.clone()),
-        )
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(theme_muted()))
-                .child(match home.recv_amount_mode {
-                    AmountMode::Xmr => l10n::t("Amount (optional, XMR)").to_string(),
-                    AmountMode::Fiat => format!("Amount (optional, {})", home.fiat_currency),
-                }),
-        )
-        .child(field_input(
-            home,
-            window,
-            cx,
-            Field::RecvAmount,
-            "recv-amount",
-            "Optional amount",
-            false,
-            false,
-        ))
-        .when(home.live_rate().is_some(), |card| {
-            card.child(action_button(
-                "recv-unit",
-                if home.recv_amount_mode == AmountMode::Xmr {
-                    l10n::t("Type in fiat")
-                } else {
-                    l10n::t("Type in XMR")
-                },
-                cx.listener(|this, _: &ClickEvent, _, cx| this.swap_amount_mode(false, cx)),
-            ))
-        })
-        .when(recv_secondary.is_some(), |card| {
-            card.child(
-                div()
-                    .text_xs()
-                    .text_color(rgb(theme_muted()))
-                    .child(recv_secondary.clone().unwrap_or_default()),
-            )
-        })
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(theme_muted()))
-                .child(l10n::t("Description (optional)")),
-        )
-        .child(field_input(
-            home,
-            window,
-            cx,
-            Field::RecvDesc,
-            "recv-desc",
-            "Optional description",
-            false,
-            false,
-        ))
-        .child(div().text_xs().text_color(rgb(theme_muted())).child(
-            if home.address_copy_hint_active() {
-                "Copied.".to_string()
-            } else {
-                uri
-            },
-        ))
-        .child(action_button(
-            "receive-copy",
-            l10n::t("Copy address"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.copy_address(cx)),
-        ))
-        .child(action_button(
-            "receive-copy-uri",
-            l10n::t("Copy payment URI"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.copy_receive_uri(cx)),
-        ))
-        .child(action_button(
-            "receive-back",
-            l10n::t("Back"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.go_wallet(cx)),
         ))
 }
 
@@ -4443,165 +4487,188 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
         .send_piconero()
         .filter(|v| *v > 0)
         .and_then(|pico| home.amount_secondary(pico, home.send_amount_mode));
+    let compact_tools = window.viewport_size().width < px(900.);
 
     div()
         .flex()
         .flex_col()
-        .gap_3()
-        .p_5()
-        .rounded_lg()
-        .bg(rgb(theme_card()))
-        .child(
+        .gap_4()
+        .child(page_title(l10n::t("Send XMR")))
+        .child(section_card(
+            l10n::t("To address"),
             div()
-                .text_sm()
-                .text_color(rgb(theme_muted()))
-                .child(l10n::t("Send")),
-        )
-        .child(
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(field_input(
+                    home,
+                    window,
+                    cx,
+                    Field::Dest,
+                    "send-dest",
+                    "Paste a Monero address or monero: URI",
+                    true,
+                    false,
+                ))
+                .child(
+                    div()
+                        .flex()
+                        .gap_2()
+                        .when(compact_tools, |tools| tools.flex_col())
+                        .when(!compact_tools, |tools| tools.flex_row())
+                        .child(secondary_action_button(
+                            "send-paste-qr",
+                            l10n::t("Paste QR from clipboard"),
+                            cx.listener(|this, _: &ClickEvent, _, cx| this.paste_send_qr(cx)),
+                        ))
+                        .child(secondary_action_button(
+                            "send-open-qr",
+                            l10n::t("Open QR image"),
+                            cx.listener(|this, _: &ClickEvent, _, cx| this.open_send_qr_image(cx)),
+                        ))
+                        .child(secondary_action_button(
+                            "send-scan-qr",
+                            if home.send_qr_busy {
+                                l10n::t("Looking for QR…")
+                            } else {
+                                l10n::t("Scan QR with camera")
+                            },
+                            cx.listener(|this, _: &ClickEvent, _, cx| this.scan_send_qr_camera(cx)),
+                        )),
+                ),
+        ))
+        .child(section_card(
+            l10n::t("Amount"),
             div()
-                .text_xs()
-                .text_color(rgb(theme_muted()))
-                .child(l10n::t("Destination")),
-        )
-        .child(field_input(
-            home,
-            window,
-            cx,
-            Field::Dest,
-            "send-dest",
-            "Paste a Monero address or monero: URI",
-            true,
-            false,
-        ))
-        .child(action_button(
-            "send-paste-qr",
-            l10n::t("Paste QR from clipboard"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.paste_send_qr(cx)),
-        ))
-        .child(action_button(
-            "send-open-qr",
-            l10n::t("Open QR image"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.open_send_qr_image(cx)),
-        ))
-        .child(action_button(
-            "send-scan-qr",
-            if home.send_qr_busy {
-                l10n::t("Looking for QR…")
-            } else {
-                l10n::t("Scan QR with camera")
-            },
-            cx.listener(|this, _: &ClickEvent, _, cx| this.scan_send_qr_camera(cx)),
-        ))
-        .child(action_button(
-            "send-from-toggle",
-            if home.send_from_subaddress {
-                l10n::t("Spend from selected address")
-            } else {
-                l10n::t("Spend from whole wallet")
-            },
-            cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_send_from_subaddress(cx)),
-        ))
-        .when(home.send_from_subaddress, |card| {
-            card.child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .gap_2()
-                    .child(action_button(
-                        "send-from-prev",
-                        l10n::t("Prev"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.cycle_send_source(false, cx);
-                        }),
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(div().text_xs().text_color(rgb(theme_muted())).child(
+                    match home.send_amount_mode {
+                        AmountMode::Xmr => l10n::t("Amount (XMR)").to_string(),
+                        AmountMode::Fiat => format!("Amount ({})", home.fiat_currency),
+                    },
+                ))
+                .child(field_input(
+                    home,
+                    window,
+                    cx,
+                    Field::Amount,
+                    "send-amount",
+                    "Amount",
+                    false,
+                    false,
+                ))
+                .when(home.live_rate().is_some(), |content| {
+                    content.child(secondary_action_button(
+                        "send-unit",
+                        if home.send_amount_mode == AmountMode::Xmr {
+                            l10n::t("Type in fiat")
+                        } else {
+                            l10n::t("Type in XMR")
+                        },
+                        cx.listener(|this, _: &ClickEvent, _, cx| this.swap_amount_mode(true, cx)),
                     ))
-                    .child(
+                })
+                .when_some(send_secondary.clone(), |content, secondary| {
+                    content.child(
                         div()
-                            .px_3()
-                            .py_2()
-                            .child(home.receive_book.display_label_for(home.send_source_index)),
+                            .text_xs()
+                            .text_color(rgb(theme_muted()))
+                            .child(secondary),
                     )
-                    .child(action_button(
-                        "send-from-next",
-                        l10n::t("Next"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.cycle_send_source(true, cx);
-                        }),
-                    )),
-            )
-        })
-        .child(
+                })
+                .child(
+                    div()
+                        .p_3()
+                        .rounded_md()
+                        .bg(rgb(theme_field()))
+                        .text_sm()
+                        .text_color(rgb(theme_muted()))
+                        .child(fee_line),
+                )
+                .child(wide_secondary_action_button(
+                    "send-max",
+                    l10n::t("Send max"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.fill_send_max(cx)),
+                )),
+        ))
+        .child(section_card(
+            l10n::t("Spend source"),
             div()
-                .text_xs()
-                .text_color(rgb(theme_muted()))
-                .child(match home.send_amount_mode {
-                    AmountMode::Xmr => l10n::t("Amount (XMR)").to_string(),
-                    AmountMode::Fiat => format!("Amount ({})", home.fiat_currency),
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(wide_secondary_action_button(
+                    "send-from-toggle",
+                    if home.send_from_subaddress {
+                        l10n::t("Spend from selected address")
+                    } else {
+                        l10n::t("Spend from whole wallet")
+                    },
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_send_from_subaddress(cx)),
+                ))
+                .when(home.send_from_subaddress, |content| {
+                    content.child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_2()
+                            .child(secondary_action_button(
+                                "send-from-prev",
+                                l10n::t("Prev"),
+                                cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.cycle_send_source(false, cx);
+                                }),
+                            ))
+                            .child(
+                                div().flex_1().px_3().py_2().text_center().child(
+                                    home.receive_book.display_label_for(home.send_source_index),
+                                ),
+                            )
+                            .child(secondary_action_button(
+                                "send-from-next",
+                                l10n::t("Next"),
+                                cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.cycle_send_source(true, cx);
+                                }),
+                            )),
+                    )
                 }),
-        )
-        .child(field_input(
-            home,
-            window,
-            cx,
-            Field::Amount,
-            "send-amount",
-            "Amount",
-            false,
-            false,
         ))
-        .when(home.live_rate().is_some(), |card| {
-            card.child(action_button(
-                "send-unit",
-                if home.send_amount_mode == AmountMode::Xmr {
-                    l10n::t("Type in fiat")
-                } else {
-                    l10n::t("Type in XMR")
-                },
-                cx.listener(|this, _: &ClickEvent, _, cx| this.swap_amount_mode(true, cx)),
-            ))
-        })
-        .when(send_secondary.is_some(), |card| {
-            card.child(
-                div()
-                    .text_xs()
-                    .text_color(rgb(theme_muted()))
-                    .child(send_secondary.clone().unwrap_or_default()),
-            )
-        })
-        .child(
+        .child(section_card(
+            l10n::t("Actions"),
             div()
-                .text_xs()
-                .text_color(rgb(theme_muted()))
-                .child(fee_line),
-        )
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(theme_muted()))
-                .child(home.network_policy.label()),
-        )
-        .child(action_button(
-            "send-max",
-            l10n::t("Send max"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.fill_send_max(cx)),
-        ))
-        .child(action_button(
-            "send-preview",
-            if home.send_busy {
-                l10n::t("Working…")
-            } else {
-                l10n::t("Preview fee")
-            },
-            cx.listener(|this, _: &ClickEvent, _, cx| this.run_preview(cx)),
-        ))
-        .child(action_button(
-            "send-broadcast",
-            l10n::t("Send"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.run_send(cx)),
-        ))
-        .child(action_button(
-            "send-back",
-            l10n::t("Back"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.go_wallet(cx)),
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(theme_muted()))
+                        .child(home.network_policy.label()),
+                )
+                .when(home.send_busy, |content| {
+                    content.child(disabled_action_button("send-preview", l10n::t("Working…")))
+                })
+                .when(!home.send_busy, |content| {
+                    content.child(wide_primary_action_button(
+                        "send-preview",
+                        l10n::t("Preview Fee"),
+                        cx.listener(|this, _: &ClickEvent, _, cx| this.run_preview(cx)),
+                    ))
+                })
+                .when(home.send_fee.is_none() || home.send_busy, |content| {
+                    content.child(disabled_action_button("send-broadcast", l10n::t("Send")))
+                })
+                .when(home.send_fee.is_some() && !home.send_busy, |content| {
+                    content.child(wide_primary_action_button(
+                        "send-broadcast",
+                        l10n::t("Send"),
+                        cx.listener(|this, _: &ClickEvent, _, cx| this.run_send(cx)),
+                    ))
+                }),
         ))
 }
 
@@ -4707,310 +4774,381 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
     div()
         .flex()
         .flex_col()
-        .gap_3()
-        .p_5()
-        .rounded_lg()
-        .bg(rgb(theme_card()))
-        .child(div().text_sm().text_color(rgb(theme_muted())).child(l10n::t("Settings")))
-        .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("How to connect")))
-        .child(action_button(
-            "settings-theme",
-            format!("Theme: {}", home.theme.label()),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_theme(cx)),
-        ))
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(theme_muted()))
-                .child(l10n::t(
-                    "Neon terminal look. Leave off for the standard theme (default).",
-                )),
-        )
-        .child(action_button(
-            "net-policy",
-            home.network_policy.label(),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.cycle_network_policy(cx)),
-        ))
-        .child(action_button(
-            "settings-test-node",
-            if home.node_probe_running {
-                l10n::t("Testing node…")
-            } else {
-                l10n::t("Test scan node")
-            },
-            cx.listener(|this, _: &ClickEvent, _, cx| this.probe_scan_node(cx)),
-        ))
-        .when_some(home.node_probe_status.clone(), |card, status| {
-            card.child(div().text_xs().text_color(rgb(theme_muted())).child(status))
-        })
-        .child(action_button(
-            "settings-test-broadcast-node",
-            if home.broadcast_probe_running {
-                l10n::t("Testing broadcast…")
-            } else {
-                l10n::t("Test broadcast node")
-            },
-            cx.listener(|this, _: &ClickEvent, _, cx| this.probe_broadcast_node(cx)),
-        ))
-        .when_some(home.broadcast_probe_status.clone(), |card, status| {
-            card.child(div().text_xs().text_color(rgb(theme_muted())).child(status))
-        })
-        .when(home.network_policy != network::Policy::I2p, |card| {
-            card.child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("Clearnet node")))
-                .child(field_input(
-                    home,
-                    window,
-                    cx,
-                    Field::Node,
-                    "settings-node",
-                    "http://127.0.0.1:18081",
-                    false,
-                    false,
-                ))
-        })
-        .when(home.network_policy != network::Policy::Clearnet, |card| {
-            card.child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("I2P node (host:port)")))
-                .child(field_input(
-                    home,
-                    window,
-                    cx,
-                    Field::I2pNode,
-                    "settings-i2p-node",
-                    "hostname.b32.i2p:18081",
-                    false,
-                    false,
-                ))
-                .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("I2P HTTP proxy (host:port)")))
-                .child(field_input(
-                    home,
-                    window,
-                    cx,
-                    Field::I2pProxy,
-                    "settings-i2p-proxy",
-                    "127.0.0.1:4444",
-                    false,
-                    false,
-                ))
-                .child(action_button(
-                    "apply-i2p",
-                    l10n::t("Apply I2P settings"),
-                    cx.listener(|this, _: &ClickEvent, _, cx| this.apply_network(cx)),
-                ))
-        })
-        .child(action_button(
-            "settings-auth",
-            if home.require_device_auth {
-                l10n::t("Device authentication: on")
-            } else {
-                l10n::t("Device authentication: off")
-            },
-            cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_device_auth(cx)),
-        ))
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(theme_muted()))
-                .child(if device_auth::is_available() {
-                    l10n::t("When on, Touch ID or your login password is required to unlock and send.")
-                } else {
-                    l10n::t("Touch ID / password is not available on this computer.")
-                }),
-        )
-        .child(action_button(
-            "settings-scan-benchmark",
-            if home.benchmark_running {
-                l10n::t("Scan benchmark running…")
-            } else {
-                l10n::t("Run scan benchmark")
-            },
-            cx.listener(|this, _: &ClickEvent, _, cx| this.run_scan_benchmark(cx)),
-        ))
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(theme_muted()))
-                .child(l10n::t(
-                    "Stops the current sync, compares 25, 50, 75, 100, 125, 150, and 500-block batches in shuffled repeated samples, then saves JSON results.",
-                )),
-        )
-        .child(action_button(
-            "settings-fiat",
-            if home.fiat_enabled {
-                l10n::t("Fiat estimates: on")
-            } else {
-                l10n::t("Fiat estimates: off")
-            },
-            cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_fiat(cx)),
-        ))
-        .when(home.fiat_enabled, |card| {
-            card.child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .gap_2()
-                    .child(action_button(
-                        "fiat-prev",
-                        l10n::t("Prev currency"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.cycle_fiat_currency(false, cx);
-                        }),
-                    ))
-                    .child(
-                        div()
-                            .px_3()
-                            .py_2()
-                            .child(home.fiat_currency.clone()),
-                    )
-                    .child(action_button(
-                        "fiat-next",
-                        l10n::t("Next currency"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.cycle_fiat_currency(true, cx);
-                        }),
-                    )),
-            )
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(rgb(theme_muted()))
-                    .child("Optional. Fetches XMR/USD from api.kraken.com and, if needed, FX from api.frankfurter.dev. Those servers see your IP. Amounts and addresses are not sent."),
-            )
-        })
-        .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("Scan maintenance")))
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(theme_muted()))
-                .child(l10n::t("Clear the local cache without changing wallet keys, or rescan from a chosen block.")),
-        )
-        .child(
-            field_input(
-                home,
-                window,
-                cx,
-                Field::RescanHeight,
-                "settings-rescan-height",
-                "0",
-                false,
-                true,
-            ),
-        )
-        .child(
+        .gap_4()
+        .child(page_title(l10n::t("Settings")))
+        .child(section_card(
+            l10n::t("Appearance"),
             div()
                 .flex()
-                .flex_row()
-                .gap_2()
-                .child(action_button(
+                .flex_col()
+                .gap_3()
+                .child(wide_secondary_action_button(
+                    "settings-theme",
+                    format!("Theme: {}", home.theme.label()),
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_theme(cx)),
+                ))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(theme_muted()))
+                        .child(l10n::t(
+                            "Neon terminal look. Leave off for the standard theme (default).",
+                        )),
+                ),
+        ))
+        .child(section_card(
+            l10n::t("How to connect"),
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(wide_secondary_action_button(
+                    "net-policy",
+                    home.network_policy.label(),
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.cycle_network_policy(cx)
+                    }),
+                ))
+                .when(home.network_policy != network::Policy::I2p, |content| {
+                    content
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(rgb(theme_muted()))
+                                .child(l10n::t("Clearnet node")),
+                        )
+                        .child(field_input(
+                            home,
+                            window,
+                            cx,
+                            Field::Node,
+                            "settings-node",
+                            "http://127.0.0.1:18081",
+                            false,
+                            false,
+                        ))
+                })
+                .when(home.network_policy != network::Policy::Clearnet, |content| {
+                    content
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(rgb(theme_muted()))
+                                .child(l10n::t("I2P node (host:port)")),
+                        )
+                        .child(field_input(
+                            home,
+                            window,
+                            cx,
+                            Field::I2pNode,
+                            "settings-i2p-node",
+                            "hostname.b32.i2p:18081",
+                            false,
+                            false,
+                        ))
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(rgb(theme_muted()))
+                                .child(l10n::t("I2P HTTP proxy (host:port)")),
+                        )
+                        .child(field_input(
+                            home,
+                            window,
+                            cx,
+                            Field::I2pProxy,
+                            "settings-i2p-proxy",
+                            "127.0.0.1:4444",
+                            false,
+                            false,
+                        ))
+                })
+                .child(wide_primary_action_button(
+                    "settings-use-node",
+                    l10n::t("Use this node"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.apply_network(cx)),
+                ))
+                .child(wide_secondary_action_button(
+                    "settings-test-node",
+                    if home.node_probe_running {
+                        l10n::t("Testing node…")
+                    } else {
+                        l10n::t("Test scan node")
+                    },
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.probe_scan_node(cx)),
+                ))
+                .when_some(home.node_probe_status.clone(), |content, status| {
+                    content.child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(theme_muted()))
+                            .child(status),
+                    )
+                })
+                .child(wide_secondary_action_button(
+                    "settings-test-broadcast-node",
+                    if home.broadcast_probe_running {
+                        l10n::t("Testing broadcast…")
+                    } else {
+                        l10n::t("Test broadcast node")
+                    },
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.probe_broadcast_node(cx)
+                    }),
+                ))
+                .when_some(home.broadcast_probe_status.clone(), |content, status| {
+                    content.child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(theme_muted()))
+                            .child(status),
+                    )
+                }),
+        ))
+        .child(section_card(
+            l10n::t("Security"),
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(wide_secondary_action_button(
+                    "settings-auth",
+                    if home.require_device_auth {
+                        l10n::t("Device authentication: on")
+                    } else {
+                        l10n::t("Device authentication: off")
+                    },
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_device_auth(cx)),
+                ))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(theme_muted()))
+                        .child(if device_auth::is_available() {
+                            l10n::t(
+                                "When on, Touch ID or your login password is required to unlock and send.",
+                            )
+                        } else {
+                            l10n::t("Touch ID / password is not available on this computer.")
+                        }),
+                ),
+        ))
+        .child(section_card(
+            l10n::t("Fiat estimates"),
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(wide_secondary_action_button(
+                    "settings-fiat",
+                    if home.fiat_enabled {
+                        l10n::t("Fiat estimates: on")
+                    } else {
+                        l10n::t("Fiat estimates: off")
+                    },
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_fiat(cx)),
+                ))
+                .when(home.fiat_enabled, |content| {
+                    content
+                        .child(
+                            div()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_2()
+                                .child(secondary_action_button(
+                                    "fiat-prev",
+                                    l10n::t("Prev currency"),
+                                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                                        this.cycle_fiat_currency(false, cx);
+                                    }),
+                                ))
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .px_3()
+                                        .py_2()
+                                        .text_center()
+                                        .child(home.fiat_currency.clone()),
+                                )
+                                .child(secondary_action_button(
+                                    "fiat-next",
+                                    l10n::t("Next currency"),
+                                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                                        this.cycle_fiat_currency(true, cx);
+                                    }),
+                                )),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(rgb(theme_muted()))
+                                .child("Optional. Fetches XMR/USD from api.kraken.com and, if needed, FX from api.frankfurter.dev. Those servers see your IP. Amounts and addresses are not sent."),
+                        )
+                }),
+        ))
+        .child(section_card(
+            l10n::t("Recovery"),
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(theme_muted()))
+                        .child(l10n::t(
+                            "Clear the local cache without changing wallet keys, or rescan from a chosen block.",
+                        )),
+                )
+                .child(field_input(
+                    home,
+                    window,
+                    cx,
+                    Field::RescanHeight,
+                    "settings-rescan-height",
+                    "0",
+                    false,
+                    true,
+                ))
+                .child(wide_secondary_action_button(
                     "settings-clear-scan-cache",
                     l10n::t("Clear scan cache"),
                     cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.request_clear_scan_cache(cx);
                     }),
                 ))
-                .child(action_button(
+                .child(wide_primary_action_button(
                     "settings-rescan",
-                    l10n::t("Rescan from height"),
-                    cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.request_rescan(cx);
-                    }),
-                )),
-        )
-        .when(home.maintenance_confirmation.is_some(), |card| {
-            let message = match home.maintenance_confirmation {
-                Some(MaintenanceAction::ClearCache) => {
-                    l10n::t("This cancels an active scan and deletes only the local scan cache. Continue?")
-                }
-                Some(MaintenanceAction::Rescan) => format!(
-                    "This clears tracked wallet state and starts a full rescan from block {}. Continue?",
-                    home.rescan_height()
-                )
-                .into(),
-                None => "".into(),
-            };
-            card.child(
-                div()
-                    .p_3()
-                    .rounded_md()
-                    .bg(rgb(theme_field()))
-                    .text_xs()
-                    .text_color(rgb(theme_muted()))
-                    .child(message),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .gap_2()
-                    .child(action_button(
-                        "maintenance-confirm",
-                        l10n::t("Confirm"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.confirm_maintenance(cx);
-                        }),
-                    ))
-                    .child(action_button(
-                        "maintenance-cancel",
-                        l10n::t("Cancel"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.cancel_maintenance(cx);
-                        }),
-                    )),
-            )
-        })
-        .child(action_button(
-            "settings-terms",
-            l10n::t("Terms of Use"),
-            cx.listener(|this, _: &ClickEvent, _, cx| {
-                this.open_legal(legal::Document::Terms, cx);
-            }),
+                    l10n::t("Rescan from Height"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.request_rescan(cx)),
+                ))
+                .when(home.maintenance_confirmation.is_some(), |content| {
+                    let message = match home.maintenance_confirmation {
+                        Some(MaintenanceAction::ClearCache) => l10n::t(
+                            "This cancels an active scan and deletes only the local scan cache. Continue?",
+                        ),
+                        Some(MaintenanceAction::Rescan) => format!(
+                            "This clears tracked wallet state and starts a full rescan from block {}. Continue?",
+                            home.rescan_height()
+                        )
+                        .into(),
+                        None => "".into(),
+                    };
+                    content
+                        .child(
+                            div()
+                                .p_3()
+                                .rounded_md()
+                                .bg(rgb(theme_field()))
+                                .text_xs()
+                                .text_color(rgb(theme_muted()))
+                                .child(message),
+                        )
+                        .child(wide_primary_action_button(
+                            "maintenance-confirm",
+                            l10n::t("Confirm"),
+                            cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.confirm_maintenance(cx);
+                            }),
+                        ))
+                        .child(wide_secondary_action_button(
+                            "maintenance-cancel",
+                            l10n::t("Cancel"),
+                            cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.cancel_maintenance(cx);
+                            }),
+                        ))
+                }),
         ))
-        .child(action_button(
-            "settings-privacy",
-            l10n::t("Privacy Policy"),
-            cx.listener(|this, _: &ClickEvent, _, cx| {
-                this.open_legal(legal::Document::Privacy, cx);
-            }),
-        ))
-        .child(action_button(
-            "settings-license",
-            l10n::t("License"),
-            cx.listener(|this, _: &ClickEvent, _, cx| {
-                this.open_legal(legal::Document::License, cx);
-            }),
-        ))
-        .child(
+        .child(section_card(
+            l10n::t("Advanced"),
             div()
-                .text_xs()
-                .text_color(rgb(theme_muted()))
-                .child(l10n::t("About")),
-        )
-        .child(
-            div()
-                .p_3()
-                .rounded_md()
-                .bg(rgb(theme_field()))
                 .flex()
                 .flex_col()
-                .gap_1()
-                .child(div().text_sm().child("nexawal"))
+                .gap_3()
+                .child(wide_secondary_action_button(
+                    "settings-scan-benchmark",
+                    if home.benchmark_running {
+                        l10n::t("Scan benchmark running…")
+                    } else {
+                        l10n::t("Run scan benchmark")
+                    },
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.run_scan_benchmark(cx)),
+                ))
                 .child(
                     div()
                         .text_xs()
                         .text_color(rgb(theme_muted()))
-                        .child(format!(
-                            "{} · {} · {}",
-                            home.core_version,
-                            std::env::consts::OS,
-                            std::env::consts::ARCH
+                        .child(l10n::t(
+                            "Stops the current sync, compares 25, 50, 75, 100, 125, 150, and 500-block batches in shuffled repeated samples, then saves JSON results.",
                         )),
                 ),
-        )
-        .child(action_button(
-            "settings-remove",
-            l10n::t("Remove wallet from this computer"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.remove_stored_wallet(cx)),
         ))
-        .child(action_button(
+        .child(section_card(
+            l10n::t("About"),
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(
+                    div()
+                        .p_3()
+                        .rounded_md()
+                        .bg(rgb(theme_field()))
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(div().text_sm().child("nexawal"))
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(rgb(theme_muted()))
+                                .child(format!(
+                                    "{} · {} · {}",
+                                    home.core_version,
+                                    std::env::consts::OS,
+                                    std::env::consts::ARCH
+                                )),
+                        ),
+                )
+                .child(wide_secondary_action_button(
+                    "settings-terms",
+                    l10n::t("Terms of Use"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.open_legal(legal::Document::Terms, cx);
+                    }),
+                ))
+                .child(wide_secondary_action_button(
+                    "settings-privacy",
+                    l10n::t("Privacy Policy"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.open_legal(legal::Document::Privacy, cx);
+                    }),
+                ))
+                .child(wide_secondary_action_button(
+                    "settings-license",
+                    l10n::t("License"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.open_legal(legal::Document::License, cx);
+                    }),
+                )),
+        ))
+        .child(section_card(
+            l10n::t("Danger Zone"),
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(destructive_action_button(
+                    "settings-remove",
+                    l10n::t("Remove wallet from this computer"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.remove_stored_wallet(cx)
+                    }),
+                )),
+        ))
+        .child(wide_secondary_action_button(
             "settings-back",
             if home.opened {
                 l10n::t("Back")
@@ -5547,6 +5685,106 @@ fn action_button(
         .cursor(CursorStyle::PointingHand)
         .on_click(listener)
         .child(label.into())
+}
+
+fn page_title(label: impl Into<SharedString>) -> impl IntoElement {
+    div()
+        .text_xl()
+        .font_weight(gpui::FontWeight::SEMIBOLD)
+        .child(theme_display_label(label.into()))
+}
+
+fn section_card(label: impl Into<SharedString>, content: impl IntoElement) -> impl IntoElement {
+    div()
+        .w_full()
+        .p_5()
+        .rounded_lg()
+        .bg(rgb(theme_card()))
+        .flex()
+        .flex_col()
+        .gap_3()
+        .child(
+            div()
+                .text_sm()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .child(theme_display_label(label.into())),
+        )
+        .child(content)
+}
+
+fn wide_primary_action_button(
+    id: &'static str,
+    label: impl Into<SharedString>,
+    listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    div()
+        .id(id)
+        .w_full()
+        .px_4()
+        .py_3()
+        .rounded_lg()
+        .bg(rgb(theme_accent()))
+        .text_color(rgb(theme_button_text()))
+        .text_center()
+        .font_weight(gpui::FontWeight::SEMIBOLD)
+        .cursor(CursorStyle::PointingHand)
+        .on_click(listener)
+        .child(theme_display_label(label.into()))
+}
+
+fn wide_secondary_action_button(
+    id: &'static str,
+    label: impl Into<SharedString>,
+    listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    div()
+        .id(id)
+        .w_full()
+        .px_4()
+        .py_3()
+        .rounded_lg()
+        .bg(rgb(theme_field()))
+        .border_1()
+        .border_color(rgb(theme_border()))
+        .text_color(rgb(theme_accent()))
+        .text_center()
+        .cursor(CursorStyle::PointingHand)
+        .on_click(listener)
+        .child(theme_display_label(label.into()))
+}
+
+fn disabled_action_button(id: &'static str, label: impl Into<SharedString>) -> impl IntoElement {
+    div()
+        .id(id)
+        .w_full()
+        .px_4()
+        .py_3()
+        .rounded_lg()
+        .bg(rgb(theme_disabled()))
+        .text_color(rgb(theme_muted()))
+        .text_center()
+        .child(theme_display_label(label.into()))
+}
+
+fn destructive_action_button(
+    id: &'static str,
+    label: impl Into<SharedString>,
+    listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    div()
+        .id(id)
+        .w_full()
+        .px_4()
+        .py_3()
+        .rounded_lg()
+        .bg(rgb(theme_field()))
+        .border_1()
+        .border_color(rgb(theme_out()))
+        .text_color(rgb(theme_out()))
+        .text_center()
+        .cursor(CursorStyle::PointingHand)
+        .on_click(listener)
+        .child(theme_display_label(label.into()))
 }
 
 fn secondary_action_button(
