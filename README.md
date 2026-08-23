@@ -42,6 +42,10 @@ settings components. On narrower desktop windows the rail automatically
 collapses to an icon rail while retaining accessible Wallet/Receive/Send/Settings
 labels. Techno mode uses the same black/neon-green palette and a platform
 monospaced font family as the iOS and Android Techno implementations.
+The first launch uses a desktop-sized window (up to 1100×760 within the current
+display); later launches restore the last usable size, position, and maximized
+state. The wallet page uses the main window scroll area for its balance, sync,
+and recent-transaction cards, avoiding a nested history scroller.
 
 Keyring v3 does not enable a native backend by default. This repository enables each platform backend explicitly; builds before this change used a temporary in-memory backend and require entering the seed one final time to migrate it into persistent secure storage.
 

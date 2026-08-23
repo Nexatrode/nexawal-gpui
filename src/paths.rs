@@ -62,6 +62,80 @@ pub fn theme_path() -> PathBuf {
     data_dir().join("theme")
 }
 
+pub fn window_placement_path() -> PathBuf {
+    data_dir().join("window_placement")
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct WindowPlacement {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub maximized: bool,
+}
+
+impl WindowPlacement {
+    fn parse(raw: &str) -> Option<Self> {
+        let mut lines = raw.lines();
+        if lines.next()?.trim() != "1" {
+            return None;
+        }
+        let maximized = match lines.next()?.trim() {
+            "windowed" => false,
+            "maximized" => true,
+            _ => return None,
+        };
+        let placement = Self {
+            x: lines.next()?.trim().parse().ok()?,
+            y: lines.next()?.trim().parse().ok()?,
+            width: lines.next()?.trim().parse().ok()?,
+            height: lines.next()?.trim().parse().ok()?,
+            maximized,
+        };
+        placement.is_sane().then_some(placement)
+    }
+
+    fn is_sane(self) -> bool {
+        [self.x, self.y, self.width, self.height]
+            .into_iter()
+            .all(f32::is_finite)
+            && (520.0..=10_000.0).contains(&self.width)
+            && (520.0..=10_000.0).contains(&self.height)
+            && (-100_000.0..=100_000.0).contains(&self.x)
+            && (-100_000.0..=100_000.0).contains(&self.y)
+    }
+
+    fn encode(self) -> String {
+        format!(
+            "1\n{}\n{}\n{}\n{}\n{}\n",
+            if self.maximized {
+                "maximized"
+            } else {
+                "windowed"
+            },
+            self.x,
+            self.y,
+            self.width,
+            self.height
+        )
+    }
+}
+
+pub fn load_window_placement() -> Option<WindowPlacement> {
+    WindowPlacement::parse(&fs::read_to_string(window_placement_path()).ok()?)
+}
+
+pub fn save_window_placement(placement: WindowPlacement) -> std::io::Result<()> {
+    if !placement.is_sane() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "invalid window placement",
+        ));
+    }
+    write_bytes(window_placement_path(), placement.encode().as_bytes())
+}
+
 pub fn load_theme() -> String {
     fs::read_to_string(theme_path())
         .ok()
@@ -375,7 +449,7 @@ pub(crate) fn write_bytes(path: PathBuf, bytes: &[u8]) -> std::io::Result<()> {
 mod tests {
     use std::fs;
 
-    use super::{parse_bool_preference, write_bytes};
+    use super::{WindowPlacement, parse_bool_preference, write_bytes};
 
     #[test]
     fn device_auth_preference_is_tristate() {
@@ -394,5 +468,19 @@ mod tests {
         write_bytes(path.clone(), b"first complete cache").unwrap();
         write_bytes(path.clone(), b"second complete cache").unwrap();
         assert_eq!(fs::read(path).unwrap(), b"second complete cache");
+    }
+
+    #[test]
+    fn window_placement_round_trips_and_rejects_bad_sizes() {
+        let placement = WindowPlacement {
+            x: 120.5,
+            y: -20.0,
+            width: 1100.0,
+            height: 760.0,
+            maximized: true,
+        };
+        assert_eq!(WindowPlacement::parse(&placement.encode()), Some(placement));
+        assert!(WindowPlacement::parse("1\nwindowed\n0\n0\n100\n100\n").is_none());
+        assert!(WindowPlacement::parse("2\nwindowed\n0\n0\n1100\n760\n").is_none());
     }
 }

@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 use std::fs;
 use std::ops::Range;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering as AtomicOrdering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 #[cfg(target_os = "macos")]
@@ -12,7 +12,7 @@ use gpui::{
     ImageSource, KeyBinding, KeyDownEvent, Menu, MenuItem, MouseButton, MouseDownEvent,
     MouseMoveEvent, MouseUpEvent, ObjectFit, OsAction, PathPromptOptions, RenderImage, ResizeEdge,
     ScrollHandle, SharedString, TitlebarOptions, Window, WindowBounds, WindowOptions, actions, div,
-    img, prelude::*, px, relative, rgb, size,
+    img, point, prelude::*, px, relative, rgb, size,
 };
 use gpui_platform::application;
 use monerowalletcore::api::{self, RefreshJob, SyncStatus, Transfer};
@@ -197,6 +197,20 @@ fn theme_accent() -> u32 {
     }
 }
 
+fn theme_send_action() -> u32 {
+    match active_theme() {
+        Theme::Classic => 0xF58A28,
+        Theme::Neon => ACCENT,
+    }
+}
+
+fn theme_receive_action() -> u32 {
+    match active_theme() {
+        Theme::Classic => 0x2CC75B,
+        Theme::Neon => ACCENT,
+    }
+}
+
 fn theme_in() -> u32 {
     match active_theme() {
         Theme::Classic => 0x50D6A0,
@@ -346,7 +360,6 @@ struct Home {
     edit_last_bounds: Option<Bounds<gpui::Pixels>>,
     edit_dragging: bool,
     main_scroll_handle: ScrollHandle,
-    history_scroll_handle: ScrollHandle,
     status: SharedString,
     opened: bool,
     screen: Screen,
@@ -486,7 +499,6 @@ impl Home {
             edit_last_bounds: None,
             edit_dragging: false,
             main_scroll_handle: ScrollHandle::new(),
-            history_scroll_handle: ScrollHandle::new(),
             status: if should_auto_unlock {
                 l10n::t("Unlocking Wallet...").into()
             } else if has_stored {
@@ -3053,6 +3065,10 @@ impl Home {
                         if remaining <= 3 && sync.chain_height > 0 {
                             self.scan_needs_retry = false;
                             self.last_scan_error = None;
+                            if was_running {
+                                self.status =
+                                    format!("Wallet synced to block {}.", sync.last_scanned).into();
+                            }
                         } else {
                             self.scan_needs_retry = true;
                             if self.last_scan_error.is_none() {
@@ -3158,7 +3174,9 @@ impl Render for Home {
             .when(self.opened && self.screen == Screen::Send, |body| {
                 body.child(send_card(self, window, cx))
             })
-            .child(status_line(self))
+            .when(!(self.opened && self.screen == Screen::Wallet), |body| {
+                body.child(status_line(self))
+            })
             .when(self.opened && self.screen == Screen::Wallet, |body| {
                 body.child(history(self, window, cx))
             });
@@ -3345,13 +3363,12 @@ fn side_nav_button(
         .child(button_text)
 }
 
-fn header(home: &Home) -> impl IntoElement {
+fn header(_: &Home) -> impl IntoElement {
     div()
         .id("window-drag")
         .flex()
         .flex_row()
         .items_center()
-        .justify_between()
         .cursor(CursorStyle::Arrow)
         .on_mouse_down(MouseButton::Left, |_, window, _| {
             window.start_window_move();
@@ -3367,17 +3384,6 @@ fn header(home: &Home) -> impl IntoElement {
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .text_color(rgb(theme_accent()))
                 .child("nexawal"),
-        )
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(theme_muted()))
-                .child(format!(
-                    "{} · {} · {}",
-                    home.core_version,
-                    std::env::consts::OS,
-                    std::env::consts::ARCH
-                )),
         )
 }
 
@@ -3974,29 +3980,28 @@ fn opened_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
     div()
         .flex()
         .flex_col()
-        .gap_2()
+        .gap_3()
         .p_5()
         .rounded_lg()
         .bg(rgb(theme_card()))
         .child(
             div()
-                .id("copy-address-row")
-                .cursor(CursorStyle::PointingHand)
-                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.copy_address(cx)))
+                .flex()
+                .flex_row()
+                .items_center()
+                .justify_between()
                 .child(
                     div()
-                        .text_xs()
+                        .text_sm()
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
                         .text_color(rgb(theme_muted()))
-                        .child(format!(
-                            "{}  ·  {}",
-                            truncate_middle(&home.address, 12, 12),
-                            if home.address_copy_hint_active() {
-                                "copied"
-                            } else {
-                                "click to copy"
-                            }
-                        )),
-                ),
+                        .child(l10n::t("Wallet")),
+                )
+                .child(secondary_action_button(
+                    "lock-wallet",
+                    l10n::t("Lock"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.forget(cx)),
+                )),
         )
         .child(div().text_3xl().child(format_xmr(home.total_piconero)))
         .when(home.fiat_line(home.total_piconero).is_some(), |card| {
@@ -4011,40 +4016,65 @@ fn opened_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
             div()
                 .text_sm()
                 .text_color(rgb(theme_muted()))
-                .child(format!("Unlocked {}", format_xmr(home.unlocked_piconero))),
+                .child(format!(
+                    "{} {}",
+                    l10n::t("Unlocked"),
+                    format_xmr(home.unlocked_piconero)
+                )),
         )
-        .child(action_button(
-            "copy-address",
-            l10n::t("Copy address"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.copy_address(cx)),
-        ))
-        .child(action_button(
-            "go-receive",
-            l10n::t("Receive"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.go_receive(cx)),
-        ))
-        .child(action_button(
-            "go-send",
-            l10n::t("Send"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.go_send(cx)),
-        ))
-        .child(action_button(
-            "go-settings",
-            l10n::t("Settings"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.go_settings(cx)),
-        ))
-        .when(home.scan_needs_retry, |card| {
-            card.child(action_button(
-                "retry-sync",
-                l10n::t("Retry sync"),
-                cx.listener(|this, _: &ClickEvent, _, cx| this.retry_refresh(cx)),
-            ))
-        })
-        .child(action_button(
-            "forget",
-            l10n::t("Lock"),
-            cx.listener(|this, _: &ClickEvent, _, cx| this.forget(cx)),
-        ))
+        .child(
+            div()
+                .id("copy-address-row")
+                .w_full()
+                .px_3()
+                .py_2()
+                .rounded_md()
+                .bg(rgb(theme_field()))
+                .cursor(CursorStyle::PointingHand)
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.copy_address(cx)))
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .justify_between()
+                        .gap_3()
+                        .child(
+                            div()
+                                .min_w(px(0.))
+                                .text_xs()
+                                .text_color(rgb(theme_muted()))
+                                .child(truncate_middle(&home.address, 16, 16)),
+                        )
+                        .child(div().text_xs().text_color(rgb(theme_accent())).child(
+                            if home.address_copy_hint_active() {
+                                l10n::t("Copied")
+                            } else {
+                                l10n::t("Copy address")
+                            },
+                        )),
+                ),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .gap_3()
+                .child(wallet_action_button(
+                    "wallet-send",
+                    "↑",
+                    l10n::t("Send"),
+                    theme_send_action(),
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.go_send(cx)),
+                ))
+                .child(wallet_action_button(
+                    "wallet-receive",
+                    "⌗",
+                    l10n::t("Receive"),
+                    theme_receive_action(),
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.go_receive(cx)),
+                )),
+        )
 }
 
 fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
@@ -4191,6 +4221,17 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 ));
             }
             card.children(rows.into_iter().map(|(label, value)| sync_kv(label, value)))
+        })
+        .when(!running, |card| {
+            card.child(secondary_action_button(
+                "sync-refresh-wallet",
+                if home.scan_needs_retry {
+                    l10n::t("Retry sync")
+                } else {
+                    l10n::t("Refresh Wallet")
+                },
+                cx.listener(|this, _: &ClickEvent, _, cx| this.retry_refresh(cx)),
+            ))
         })
         .into_any_element()
 }
@@ -4937,6 +4978,33 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 this.open_legal(legal::Document::License, cx);
             }),
         ))
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(theme_muted()))
+                .child(l10n::t("About")),
+        )
+        .child(
+            div()
+                .p_3()
+                .rounded_md()
+                .bg(rgb(theme_field()))
+                .flex()
+                .flex_col()
+                .gap_1()
+                .child(div().text_sm().child("nexawal"))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(theme_muted()))
+                        .child(format!(
+                            "{} · {} · {}",
+                            home.core_version,
+                            std::env::consts::OS,
+                            std::env::consts::ARCH
+                        )),
+                ),
+        )
         .child(action_button(
             "settings-remove",
             l10n::t("Remove wallet from this computer"),
@@ -4992,18 +5060,30 @@ fn history(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoEle
 
     div()
         .id("history")
-        .track_scroll(&home.history_scroll_handle)
-        .flex_1()
-        .min_h(px(180.))
-        .overflow_y_scroll()
         .flex()
         .flex_col()
-        .gap_1()
+        .gap_2()
+        .p_5()
+        .rounded_lg()
+        .bg(rgb(theme_card()))
         .child(
             div()
-                .text_sm()
-                .font_weight(gpui::FontWeight::SEMIBOLD)
-                .child(l10n::t("History")),
+                .flex()
+                .flex_row()
+                .items_center()
+                .justify_between()
+                .child(
+                    div()
+                        .text_sm()
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .child(l10n::t("Recent Transactions")),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(rgb(theme_muted()))
+                        .child(home.transfers.len().to_string()),
+                ),
         )
         .child(field_input(
             home,
@@ -5046,7 +5126,7 @@ fn history(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoEle
                 )),
         )
         .when(!home.transfer_search.is_empty(), |list| {
-            list.child(action_button(
+            list.child(secondary_action_button(
                 "history-clear-search",
                 l10n::t("Clear search"),
                 cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -5056,22 +5136,28 @@ fn history(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoEle
                 }),
             ))
         })
-        .when(!home.transfers.is_empty(), |list| {
-            list.child(action_button(
-                "history-export-csv",
-                l10n::t("Export CSV"),
-                cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.export_transfer_history(cx);
-                }),
-            ))
-        })
-        .child(action_button(
-            "history-refresh-transfers",
-            l10n::t("Refresh transfers"),
-            cx.listener(|this, _: &ClickEvent, _, cx| {
-                this.refresh_wallet_snapshots(cx);
-            }),
-        ))
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .gap_2()
+                .when(!home.transfers.is_empty(), |actions| {
+                    actions.child(secondary_action_button(
+                        "history-export-csv",
+                        l10n::t("Export CSV"),
+                        cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.export_transfer_history(cx);
+                        }),
+                    ))
+                })
+                .child(secondary_action_button(
+                    "history-refresh-transfers",
+                    l10n::t("Refresh transfers"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.refresh_wallet_snapshots(cx);
+                    }),
+                )),
+        )
         .when(no_transfers, |list| {
             list.child(
                 div()
@@ -5168,6 +5254,14 @@ fn history(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoEle
                                     conf
                                 )),
                         )
+                        .when_some(row.fee, |col, fee| {
+                            col.child(
+                                div()
+                                    .text_xs()
+                                    .text_color(rgb(theme_muted()))
+                                    .child(format!("Fee {}", format_xmr(fee))),
+                            )
+                        })
                         .when_some(
                             home.fiat_snapshots.get(&row.txid).map(|snap| {
                                 fiat::recorded_approx(row.amount, snap.fiat_per_xmr, &snap.currency)
@@ -5450,8 +5544,88 @@ fn action_button(
         .rounded_md()
         .bg(rgb(theme_accent()))
         .text_color(rgb(theme_button_text()))
+        .cursor(CursorStyle::PointingHand)
         .on_click(listener)
         .child(label.into())
+}
+
+fn secondary_action_button(
+    id: &'static str,
+    label: impl Into<SharedString>,
+    listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    div()
+        .id(id)
+        .px_3()
+        .py_2()
+        .rounded_md()
+        .bg(rgb(theme_field()))
+        .border_1()
+        .border_color(rgb(theme_border()))
+        .text_sm()
+        .text_color(rgb(theme_accent()))
+        .cursor(CursorStyle::PointingHand)
+        .on_click(listener)
+        .child(theme_display_label(label.into()))
+}
+
+fn wallet_action_button(
+    id: &'static str,
+    icon: &'static str,
+    label: impl Into<SharedString>,
+    color: u32,
+    listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    let label = label.into();
+    let display_label = theme_display_label(label.clone());
+    div()
+        .id(id)
+        .flex_1()
+        .h(px(56.))
+        .rounded_lg()
+        .bg(rgb(color))
+        .text_color(rgb(theme_button_text()))
+        .text_lg()
+        .font_weight(gpui::FontWeight::SEMIBOLD)
+        .flex()
+        .items_center()
+        .justify_center()
+        .cursor(CursorStyle::PointingHand)
+        .aria_label(label)
+        .on_click(listener)
+        .child(format!("{icon}  {display_label}"))
+}
+
+fn initial_window_bounds(cx: &App) -> WindowBounds {
+    if let Some(placement) = paths::load_window_placement() {
+        let saved = Bounds {
+            origin: point(px(placement.x), px(placement.y)),
+            size: size(px(placement.width), px(placement.height)),
+        };
+        let center_is_visible = cx
+            .displays()
+            .iter()
+            .any(|display| display.visible_bounds().contains(&saved.center()));
+        if center_is_visible {
+            return if placement.maximized {
+                WindowBounds::Maximized(saved)
+            } else {
+                WindowBounds::Windowed(saved)
+            };
+        }
+    }
+
+    let preferred = cx
+        .primary_display()
+        .map(|display| {
+            let visible = display.visible_bounds();
+            size(
+                px((visible.size.width.as_f32() - 80.0).clamp(520.0, 1100.0)),
+                px((visible.size.height.as_f32() - 80.0).clamp(520.0, 760.0)),
+            )
+        })
+        .unwrap_or_else(|| size(px(1100.), px(760.)));
+    WindowBounds::Windowed(Bounds::centered(None, preferred, cx))
 }
 
 fn env_or(key: &str, fallback: &str) -> String {
@@ -5696,17 +5870,25 @@ fn main() {
             KeyBinding::new("ctrl-shift-left", SelectHome, None),
             KeyBinding::new("ctrl-shift-right", SelectEnd, None),
         ]);
-        cx.on_window_closed(|cx, _| {
+        let last_window_placement = Arc::new(Mutex::new(paths::load_window_placement()));
+        let placement_on_close = last_window_placement.clone();
+        cx.on_window_closed(move |cx, _| {
             if cx.windows().is_empty() {
+                if let Ok(placement) = placement_on_close.lock()
+                    && let Some(placement) = *placement
+                {
+                    let _ = paths::save_window_placement(placement);
+                }
                 cx.quit();
             }
         })
         .detach();
 
-        let bounds = Bounds::centered(None, size(px(720.), px(640.)), cx);
+        let bounds = initial_window_bounds(cx);
+        let placement_in_window = last_window_placement.clone();
         cx.open_window(
             WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                window_bounds: Some(bounds),
                 titlebar: Some(TitlebarOptions {
                     title: Some("nexawal".into()),
                     ..Default::default()
@@ -5717,9 +5899,25 @@ fn main() {
                 window_min_size: Some(size(px(520.), px(520.))),
                 ..Default::default()
             },
-            |window, cx| {
+            move |window, cx| {
                 let should_unlock = should_auto_unlock_stored();
+                let placement_observer = placement_in_window.clone();
                 let home = cx.new(|cx| {
+                    cx.observe_window_bounds(window, move |_, window, _| {
+                        let window_bounds = window.window_bounds();
+                        let maximized = matches!(window_bounds, WindowBounds::Maximized(_));
+                        let bounds = window_bounds.get_bounds();
+                        if let Ok(mut placement) = placement_observer.lock() {
+                            *placement = Some(paths::WindowPlacement {
+                                x: bounds.origin.x.as_f32(),
+                                y: bounds.origin.y.as_f32(),
+                                width: bounds.size.width.as_f32(),
+                                height: bounds.size.height.as_f32(),
+                                maximized,
+                            });
+                        }
+                    })
+                    .detach();
                     let mut home = Home::new(cx);
                     if !should_unlock {
                         home.seed_focus.focus(window, cx);
