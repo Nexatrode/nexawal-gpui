@@ -1974,6 +1974,8 @@ impl Home {
         self.theme = self.theme.next();
         apply_theme(self.theme);
         let _ = paths::save_theme(self.theme.stored());
+        self.qr_uri.clear();
+        self.qr_image = None;
         self.status = format!("Theme: {}.", self.theme.label()).into();
         cx.notify();
     }
@@ -2773,7 +2775,7 @@ impl Home {
             return;
         }
         self.qr_uri = uri.clone();
-        self.qr_image = qr::render_image(&uri);
+        self.qr_image = qr::render_image(&uri, self.theme == Theme::Neon);
     }
 
     fn authenticate_if_required(&mut self, reason: &str, cx: &mut Context<Self>) -> bool {
@@ -4272,12 +4274,20 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                 .gap_3()
                 .when_some(home.qr_image.clone(), |content, image| {
                     content.child(
-                        div().p_3().rounded_lg().bg(rgb(0xFFFFFF)).child(
-                            img(ImageSource::Render(image))
-                                .w(px(260.))
-                                .h(px(260.))
-                                .object_fit(ObjectFit::Contain),
-                        ),
+                        div()
+                            .p_3()
+                            .rounded_lg()
+                            .bg(rgb(if active_theme() == Theme::Neon {
+                                BG
+                            } else {
+                                0xFFFFFF
+                            }))
+                            .child(
+                                img(ImageSource::Render(image))
+                                    .w(px(260.))
+                                    .h(px(260.))
+                                    .object_fit(ObjectFit::Contain),
+                            ),
                     )
                 })
                 .child(

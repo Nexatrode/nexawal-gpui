@@ -7,7 +7,18 @@ use image::{ImageBuffer, Rgba};
 use qrcode::{Color, EcLevel, QrCode};
 use smallvec::SmallVec;
 
-pub fn render_image(payload: &str) -> Option<Arc<RenderImage>> {
+const CLASSIC_FOREGROUND: Rgba<u8> = Rgba([0, 0, 0, 255]);
+const CLASSIC_BACKGROUND: Rgba<u8> = Rgba([255, 255, 255, 255]);
+const TECHNO_FOREGROUND: Rgba<u8> = Rgba([0x39, 0xFF, 0x14, 255]);
+const TECHNO_BACKGROUND: Rgba<u8> = Rgba([0, 0, 0, 255]);
+
+pub fn render_image(payload: &str, techno: bool) -> Option<Arc<RenderImage>> {
+    let buf = render_rgba(payload, techno)?;
+    let frame = image::Frame::new(buf);
+    Some(Arc::new(RenderImage::new(SmallVec::from_elem(frame, 1))))
+}
+
+fn render_rgba(payload: &str, techno: bool) -> Option<image::RgbaImage> {
     let code = QrCode::with_error_correction_level(payload.as_bytes(), EcLevel::M).ok()?;
     let colors = code.to_colors();
     let width = code.width() as u32;
@@ -18,7 +29,12 @@ pub fn render_image(payload: &str) -> Option<Arc<RenderImage>> {
     let modules = width + quiet * 2;
     let module_px = (280 / modules).max(4);
     let size = modules * module_px;
-    let mut buf = ImageBuffer::from_pixel(size, size, Rgba([255, 255, 255, 255]));
+    let (foreground, background) = if techno {
+        (TECHNO_FOREGROUND, TECHNO_BACKGROUND)
+    } else {
+        (CLASSIC_FOREGROUND, CLASSIC_BACKGROUND)
+    };
+    let mut buf = ImageBuffer::from_pixel(size, size, background);
     for y in 0..width {
         for x in 0..width {
             if colors[(y * width + x) as usize] != Color::Dark {
@@ -28,13 +44,12 @@ pub fn render_image(payload: &str) -> Option<Arc<RenderImage>> {
             let py0 = (quiet + y) * module_px;
             for dy in 0..module_px {
                 for dx in 0..module_px {
-                    buf.put_pixel(px0 + dx, py0 + dy, Rgba([0, 0, 0, 255]));
+                    buf.put_pixel(px0 + dx, py0 + dy, foreground);
                 }
             }
         }
     }
-    let frame = image::Frame::new(buf);
-    Some(Arc::new(RenderImage::new(SmallVec::from_elem(frame, 1))))
+    Some(buf)
 }
 
 pub fn decode_bytes(bytes: &[u8]) -> Option<String> {
@@ -101,6 +116,22 @@ mod tests {
                     }
                 }
             }
+        }
+        assert_eq!(decode_luma(gray).as_deref(), Some(payload));
+    }
+
+    #[test]
+    fn techno_qr_uses_neon_green_on_black_and_decodes() {
+        let payload = "monero:4A1ZVG4SrnpMgcnr3EDTHz2rzprHZm9pq7sZKj3dNL6L5j9CFcVd3RK3yZFJm3XWW3W2YtCAUxb7yBJEvsnicvriSZVA5nq";
+        let rgba = render_rgba(payload, true).expect("techno QR");
+        assert!(rgba.pixels().any(|pixel| *pixel == TECHNO_FOREGROUND));
+        assert!(rgba.pixels().any(|pixel| *pixel == TECHNO_BACKGROUND));
+
+        // rqrr expects dark modules on a light background. Inverting the
+        // luminance models the polarity normalization used by QR scanners.
+        let mut gray = image::DynamicImage::ImageRgba8(rgba).to_luma8();
+        for pixel in gray.pixels_mut() {
+            pixel.0[0] = 255 - pixel.0[0];
         }
         assert_eq!(decode_luma(gray).as_deref(), Some(payload));
     }
