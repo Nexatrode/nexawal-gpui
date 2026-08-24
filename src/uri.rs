@@ -4,13 +4,16 @@
 pub struct PaymentUri {
     pub address: String,
     pub amount_xmr: Option<String>,
+    pub description: Option<String>,
+    pub recipient_name: Option<String>,
 }
 
 pub fn parse(raw: &str) -> Option<PaymentUri> {
     let trimmed = raw.trim();
-    let rest = trimmed
-        .strip_prefix("monero:")
-        .or_else(|| trimmed.strip_prefix("MONERO:"))?;
+    let (scheme, rest) = trimmed.split_once(':')?;
+    if !scheme.eq_ignore_ascii_case("monero") {
+        return None;
+    }
     let rest = rest.strip_prefix("//").unwrap_or(rest);
     let (address_raw, query) = match rest.split_once('?') {
         Some((addr, q)) => (addr, Some(q)),
@@ -21,6 +24,8 @@ pub fn parse(raw: &str) -> Option<PaymentUri> {
         return None;
     }
     let mut amount_xmr = None;
+    let mut description = None;
+    let mut recipient_name = None;
     if let Some(query) = query {
         for pair in query.split('&') {
             let mut it = pair.splitn(2, '=');
@@ -36,17 +41,26 @@ pub fn parse(raw: &str) -> Option<PaymentUri> {
                 && !value.is_empty()
                 && amount_xmr.is_none()
             {
-                amount_xmr = Some(percent_decode(value));
+                amount_xmr = Some(percent_decode(value, false));
+            } else if matches!(name.as_str(), "tx_description" | "message")
+                && !value.is_empty()
+                && description.is_none()
+            {
+                description = Some(percent_decode(value, true));
+            } else if name == "recipient_name" && !value.is_empty() && recipient_name.is_none() {
+                recipient_name = Some(percent_decode(value, true));
             }
         }
     }
     Some(PaymentUri {
         address,
         amount_xmr,
+        description,
+        recipient_name,
     })
 }
 
-fn percent_decode(value: &str) -> String {
+fn percent_decode(value: &str, plus_as_space: bool) -> String {
     let bytes = value.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
@@ -58,7 +72,11 @@ fn percent_decode(value: &str) -> String {
                 continue;
             }
         }
-        out.push(bytes[i]);
+        out.push(if plus_as_space && bytes[i] == b'+' {
+            b' '
+        } else {
+            bytes[i]
+        });
         i += 1;
     }
     String::from_utf8_lossy(&out).into_owned()
@@ -129,6 +147,24 @@ mod tests {
     }
 
     #[test]
+    fn mixed_case_scheme_and_metadata_are_supported() {
+        let parsed = parse(&format!(
+            "MonErO://{PRIMARY}?TX_AMOUNT=1.5&recipient_name=Coffee+Shop&message=two%20drinks%20%26%20tip"
+        ))
+        .unwrap();
+        assert_eq!(parsed.address, PRIMARY);
+        assert_eq!(parsed.amount_xmr.as_deref(), Some("1.5"));
+        assert_eq!(parsed.recipient_name.as_deref(), Some("Coffee Shop"));
+        assert_eq!(parsed.description.as_deref(), Some("two drinks & tip"));
+    }
+
+    #[test]
+    fn plus_is_not_rewritten_in_amount() {
+        let parsed = parse(&format!("monero:{PRIMARY}?tx_amount=%2B1.5")).unwrap();
+        assert_eq!(parsed.amount_xmr.as_deref(), Some("+1.5"));
+    }
+
+    #[test]
     fn spend_and_view_keys_ignored_as_send_targets() {
         let uri = format!(
             "monero:{PRIMARY}?spend_key=deadbeefdeadbeef&view_key=cafebabecafebabe&tx_amount=1.0"
@@ -169,7 +205,10 @@ mod tests {
 
     #[test]
     fn build_uri_with_amount_and_description() {
-        let uri = build("4abc", Some("1.25"), Some("thanks"));
-        assert_eq!(uri, "monero:4abc?tx_amount=1.25&tx_description=thanks");
+        let uri = build("4abc", Some("1.25"), Some("coffee & cake = good"));
+        assert_eq!(
+            uri,
+            "monero:4abc?tx_amount=1.25&tx_description=coffee%20%26%20cake%20%3D%20good"
+        );
     }
 }

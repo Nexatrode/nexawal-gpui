@@ -29,7 +29,7 @@ fields and do not auto-open.
 
 On macOS the menu bar is `nexawal | Edit | Wallet | Window` (Zed-style: Hide, Paste, Minimize, Quit) so you can Hide or Cmd-Tab back to the running app.
 
-Scan cache is stored at `~/Library/Application Support/nexawal/main_wallet.cache` on macOS (XDG data dir on Linux). The seed is **never written to the app data directory**. After the first restore, it is saved in the native per-user secure store: macOS Keychain, Windows Credential Manager, or Linux Secret Service. The next launch opens the stored wallet automatically and reuses the same scan cache and wallet UI without asking for the seed again; **Open existing wallet** remains available after a cancelled or failed unlock.
+Scan cache is stored at `~/Library/Application Support/nexawal/main_wallet.cache` on macOS (XDG data dir on Linux). Cache checkpoints are replaced atomically. If a checkpoint cannot be read or WalletCore rejects it, the app moves it to a neighboring `main_wallet.cache.rejected-<timestamp>` diagnostic file and safely scans again from the restore height instead of retrying the bad cache on every launch. The seed is **never written to the app data directory**. After the first restore, it is saved in the native per-user secure store: macOS Keychain, Windows Credential Manager, or Linux Secret Service. The next launch opens the stored wallet automatically and reuses the same scan cache and wallet UI without asking for the seed again; **Open existing wallet** remains available after a cancelled or failed unlock.
 
 On macOS, device authentication defaults on when a stored wallet is first detected. Launch shows an **Unlocking wallet…** screen, requests Touch ID (with the Mac login password fallback supplied by macOS), and opens directly into the wallet after success. Cancelling or failing authentication reveals the manual retry and seed-recovery screen. An explicit device-authentication choice in Settings is preserved.
 
@@ -169,6 +169,34 @@ python3 scripts/compare-history.py \
   --max-height 3671512 \
   --allow-extra
 ```
+
+### Interruption and node-switch torture audit
+
+`--sync-torture-audit` uses isolated temporary caches and never opens or changes the
+normal GPUI wallet slot. For each node direction it starts a child scan, atomically
+checkpoints it, forcibly kills that process without cleanup, imports the checkpoint,
+probes an unreachable endpoint, switches to the other node implementation, and scans
+to completion. The two resumed ledgers must agree on balance, transaction IDs,
+directions, amounts, fees, and heights. Checkpoint history must survive both the kill
+and failed-network probe.
+
+```bash
+export NEXAWAL_MNEMONIC='your mnemonic here'
+export NEXAWAL_AUDIT_START_HEIGHT=3519450
+export NEXAWAL_AUDIT_TARGET_HEIGHT=3671512
+export NEXAWAL_NODE_URL=https://rpc.nexatrode.com
+export NEXAWAL_AUDIT_TIMEOUT_SECS=1800
+
+cargo run --release -- --sync-torture-audit
+```
+
+By default, each child is killed after at least 20,000 completed blocks so the
+checkpoint contains meaningful history. `NEXAWAL_TORTURE_CHECKPOINT_BLOCKS` can
+override that threshold. Reports are saved as `sync_torture_audit_<run-id>.json`
+with neighboring RPC telemetry. Mnemonics and cache bytes are never written to the
+report. `NEXAWAL_TORTURE_EPHEMERAL=1` generates a temporary empty wallet when no
+mnemonic is supplied; that is useful for a quick harness smoke test, but it cannot
+validate preservation of the real wallet's transaction history.
 
 `--allow-extra` is useful when the GPUI scan has reached a newer chain height
 than an older Feather export. The comparator exits nonzero for a Feather row

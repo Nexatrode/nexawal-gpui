@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::fs;
 use std::ops::Range;
-use std::sync::atomic::{AtomicU8, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering as AtomicOrdering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -92,6 +92,7 @@ const ACTIVE_SYNC_CACHE_BLOCK_DELTA: u64 = 1_000;
 const REFRESH_STOP_TIMEOUT: Duration = Duration::from_secs(10);
 const SHUTDOWN_REFRESH_WAIT: Duration = Duration::from_secs(2);
 static ACTIVE_THEME: AtomicU8 = AtomicU8::new(0);
+static CACHE_PERSISTENCE_SUPPRESSED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Theme {
@@ -407,6 +408,8 @@ struct Home {
     address_copied_at: Option<Instant>,
     send_dest: String,
     send_amount: String,
+    send_description: String,
+    send_recipient_name: String,
     send_max: bool,
     send_busy: bool,
     send_fee: Option<u64>,
@@ -558,6 +561,8 @@ impl Home {
             address_copied_at: None,
             send_dest: String::new(),
             send_amount: String::new(),
+            send_description: String::new(),
+            send_recipient_name: String::new(),
             send_max: false,
             send_busy: false,
             send_fee: None,
@@ -695,10 +700,14 @@ impl Home {
                 self.send_amount = amt;
                 self.send_max = false;
             }
+            self.send_description = parsed.description.unwrap_or_default();
+            self.send_recipient_name = parsed.recipient_name.unwrap_or_default();
             self.clear_send_preview();
             self.status = l10n::t("QR filled destination.").into();
         } else if uri::looks_like_address(trimmed) {
             self.send_dest = trimmed.to_string();
+            self.send_description.clear();
+            self.send_recipient_name.clear();
             self.clear_send_preview();
             self.status = l10n::t("QR filled destination.").into();
         } else {
@@ -878,6 +887,9 @@ impl Home {
     }
 
     fn persist_scan_cache_at(&mut self, last_scanned: u64) {
+        if CACHE_PERSISTENCE_SUPPRESSED.load(AtomicOrdering::Relaxed) {
+            return;
+        }
         let saved = api::export_cache(WALLET_ID)
             .ok()
             .filter(|blob| !blob.is_empty())
@@ -1330,9 +1342,45 @@ impl Home {
 
     fn clear_scan_cache(&mut self, cx: &mut Context<Self>) {
         let was_running = matches!(api::refresh_job(WALLET_ID), RefreshJob::Running);
-        let _ = api::refresh_cancel(WALLET_ID);
+        if was_running {
+            let _ = api::refresh_cancel(WALLET_ID);
+            self.status = l10n::t("Stopping sync before clearing the local cache…").into();
+            cx.notify();
+            cx.spawn(async move |this, cx| {
+                let started = Instant::now();
+                while matches!(api::refresh_job(WALLET_ID), RefreshJob::Running)
+                    && started.elapsed() < REFRESH_STOP_TIMEOUT
+                {
+                    cx.background_executor()
+                        .timer(Duration::from_millis(50))
+                        .await;
+                }
+                let stopped = !matches!(api::refresh_job(WALLET_ID), RefreshJob::Running);
+                let _ = this.update(cx, |this, cx| {
+                    if stopped {
+                        this.finish_clear_scan_cache(true, cx);
+                    } else {
+                        this.scan_needs_retry = true;
+                        this.status = l10n::t(
+                            "The scan is still stopping. The cache was not cleared; try again.",
+                        )
+                        .into();
+                        cx.notify();
+                    }
+                });
+            })
+            .detach();
+            return;
+        }
+        self.finish_clear_scan_cache(false, cx);
+    }
+
+    fn finish_clear_scan_cache(&mut self, was_running: bool, cx: &mut Context<Self>) {
         let removed = fs::remove_file(paths::cache_path()).is_ok();
-        self.last_exported_scanned = None;
+        CACHE_PERSISTENCE_SUPPRESSED.store(true, AtomicOrdering::Relaxed);
+        // Keep the current completed checkpoint marker so poll_core does not treat this as a
+        // missing final export. Persistence remains suppressed until the wallet is reopened or a
+        // deliberate rescan starts.
         self.last_cache_persist_at = None;
         self.scan_was_running = false;
         self.scan_needs_retry = was_running;
@@ -1348,7 +1396,6 @@ impl Home {
             l10n::t("No local scan cache was present.")
         }
         .into();
-        self.poll_core();
         cx.notify();
     }
 
@@ -1406,6 +1453,7 @@ impl Home {
             return;
         }
         let _ = fs::remove_file(paths::cache_path());
+        CACHE_PERSISTENCE_SUPPRESSED.store(false, AtomicOrdering::Relaxed);
         let _ = paths::save_restore_height(height);
         self.restore_height_text = height.to_string();
         self.rescan_height_text = height.to_string();
@@ -1598,6 +1646,8 @@ impl Home {
             Field::RescanHeight => self.rescan_height_text = text,
             Field::Dest => {
                 self.send_dest = text;
+                self.send_description.clear();
+                self.send_recipient_name.clear();
                 self.clear_send_preview();
             }
             Field::Amount => {
@@ -1665,6 +1715,8 @@ impl Home {
                 self.send_amount = amount;
                 self.send_max = false;
             }
+            self.send_description = payment.description.unwrap_or_default();
+            self.send_recipient_name = payment.recipient_name.unwrap_or_default();
             self.clear_send_preview();
             self.status = l10n::t("Payment URI filled destination.").into();
             self.reset_edit_cursor(field);
@@ -2025,6 +2077,11 @@ impl Home {
         if self.send_busy {
             return;
         }
+        if matches!(api::refresh_job(WALLET_ID), RefreshJob::Running) {
+            self.status = l10n::t("Wait for wallet sync to finish before preparing a send.").into();
+            cx.notify();
+            return;
+        }
         let dest = self.send_dest.trim().to_string();
         if !uri::looks_like_address(&dest) {
             self.status = l10n::t("Enter a valid mainnet address (or paste a monero: URI).").into();
@@ -2103,6 +2160,11 @@ impl Home {
 
     fn run_send(&mut self, cx: &mut Context<Self>) {
         if self.send_busy {
+            return;
+        }
+        if matches!(api::refresh_job(WALLET_ID), RefreshJob::Running) {
+            self.status = l10n::t("Wait for wallet sync to finish before sending.").into();
+            cx.notify();
             return;
         }
         let dest = self.send_dest.trim().to_string();
@@ -2319,19 +2381,49 @@ impl Home {
             }
         }
 
-        if let Some(cache) = paths::load_cache() {
-            match api::import_cache(WALLET_ID, &cache) {
-                Ok(()) => self.status = l10n::t("Opened with local cache. Syncing…").into(),
-                Err(err) => {
-                    self.status =
-                        format!("Cache skipped ({err}). Syncing from restore height…").into()
-                }
-            }
-        } else {
-            self.status = l10n::t("Opened. Syncing…").into();
-        }
+        self.status = match paths::load_cache() {
+            Ok(Some(cache)) => match api::import_cache(WALLET_ID, &cache) {
+                Ok(()) => l10n::t("Opened with local cache. Syncing…").into(),
+                Err(error) => match paths::quarantine_rejected_cache() {
+                    Ok(Some(path)) => format!(
+                        "Cache rejected ({error}) and moved to {}. Syncing from restore height…",
+                        path.file_name()
+                            .and_then(|name| name.to_str())
+                            .unwrap_or("a rejected-cache file")
+                    )
+                    .into(),
+                    Ok(None) => format!(
+                        "Cache rejected ({error}). Syncing from restore height…"
+                    )
+                    .into(),
+                    Err(quarantine_error) => format!(
+                        "Cache rejected ({error}); it could not be moved aside ({quarantine_error}). Syncing from restore height…"
+                    )
+                    .into(),
+                },
+            },
+            Ok(None) => l10n::t("Opened. Syncing…").into(),
+            Err(error) => match paths::quarantine_rejected_cache() {
+                Ok(Some(path)) => format!(
+                    "Cache could not be read ({error}) and was moved to {}. Syncing from restore height…",
+                    path.file_name()
+                        .and_then(|name| name.to_str())
+                        .unwrap_or("a rejected-cache file")
+                )
+                .into(),
+                Ok(None) => format!(
+                    "Cache could not be read ({error}). Syncing from restore height…"
+                )
+                .into(),
+                Err(quarantine_error) => format!(
+                    "Cache could not be read ({error}) or moved aside ({quarantine_error}). Syncing from restore height…"
+                )
+                .into(),
+            },
+        };
 
         self.last_exported_scanned = None;
+        CACHE_PERSISTENCE_SUPPRESSED.store(false, AtomicOrdering::Relaxed);
         self.last_cache_persist_at = None;
         self.last_balance_poll_at = None;
         self.last_transfers_poll_at = None;
@@ -2434,6 +2526,8 @@ impl Home {
             cx.notify();
             return;
         }
+        // An explicit retry after Clear cache opts back into building a fresh resume cache.
+        CACHE_PERSISTENCE_SUPPRESSED.store(false, AtomicOrdering::Relaxed);
         self.apply_scan_proxy();
         if let Err(err) = self.start_fast_scan() {
             self.status = format!("Retry failed: {err}").into();
@@ -2632,6 +2726,8 @@ impl Home {
         self.address_copied_at = None;
         self.send_dest.clear();
         self.send_amount.clear();
+        self.send_description.clear();
+        self.send_recipient_name.clear();
         self.send_max = false;
         self.send_busy = false;
         self.send_from_subaddress = false;
@@ -4547,6 +4643,32 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
                         )),
                 ),
         ))
+        .when(
+            !home.send_recipient_name.is_empty() || !home.send_description.is_empty(),
+            |content| {
+                content.child(section_card(
+                    l10n::t("Payment URI"),
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_2()
+                        .when(!home.send_recipient_name.is_empty(), |details| {
+                            details.child(div().text_sm().child(format!(
+                                "{}: {}",
+                                l10n::t("Recipient"),
+                                home.send_recipient_name
+                            )))
+                        })
+                        .when(!home.send_description.is_empty(), |details| {
+                            details.child(div().text_sm().child(format!(
+                                "{}: {}",
+                                l10n::t("Description"),
+                                home.send_description
+                            )))
+                        }),
+                ))
+            },
+        )
         .child(section_card(
             l10n::t("Amount"),
             div()
@@ -5940,7 +6062,8 @@ fn prepare_wallet_shutdown(cx: &mut App) -> gpui::Task<()> {
 
         // WalletCore only exposes completed-batch state, so this snapshot is
         // coherent even if an unresponsive RPC request outlives the grace period.
-        if let Ok(blob) = api::export_cache(WALLET_ID)
+        if !CACHE_PERSISTENCE_SUPPRESSED.load(AtomicOrdering::Relaxed)
+            && let Ok(blob) = api::export_cache(WALLET_ID)
             && !blob.is_empty()
         {
             let _ = paths::save_cache(&blob);
@@ -6046,6 +6169,7 @@ fn run_sync_audit_cli() -> ! {
         benchmark::run_id(),
     );
     println!("{}", report.summary);
+    eprintln!("Audit report: {}", report.results_path);
     eprintln!("RPC telemetry: {}", report.rpc_results_path);
     let status = std::fs::read_to_string(&report.results_path)
         .ok()
@@ -6066,7 +6190,77 @@ fn run_sync_audit_cli() -> ! {
     });
 }
 
+fn run_sync_torture_worker_cli() -> ! {
+    match benchmark::run_sync_torture_worker() {
+        Ok(()) => std::process::exit(0),
+        Err(error) => {
+            eprintln!("sync torture worker failed: {error}");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn run_sync_torture_audit_cli() -> ! {
+    let mnemonic = std::env::var("NEXAWAL_MNEMONIC")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| {
+            let ephemeral = std::env::var("NEXAWAL_TORTURE_EPHEMERAL")
+                .ok()
+                .is_some_and(|value| matches!(value.trim(), "1" | "true" | "yes"));
+            ephemeral
+                .then(|| api::generate_mnemonic_english().ok())
+                .flatten()
+        })
+        .unwrap_or_else(|| {
+            eprintln!("--sync-torture-audit requires NEXAWAL_MNEMONIC set in the local shell");
+            eprintln!("For a no-history harness smoke test only, set NEXAWAL_TORTURE_EPHEMERAL=1.");
+            std::process::exit(2);
+        });
+    if let Err(err) = api::primary_address_from_mnemonic(&mnemonic, true) {
+        eprintln!("--sync-torture-audit mnemonic validation failed: {err}");
+        eprintln!("Use the complete English Monero seed (13 or 25 words); the seed is not logged.");
+        std::process::exit(2);
+    }
+    let start_height = std::env::var("NEXAWAL_AUDIT_START_HEIGHT")
+        .or_else(|_| std::env::var("NEXAWAL_RESTORE_HEIGHT"))
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .unwrap_or_else(|| {
+            eprintln!(
+                "--sync-torture-audit requires NEXAWAL_AUDIT_START_HEIGHT (or NEXAWAL_RESTORE_HEIGHT)"
+            );
+            std::process::exit(2);
+        });
+    let target_height = std::env::var("NEXAWAL_AUDIT_TARGET_HEIGHT")
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok());
+    let node = std::env::var("NEXAWAL_NODE_URL").unwrap_or_else(|_| paths::DEFAULT_NODE.into());
+    let report = benchmark::run_sync_torture_audit(
+        node,
+        mnemonic,
+        start_height,
+        target_height,
+        benchmark::run_id(),
+    );
+    println!("{}", report.summary);
+    eprintln!("Torture report: {}", report.results_path);
+    eprintln!("RPC telemetry: {}", report.rpc_results_path);
+    eprintln!("sync torture audit status: {}", report.status);
+    std::process::exit(match report.status.as_str() {
+        "pass" => 0,
+        "not-comparable" => 2,
+        _ => 1,
+    });
+}
+
 fn main() {
+    if std::env::args().any(|arg| arg == "--sync-torture-worker") {
+        run_sync_torture_worker_cli();
+    }
+    if std::env::args().any(|arg| arg == "--sync-torture-audit") {
+        run_sync_torture_audit_cli();
+    }
     if std::env::args().any(|arg| arg == "--sync-audit") {
         run_sync_audit_cli();
     }

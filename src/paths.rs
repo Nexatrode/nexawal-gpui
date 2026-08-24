@@ -1,5 +1,6 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const CURRENT_TERMS_VERSION: u32 = 1;
 pub const DEFAULT_NODE: &str = "https://rpc.nexatrode.com";
@@ -188,6 +189,14 @@ pub fn sync_audit_rpc_path(run_id: u64) -> PathBuf {
     data_dir().join(format!("sync_audit_rpc_{run_id}.jsonl"))
 }
 
+pub fn sync_torture_audit_path(run_id: u64) -> PathBuf {
+    data_dir().join(format!("sync_torture_audit_{run_id}.json"))
+}
+
+pub fn sync_torture_audit_rpc_path(run_id: u64) -> PathBuf {
+    data_dir().join(format!("sync_torture_audit_rpc_{run_id}.jsonl"))
+}
+
 /// WalletCore's per-wallet diagnostic log location for a mainnet benchmark wallet.
 pub fn walletcore_log_path(wallet_id: &str) -> PathBuf {
     dirs::data_dir()
@@ -209,14 +218,71 @@ pub fn append_scan_benchmark(line: &str) -> std::io::Result<()> {
     file.write_all(b"\n")
 }
 
-pub fn load_cache() -> Option<Vec<u8>> {
-    fs::read(cache_path())
-        .ok()
-        .filter(|bytes| !bytes.is_empty())
+pub fn load_cache() -> std::io::Result<Option<Vec<u8>>> {
+    match fs::read(cache_path()) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
 }
 
 pub fn save_cache(bytes: &[u8]) -> std::io::Result<()> {
     write_bytes(cache_path(), bytes)
+}
+
+/// Moves a rejected cache out of the active slot while retaining it for diagnosis.
+/// A hard link provides collision-safe, no-overwrite naming on every supported desktop
+/// platform. If the process stops between linking and unlinking, the next launch merely
+/// sees the same bytes in both places and can quarantine the active slot again.
+pub fn quarantine_rejected_cache() -> std::io::Result<Option<PathBuf>> {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    quarantine_rejected_file_at(&cache_path(), timestamp)
+}
+
+fn quarantine_rejected_file_at(
+    target: &Path,
+    timestamp_milliseconds: u128,
+) -> std::io::Result<Option<PathBuf>> {
+    match target.try_exists() {
+        Ok(false) => return Ok(None),
+        Ok(true) => {}
+        Err(error) => return Err(error),
+    }
+
+    let parent = target
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let file_name = target.file_name().unwrap_or_default().to_string_lossy();
+    let mut attempt = 0_u64;
+    loop {
+        let suffix = if attempt == 0 {
+            String::new()
+        } else {
+            format!("-{attempt}")
+        };
+        let candidate = parent.join(format!(
+            "{file_name}.rejected-{timestamp_milliseconds}{suffix}"
+        ));
+        match fs::hard_link(target, &candidate) {
+            Ok(()) => {
+                if let Err(error) = fs::remove_file(target) {
+                    let _ = fs::remove_file(&candidate);
+                    return Err(error);
+                }
+                #[cfg(unix)]
+                fs::File::open(parent)?.sync_all()?;
+                return Ok(Some(candidate));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                attempt = attempt.saturating_add(1);
+            }
+            Err(error) => return Err(error),
+        }
+    }
 }
 
 pub fn load_terms_version() -> u32 {
@@ -419,8 +485,14 @@ pub fn ensure_fiat_opted_in_at() -> u64 {
 
 pub(crate) fn write_bytes(path: PathBuf, bytes: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
-    use std::path::Path;
 
+    write_bytes_with(path, |file| file.write_all(bytes))
+}
+
+fn write_bytes_with(
+    path: PathBuf,
+    writer: impl FnOnce(&mut fs::File) -> std::io::Result<()>,
+) -> std::io::Result<()> {
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
@@ -433,7 +505,7 @@ pub(crate) fn write_bytes(path: PathBuf, bytes: &[u8]) -> std::io::Result<()> {
     let mut temporary = tempfile::Builder::new()
         .prefix(".nexawal-write-")
         .tempfile_in(parent)?;
-    temporary.write_all(bytes)?;
+    writer(temporary.as_file_mut())?;
     temporary.as_file_mut().sync_all()?;
     temporary.persist(&path).map_err(|error| error.error)?;
 
@@ -448,8 +520,12 @@ pub(crate) fn write_bytes(path: PathBuf, bytes: &[u8]) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::io::{Error, ErrorKind, Write};
 
-    use super::{WindowPlacement, parse_bool_preference, write_bytes};
+    use super::{
+        WindowPlacement, parse_bool_preference, quarantine_rejected_file_at, write_bytes,
+        write_bytes_with,
+    };
 
     #[test]
     fn device_auth_preference_is_tristate() {
@@ -468,6 +544,38 @@ mod tests {
         write_bytes(path.clone(), b"first complete cache").unwrap();
         write_bytes(path.clone(), b"second complete cache").unwrap();
         assert_eq!(fs::read(path).unwrap(), b"second complete cache");
+    }
+
+    #[test]
+    fn interrupted_atomic_write_leaves_previous_cache_complete() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("wallet.cache");
+        write_bytes(path.clone(), b"previous complete cache").unwrap();
+
+        let error = write_bytes_with(path.clone(), |file| {
+            file.write_all(b"partial replacement")?;
+            Err(Error::new(ErrorKind::Other, "simulated interruption"))
+        })
+        .unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::Other);
+        assert_eq!(fs::read(path).unwrap(), b"previous complete cache");
+    }
+
+    #[test]
+    fn rejected_caches_leave_the_active_slot_and_never_overwrite_evidence() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("wallet.cache");
+        fs::write(&path, b"rejected one").unwrap();
+        let first = quarantine_rejected_file_at(&path, 1234).unwrap().unwrap();
+        assert!(!path.exists());
+        assert_eq!(fs::read(&first).unwrap(), b"rejected one");
+
+        fs::write(&path, b"rejected two").unwrap();
+        let second = quarantine_rejected_file_at(&path, 1234).unwrap().unwrap();
+        assert_ne!(first, second);
+        assert_eq!(fs::read(&second).unwrap(), b"rejected two");
+        assert_eq!(quarantine_rejected_file_at(&path, 1234).unwrap(), None);
     }
 
     #[test]

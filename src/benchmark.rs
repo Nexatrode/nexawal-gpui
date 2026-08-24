@@ -6,6 +6,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
+use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -216,6 +217,14 @@ pub struct SyncAuditReport {
     pub results_path: String,
     pub rpc_results_path: String,
     pub summary: String,
+}
+
+#[derive(Debug)]
+pub struct SyncTortureAuditReport {
+    pub results_path: String,
+    pub rpc_results_path: String,
+    pub summary: String,
+    pub status: String,
 }
 
 pub fn run_id() -> u64 {
@@ -568,6 +577,630 @@ pub fn run_sync_audit(
         rpc_results_path: rpc_path.display().to_string(),
         summary,
     }
+}
+
+/// Exercise the lifecycle that is hardest to cover in an in-process unit test:
+/// checkpoint a live scan, kill that process without cleanup, import the checkpoint
+/// in this process, survive a dead endpoint, switch node implementations, and finish.
+/// Two inverse runs ensure both Cuprate and monerod produce the same final ledger.
+pub fn run_sync_torture_audit(
+    node_url: String,
+    mnemonic: String,
+    start_height: u64,
+    target_height: Option<u64>,
+    run_id: u64,
+) -> SyncTortureAuditReport {
+    let run_started_at_ms = now_ms();
+    let results_path = paths::sync_torture_audit_path(run_id);
+    let rpc_path = paths::sync_torture_audit_rpc_path(run_id);
+    let _ = fs::remove_file(&results_path);
+    let _ = fs::remove_file(&rpc_path);
+    unsafe {
+        std::env::set_var("WALLETCORE_RPC_TELEMETRY_PATH", &rpc_path);
+    }
+
+    let nodes = targets_for(&node_url);
+    let timeout = audit_timeout();
+    let checkpoint_blocks = torture_checkpoint_blocks();
+    let failure_node = std::env::var("NEXAWAL_TORTURE_FAILURE_NODE")
+        .unwrap_or_else(|_| "http://127.0.0.1:1".to_string());
+    let temporary = tempfile::tempdir();
+    let mut samples = Vec::new();
+    let mut setup_error = None;
+
+    if nodes.len() < 2 {
+        setup_error = Some("the torture audit requires two node targets".to_string());
+    } else if let Err(error) = &temporary {
+        setup_error = Some(format!(
+            "could not create isolated audit directory: {error}"
+        ));
+    } else if target_height.is_some_and(|target| target <= start_height) {
+        setup_error = Some("target height must be above start height".to_string());
+    }
+
+    if let Ok(temporary) = temporary
+        && setup_error.is_none()
+    {
+        for (index, (source_node, resume_node)) in [(&nodes[0], &nodes[1]), (&nodes[1], &nodes[0])]
+            .into_iter()
+            .enumerate()
+        {
+            let sequence_dir = temporary.path().join(format!("sequence-{index}"));
+            let _ = fs::create_dir_all(&sequence_dir);
+            let cache_path = sequence_dir.join("main_wallet.cache");
+            let state_path = sequence_dir.join("checkpoint.json");
+            let worker_id = format!("nexawal-torture-worker-{run_id}-{index}");
+            let resumed_id = format!("nexawal-torture-resume-{run_id}-{index}");
+            let capture = capture_killed_checkpoint(
+                &worker_id,
+                source_node,
+                &mnemonic,
+                start_height,
+                checkpoint_blocks,
+                &cache_path,
+                &state_path,
+            );
+            samples.push(match capture {
+                Ok(interruption) => run_resumed_torture_target(
+                    &resumed_id,
+                    source_node,
+                    resume_node,
+                    &failure_node,
+                    &mnemonic,
+                    start_height,
+                    target_height,
+                    timeout,
+                    &cache_path,
+                    interruption,
+                ),
+                Err(error) => json!({
+                    "node": resume_node,
+                    "node_label": node_label(resume_node),
+                    "source_node": source_node,
+                    "wallet_id": resumed_id,
+                    "start_height": start_height,
+                    "target_height": target_height,
+                    "outcome": "interruption-failed",
+                    "error": error,
+                    "transfers": [],
+                    "interruption": {"forced_kill": false},
+                    "failure_probe": {"observed": false, "state_preserved": false},
+                    "checkpoint_history_preserved": false,
+                }),
+            });
+        }
+    }
+
+    unsafe {
+        std::env::remove_var("WALLETCORE_RPC_TELEMETRY_PATH");
+    }
+    scan_tuning::clear_profile_override();
+
+    let comparison = if setup_error.is_none() {
+        compare_audit_targets(&samples, target_height)
+    } else {
+        json!({
+            "status": "not-comparable",
+            "reason": setup_error,
+        })
+    };
+    let status = torture_audit_status(&samples, &comparison).to_string();
+    let report = json!({
+        "schema": "nexawal-sync-torture-v1",
+        "run_id": run_id,
+        "ephemeral_wallet": std::env::var("NEXAWAL_TORTURE_EPHEMERAL")
+            .ok()
+            .is_some_and(|value| matches!(value.trim(), "1" | "true" | "yes")),
+        "started_at_ms": run_started_at_ms,
+        "elapsed_ms": now_ms().saturating_sub(run_started_at_ms),
+        "start_height": start_height,
+        "target_height": target_height,
+        "checkpoint_blocks": checkpoint_blocks,
+        "failure_node": failure_node,
+        "targets": samples,
+        "comparison": comparison,
+        "status": status,
+    });
+    let report_text = serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".into());
+    let _ = fs::create_dir_all(paths::data_dir());
+    let write_result = paths::write_bytes(results_path.clone(), report_text.as_bytes());
+    let summary = if let Err(error) = write_result {
+        format!("sync torture · {status} · could not write report: {error}")
+    } else {
+        format!(
+            "sync torture · {status} · report {} · RPC trace {}",
+            results_path.display(),
+            rpc_path.display()
+        )
+    };
+
+    SyncTortureAuditReport {
+        results_path: results_path.display().to_string(),
+        rpc_results_path: rpc_path.display().to_string(),
+        summary,
+        status,
+    }
+}
+
+/// Hidden child-process entry point used by `run_sync_torture_audit`.
+pub fn run_sync_torture_worker() -> Result<(), String> {
+    let mnemonic = required_torture_env("NEXAWAL_MNEMONIC")?;
+    let wallet_id = required_torture_env("NEXAWAL_TORTURE_WORKER_ID")?;
+    let node_url = required_torture_env("NEXAWAL_TORTURE_WORKER_NODE")?;
+    let cache_path =
+        std::path::PathBuf::from(required_torture_env("NEXAWAL_TORTURE_WORKER_CACHE")?);
+    let state_path =
+        std::path::PathBuf::from(required_torture_env("NEXAWAL_TORTURE_WORKER_STATE")?);
+    let start_height = required_torture_env("NEXAWAL_TORTURE_WORKER_START_HEIGHT")?
+        .parse::<u64>()
+        .map_err(|error| format!("invalid torture worker start height: {error}"))?;
+
+    api::open_from_mnemonic(&wallet_id, &mnemonic, start_height, true)
+        .and_then(|_| api::set_gap_limit(&wallet_id, 50))
+        .map_err(|error| format!("torture worker open failed: {error}"))?;
+    scan_tuning::clear_profile_override();
+    scan_tuning::apply();
+    api::refresh_async(&wallet_id, &node_url)
+        .map_err(|error| format!("torture worker refresh failed to start: {error}"))?;
+
+    let deadline = Instant::now() + torture_checkpoint_timeout();
+    let mut last_exported = None;
+    let mut last_export_at = Instant::now() - Duration::from_secs(1);
+    while Instant::now() < deadline {
+        match api::refresh_job(&wallet_id) {
+            RefreshJob::Failed(message) => {
+                return Err(format!("torture worker scan failed: {message}"));
+            }
+            RefreshJob::Running | RefreshJob::Idle => {
+                if let Ok(status) = api::sync_status(&wallet_id)
+                    && last_exported != Some(status.last_scanned)
+                    && last_export_at.elapsed() >= Duration::from_millis(500)
+                {
+                    let cache = api::export_cache(&wallet_id)
+                        .map_err(|error| format!("torture worker cache export failed: {error}"))?;
+                    if !cache.is_empty() {
+                        paths::write_bytes(cache_path.clone(), &cache).map_err(|error| {
+                            format!("torture worker cache persistence failed: {error}")
+                        })?;
+                        let state = json!({
+                            "wallet_id": wallet_id,
+                            "node": node_url,
+                            "pid": std::process::id(),
+                            "last_scanned": status.last_scanned,
+                            "chain_height": status.chain_height,
+                            "restore_height": status.restore_height,
+                            "cache_bytes": cache.len(),
+                            "written_at_ms": now_ms(),
+                            "refresh_job": match api::refresh_job(&wallet_id) {
+                                RefreshJob::Running => "running",
+                                RefreshJob::Idle => "idle",
+                                RefreshJob::Failed(_) => "failed",
+                            },
+                        });
+                        let encoded = serde_json::to_vec_pretty(&state).map_err(|error| {
+                            format!("torture worker state encode failed: {error}")
+                        })?;
+                        paths::write_bytes(state_path.clone(), &encoded).map_err(|error| {
+                            format!("torture worker state persistence failed: {error}")
+                        })?;
+                        last_exported = Some(status.last_scanned);
+                        last_export_at = Instant::now();
+                    }
+                }
+            }
+        }
+        thread::sleep(POLL_INTERVAL);
+    }
+    Err(format!(
+        "torture worker did not produce a killable checkpoint within {} seconds",
+        torture_checkpoint_timeout().as_secs()
+    ))
+}
+
+fn required_torture_env(name: &str) -> Result<String, String> {
+    std::env::var(name)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| format!("missing {name}"))
+}
+
+fn capture_killed_checkpoint(
+    wallet_id: &str,
+    source_node: &str,
+    mnemonic: &str,
+    start_height: u64,
+    checkpoint_blocks: u64,
+    cache_path: &std::path::Path,
+    state_path: &std::path::Path,
+) -> Result<Value, String> {
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("could not locate torture worker executable: {error}"))?;
+    let mut child = Command::new(executable)
+        .arg("--sync-torture-worker")
+        .env("NEXAWAL_MNEMONIC", mnemonic)
+        .env("NEXAWAL_TORTURE_WORKER_ID", wallet_id)
+        .env("NEXAWAL_TORTURE_WORKER_NODE", source_node)
+        .env(
+            "NEXAWAL_TORTURE_WORKER_START_HEIGHT",
+            start_height.to_string(),
+        )
+        .env("NEXAWAL_TORTURE_WORKER_CACHE", cache_path)
+        .env("NEXAWAL_TORTURE_WORKER_STATE", state_path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .map_err(|error| format!("could not start torture worker: {error}"))?;
+    let worker_pid = child.id();
+    let kill_height = start_height.saturating_add(checkpoint_blocks);
+    let started = Instant::now();
+    let deadline = Instant::now() + torture_checkpoint_timeout();
+
+    while Instant::now() < deadline {
+        if let Some(exit) = child
+            .try_wait()
+            .map_err(|error| format!("could not inspect torture worker: {error}"))?
+        {
+            return Err(format!(
+                "torture worker exited before forced termination: {exit}"
+            ));
+        }
+        let state = fs::read(state_path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
+        let checkpoint_ready = state
+            .as_ref()
+            .and_then(|value| value.get("last_scanned"))
+            .and_then(Value::as_u64)
+            .is_some_and(|height| height >= kill_height)
+            && fs::metadata(cache_path)
+                .map(|metadata| metadata.len() > 0)
+                .unwrap_or(false);
+        if checkpoint_ready {
+            child
+                .kill()
+                .map_err(|error| format!("could not forcibly terminate torture worker: {error}"))?;
+            let exit = child
+                .wait()
+                .map_err(|error| format!("could not reap torture worker: {error}"))?;
+            let mut state = state.unwrap_or_else(|| json!({}));
+            if let Some(object) = state.as_object_mut() {
+                object.insert("forced_kill".into(), Value::Bool(true));
+                object.insert("worker_pid".into(), json!(worker_pid));
+                object.insert("worker_exit".into(), json!(exit.to_string()));
+                object.insert("kill_height".into(), json!(kill_height));
+                object.insert(
+                    "capture_elapsed_ms".into(),
+                    json!(started.elapsed().as_millis()),
+                );
+            }
+            return Ok(state);
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+
+    let _ = child.kill();
+    let _ = child.wait();
+    Err(format!(
+        "no checkpoint reached height {kill_height} within {} seconds",
+        torture_checkpoint_timeout().as_secs()
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_resumed_torture_target(
+    wallet_id: &str,
+    source_node: &str,
+    resume_node: &str,
+    failure_node: &str,
+    mnemonic: &str,
+    start_height: u64,
+    target_height: Option<u64>,
+    timeout: Duration,
+    cache_path: &std::path::Path,
+    interruption: Value,
+) -> Value {
+    let started = Instant::now();
+    let mut outcome = "open-failed";
+    let mut error = None;
+    let cache = match fs::read(cache_path) {
+        Ok(cache) if !cache.is_empty() => Some(cache),
+        Ok(_) => {
+            error = Some("forced-kill checkpoint was empty".to_string());
+            None
+        }
+        Err(read_error) => {
+            error = Some(format!(
+                "could not read forced-kill checkpoint: {read_error}"
+            ));
+            None
+        }
+    };
+
+    if let Some(cache) = cache {
+        match api::open_from_mnemonic(wallet_id, mnemonic, start_height, true)
+            .and_then(|_| api::set_gap_limit(wallet_id, 50))
+            .and_then(|_| api::import_cache(wallet_id, &cache))
+        {
+            Err(open_error) => error = Some(format!("checkpoint import failed: {open_error}")),
+            Ok(()) => {
+                outcome = "failure-probe";
+            }
+        }
+    }
+
+    let imported = wallet_state_snapshot(wallet_id, start_height, target_height);
+    let failure_probe = if outcome == "failure-probe" {
+        run_failure_probe(
+            wallet_id,
+            failure_node,
+            &imported,
+            start_height,
+            target_height,
+        )
+    } else {
+        json!({"observed": false, "state_preserved": false})
+    };
+
+    if outcome == "failure-probe" {
+        scan_tuning::clear_profile_override();
+        scan_tuning::apply();
+        match api::refresh_async(wallet_id, resume_node) {
+            Err(refresh_error) => {
+                outcome = "resume-start-failed";
+                error = Some(refresh_error.to_string());
+            }
+            Ok(()) => {
+                outcome = "timeout";
+                let deadline = Instant::now() + timeout;
+                while Instant::now() < deadline {
+                    match api::refresh_job(wallet_id) {
+                        RefreshJob::Failed(message) => {
+                            outcome = "scan-failed";
+                            error = Some(message);
+                            break;
+                        }
+                        RefreshJob::Running => {}
+                        RefreshJob::Idle => {
+                            if let Ok(status) = api::sync_status(wallet_id)
+                                && status.chain_height > start_height
+                                && status.last_scanned >= status.chain_height
+                            {
+                                outcome = "completed";
+                                break;
+                            }
+                        }
+                    }
+                    thread::sleep(Duration::from_millis(250));
+                }
+                if outcome == "timeout" {
+                    let _ = api::refresh_cancel(wallet_id);
+                }
+                if !wait_for_idle(wallet_id, CANCEL_WAIT) {
+                    outcome = "cleanup-timeout";
+                    error = Some(format!(
+                        "resumed refresh did not stop within {} seconds",
+                        CANCEL_WAIT.as_secs()
+                    ));
+                }
+            }
+        }
+    }
+
+    let mut final_state = wallet_state_snapshot(wallet_id, start_height, target_height);
+    let checkpoint_history_preserved = canonical_history_is_subset(&imported, &final_state);
+    if let Some(object) = final_state.as_object_mut() {
+        object.insert("node".into(), json!(resume_node));
+        object.insert("node_label".into(), json!(node_label(resume_node)));
+        object.insert("source_node".into(), json!(source_node));
+        object.insert("wallet_id".into(), json!(wallet_id));
+        object.insert("outcome".into(), json!(outcome));
+        object.insert("error".into(), json!(error));
+        object.insert("elapsed_ms".into(), json!(started.elapsed().as_millis()));
+        object.insert("interruption".into(), interruption);
+        object.insert("failure_probe".into(), failure_probe);
+        object.insert(
+            "checkpoint_history_preserved".into(),
+            json!(checkpoint_history_preserved),
+        );
+    }
+    final_state
+}
+
+fn run_failure_probe(
+    wallet_id: &str,
+    failure_node: &str,
+    before: &Value,
+    start_height: u64,
+    target_height: Option<u64>,
+) -> Value {
+    let started = Instant::now();
+    let mut observed = false;
+    let mut detail = None;
+    match api::refresh_async(wallet_id, failure_node) {
+        Err(error) => {
+            observed = true;
+            detail = Some(error.to_string());
+        }
+        Ok(()) => {
+            let deadline = Instant::now() + torture_failure_timeout();
+            while Instant::now() < deadline {
+                match api::refresh_job(wallet_id) {
+                    RefreshJob::Failed(message) => {
+                        observed = true;
+                        detail = Some(message);
+                        break;
+                    }
+                    RefreshJob::Idle => {
+                        observed = true;
+                        detail = Some("refresh returned idle for unreachable endpoint".into());
+                        break;
+                    }
+                    RefreshJob::Running => thread::sleep(POLL_INTERVAL),
+                }
+            }
+        }
+    }
+    if matches!(api::refresh_job(wallet_id), RefreshJob::Running) {
+        let _ = api::refresh_cancel(wallet_id);
+    }
+    let stopped = wait_for_idle(wallet_id, CANCEL_WAIT);
+    let after = wallet_state_snapshot(wallet_id, start_height, target_height);
+    let state_preserved = stopped
+        && sample_last_scanned(before) == sample_last_scanned(&after)
+        && before.get("balance_total_piconero") == after.get("balance_total_piconero")
+        && before.get("balance_unlocked_piconero") == after.get("balance_unlocked_piconero")
+        && canonical_histories_equal(before, &after)
+        && api::export_cache(wallet_id).is_ok_and(|cache| !cache.is_empty());
+    json!({
+        "node": failure_node,
+        "observed": observed,
+        "detail": detail,
+        "stopped": stopped,
+        "state_preserved": state_preserved,
+        "elapsed_ms": started.elapsed().as_millis(),
+        "before_last_scanned": sample_last_scanned(before),
+        "after_last_scanned": sample_last_scanned(&after),
+    })
+}
+
+fn wallet_state_snapshot(wallet_id: &str, start_height: u64, target_height: Option<u64>) -> Value {
+    let sync = api::sync_status(wallet_id).ok();
+    let balance = api::get_balance(wallet_id).ok();
+    let transfers = api::list_transfers(wallet_id).unwrap_or_default();
+    let transfer_values: Vec<Value> = transfers
+        .iter()
+        .map(|transfer| {
+            json!({
+                "txid": transfer.txid,
+                "direction": transfer.direction,
+                "amount_piconero": transfer.amount,
+                "fee_piconero": transfer.fee,
+                "height": transfer.height,
+                "timestamp": transfer.timestamp,
+                "confirmations": transfer.confirmations,
+                "is_pending": transfer.is_pending,
+            })
+        })
+        .collect();
+    let fee_comparison_height = target_height.unwrap_or_else(|| {
+        sync.as_ref()
+            .map(|status| status.last_scanned)
+            .unwrap_or(start_height)
+    });
+    let missing_fee_txids = missing_confirmed_fee_txids(&transfer_values, fee_comparison_height);
+    json!({
+        "start_height": start_height,
+        "target_height": target_height,
+        "sync": sync.map(|status| json!({
+            "chain_height": status.chain_height,
+            "last_scanned": status.last_scanned,
+            "restore_height": status.restore_height,
+            "chain_time": status.chain_time,
+        })),
+        "balance_total_piconero": balance.as_ref().map(|value| value.total_piconero),
+        "balance_unlocked_piconero": balance.as_ref().map(|value| value.unlocked_piconero),
+        "transfer_count": transfer_values.len(),
+        "fees_complete": missing_fee_txids.is_empty(),
+        "missing_fee_count": missing_fee_txids.len(),
+        "missing_fee_txids": missing_fee_txids,
+        "transfers": transfer_values,
+    })
+}
+
+fn canonical_transfer(value: &Value) -> Value {
+    json!({
+        "direction": value.get("direction"),
+        "amount_piconero": value.get("amount_piconero"),
+        "fee_piconero": value.get("fee_piconero"),
+        "height": value.get("height"),
+        "is_pending": value.get("is_pending"),
+    })
+}
+
+fn canonical_history(sample: &Value) -> BTreeMap<String, Value> {
+    sample
+        .get("transfers")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|transfer| {
+            transfer
+                .get("txid")
+                .and_then(Value::as_str)
+                .map(|txid| (txid.to_string(), canonical_transfer(transfer)))
+        })
+        .collect()
+}
+
+fn canonical_histories_equal(left: &Value, right: &Value) -> bool {
+    canonical_history(left) == canonical_history(right)
+}
+
+fn canonical_history_is_subset(checkpoint: &Value, final_state: &Value) -> bool {
+    let checkpoint = canonical_history(checkpoint);
+    let final_state = canonical_history(final_state);
+    checkpoint
+        .iter()
+        .all(|(txid, transfer)| final_state.get(txid) == Some(transfer))
+}
+
+fn torture_audit_status<'a>(samples: &[Value], comparison: &'a Value) -> &'a str {
+    let comparison_status = comparison
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    if comparison_status != "pass" {
+        return comparison_status;
+    }
+    let lifecycle_passed = samples.iter().all(|sample| {
+        sample
+            .get("interruption")
+            .and_then(|value| value.get("forced_kill"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+            && sample
+                .get("failure_probe")
+                .and_then(|value| value.get("observed"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            && sample
+                .get("failure_probe")
+                .and_then(|value| value.get("state_preserved"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            && sample
+                .get("checkpoint_history_preserved")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+    });
+    if lifecycle_passed { "pass" } else { "fail" }
+}
+
+fn torture_checkpoint_blocks() -> u64 {
+    std::env::var("NEXAWAL_TORTURE_CHECKPOINT_BLOCKS")
+        .ok()
+        .and_then(|value| value.trim().parse().ok())
+        .unwrap_or(20_000)
+        .clamp(500, 1_000_000)
+}
+
+fn torture_checkpoint_timeout() -> Duration {
+    let seconds = std::env::var("NEXAWAL_TORTURE_CHECKPOINT_TIMEOUT_SECS")
+        .ok()
+        .and_then(|value| value.trim().parse().ok())
+        .unwrap_or(900)
+        .clamp(60, 7_200);
+    Duration::from_secs(seconds)
+}
+
+fn torture_failure_timeout() -> Duration {
+    let seconds = std::env::var("NEXAWAL_TORTURE_FAILURE_TIMEOUT_SECS")
+        .ok()
+        .and_then(|value| value.trim().parse().ok())
+        .unwrap_or(45)
+        .clamp(5, 300);
+    Duration::from_secs(seconds)
 }
 
 fn run_audit_target(
@@ -1477,5 +2110,70 @@ mod tests {
                 .and_then(Value::as_u64),
             Some(1)
         );
+    }
+
+    #[test]
+    fn torture_status_requires_kill_failure_preservation_and_history() {
+        let passing_sample = json!({
+            "interruption": {"forced_kill": true},
+            "failure_probe": {"observed": true, "state_preserved": true},
+            "checkpoint_history_preserved": true,
+        });
+        let comparison = json!({"status": "pass"});
+        assert_eq!(
+            torture_audit_status(
+                &[passing_sample.clone(), passing_sample.clone()],
+                &comparison
+            ),
+            "pass"
+        );
+
+        let mut failed_sample = passing_sample;
+        failed_sample["failure_probe"]["state_preserved"] = Value::Bool(false);
+        assert_eq!(
+            torture_audit_status(
+                &[
+                    failed_sample,
+                    json!({
+                        "interruption": {"forced_kill": true},
+                        "failure_probe": {"observed": true, "state_preserved": true},
+                        "checkpoint_history_preserved": true,
+                    })
+                ],
+                &comparison
+            ),
+            "fail"
+        );
+    }
+
+    #[test]
+    fn checkpoint_history_ignores_confirmation_growth_but_not_missing_transactions() {
+        let checkpoint = json!({
+            "transfers": [{
+                "txid": "abc",
+                "direction": "in",
+                "amount_piconero": 42,
+                "fee_piconero": 3,
+                "height": 100,
+                "confirmations": 1,
+                "is_pending": false,
+            }]
+        });
+        let final_state = json!({
+            "transfers": [{
+                "txid": "abc",
+                "direction": "in",
+                "amount_piconero": 42,
+                "fee_piconero": 3,
+                "height": 100,
+                "confirmations": 99,
+                "is_pending": false,
+            }]
+        });
+        assert!(canonical_history_is_subset(&checkpoint, &final_state));
+        assert!(!canonical_history_is_subset(
+            &checkpoint,
+            &json!({"transfers": []})
+        ));
     }
 }
