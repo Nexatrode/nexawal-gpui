@@ -1410,7 +1410,7 @@ dependencies = [
 [[package]]
 name = "cuprate-epee-encoding"
 version = "0.5.0"
-source = "git+https://github.com/Cuprate/cuprate?rev=c170b77ce4b0e490ba3309ebe79230b117dc3beb#c170b77ce4b0e490ba3309ebe79230b117dc3beb"
+source = "git+https://github.com/Cuprate/cuprate?rev=52d958074bcb0e69fc251b4fde862b22730ea9a1#52d958074bcb0e69fc251b4fde862b22730ea9a1"
 dependencies = [
  "bytes",
  "cuprate-fixed-bytes",
@@ -1423,7 +1423,7 @@ dependencies = [
 [[package]]
 name = "cuprate-fixed-bytes"
 version = "0.1.0"
-source = "git+https://github.com/Cuprate/cuprate?rev=c170b77ce4b0e490ba3309ebe79230b117dc3beb#c170b77ce4b0e490ba3309ebe79230b117dc3beb"
+source = "git+https://github.com/Cuprate/cuprate?rev=52d958074bcb0e69fc251b4fde862b22730ea9a1#52d958074bcb0e69fc251b4fde862b22730ea9a1"
 dependencies = [
  "bytes",
  "thiserror 2.0.20",
@@ -1432,7 +1432,7 @@ dependencies = [
 [[package]]
 name = "cuprate-hex"
 version = "0.0.0"
-source = "git+https://github.com/Cuprate/cuprate?rev=c170b77ce4b0e490ba3309ebe79230b117dc3beb#c170b77ce4b0e490ba3309ebe79230b117dc3beb"
+source = "git+https://github.com/Cuprate/cuprate?rev=52d958074bcb0e69fc251b4fde862b22730ea9a1#52d958074bcb0e69fc251b4fde862b22730ea9a1"
 dependencies = [
  "hex",
  "serde",
@@ -7057,7 +7057,7 @@ dependencies = [
 [[package]]
 name = "walletcore"
 version = "0.1.2"
-source = "git+https://github.com/cacaosteve/MoneroWalletCoreFFI.git?rev=72de684c748cc0c8189121832f5cb3df3c8b8d7f#72de684c748cc0c8189121832f5cb3df3c8b8d7f"
+source = "git+https://github.com/cacaosteve/MoneroWalletCoreFFI.git?rev=80940e383fe449f4a6ff3a07e5221c0c378ae997#80940e383fe449f4a6ff3a07e5221c0c378ae997"
 dependencies = [
  "bincode",
  "bytes",
