@@ -124,9 +124,42 @@ pub fn is_synced(sync: &SyncStatus, running: bool, transfers_empty: bool) -> boo
     true
 }
 
-pub fn is_stall_error(message: &str) -> bool {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SyncErrorKind {
+    Stalled,
+    NodeUnreachable,
+    Failed,
+}
+
+fn classify_error(message: &str, stalled: bool) -> SyncErrorKind {
     let lower = message.to_ascii_lowercase();
-    lower.contains("stall") || lower.contains("no scan progress")
+    if stalled || lower.contains("sync stalled") || lower.contains("no scan progress") {
+        return SyncErrorKind::Stalled;
+    }
+    const NETWORK_ERRORS: [&str; 14] = [
+        "connection refused",
+        "connection reset",
+        "connection timed out",
+        "timed out",
+        "timeout/disconnect",
+        "failed to connect",
+        "could not connect",
+        "couldn't connect",
+        "network is unreachable",
+        "node unreachable",
+        "not reachable",
+        "no route to host",
+        "name or service not known",
+        "transport error",
+    ];
+    if NETWORK_ERRORS.iter().any(|pattern| lower.contains(pattern))
+        || lower.contains("dns")
+        || lower.contains("tls handshake")
+    {
+        SyncErrorKind::NodeUnreachable
+    } else {
+        SyncErrorKind::Failed
+    }
 }
 
 pub fn headline(
@@ -137,11 +170,15 @@ pub fn headline(
     has_tip: bool,
     last_scanned_eq_restore: bool,
 ) -> String {
-    if stalled && error.is_some_and(is_stall_error) {
-        return l10n::t("Sync stalled").into();
-    }
-    if error.is_some() && !running && !synced {
-        return l10n::t("Node unreachable").into();
+    if let Some(kind) = error
+        .filter(|_| !running && !synced)
+        .map(|message| classify_error(message, stalled))
+    {
+        return match kind {
+            SyncErrorKind::Stalled => l10n::t("Sync stalled").into(),
+            SyncErrorKind::NodeUnreachable => l10n::t("Node unreachable").into(),
+            SyncErrorKind::Failed => l10n::t("Sync failed").into(),
+        };
     }
     if synced {
         return l10n::t("Wallet synced").into();
@@ -165,7 +202,10 @@ pub fn detail(
     restore_height: u64,
     remaining: u64,
 ) -> String {
-    if stalled && error.is_some_and(is_stall_error) {
+    if error
+        .filter(|_| !running && !synced)
+        .is_some_and(|message| classify_error(message, stalled) == SyncErrorKind::Stalled)
+    {
         return l10n::t("Tap Retry sync to continue (or reopen the app).").into();
     }
     if let Some(err) = error.filter(|_| !running && !synced) {
@@ -266,5 +306,33 @@ mod tests {
     fn sync_detail_a11y_labels_match_ios_android_english() {
         assert_eq!(SHOW_SYNC_DETAILS, "Show sync details");
         assert_eq!(HIDE_SYNC_DETAILS, "Hide sync details");
+    }
+
+    #[test]
+    fn sync_errors_only_blame_the_node_for_transport_failures() {
+        assert_eq!(
+            classify_error("refresh already running for wallet", false),
+            SyncErrorKind::Failed
+        );
+        assert_eq!(
+            classify_error("cache JSON was malformed", false),
+            SyncErrorKind::Failed
+        );
+        assert_eq!(
+            classify_error("connection refused", false),
+            SyncErrorKind::NodeUnreachable
+        );
+        assert_eq!(classify_error("anything", true), SyncErrorKind::Stalled);
+        assert_eq!(
+            headline(
+                false,
+                false,
+                false,
+                Some("refresh already running for wallet"),
+                true,
+                false
+            ),
+            "Sync failed"
+        );
     }
 }

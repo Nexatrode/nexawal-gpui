@@ -312,11 +312,25 @@ pub fn save_node_url(url: &str) -> std::io::Result<()> {
     write_bytes(node_path(), url.trim().as_bytes())
 }
 
-pub fn load_pending_send() -> Option<String> {
-    fs::read_to_string(pending_send_path())
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+pub fn load_pending_send() -> std::io::Result<Option<String>> {
+    load_pending_send_at(&pending_send_path())
+}
+
+fn load_pending_send_at(path: &Path) -> std::io::Result<Option<String>> {
+    match fs::read_to_string(path) {
+        Ok(raw) => {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "pending send journal is empty",
+                ));
+            }
+            Ok(Some(trimmed.to_string()))
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
 }
 
 pub fn save_pending_send(json: &str) -> std::io::Result<()> {
@@ -523,8 +537,8 @@ mod tests {
     use std::io::{Error, ErrorKind, Write};
 
     use super::{
-        WindowPlacement, parse_bool_preference, quarantine_rejected_file_at, write_bytes,
-        write_bytes_with,
+        WindowPlacement, load_pending_send_at, parse_bool_preference, quarantine_rejected_file_at,
+        write_bytes, write_bytes_with,
     };
 
     #[test]
@@ -560,6 +574,30 @@ mod tests {
 
         assert_eq!(error.kind(), ErrorKind::Other);
         assert_eq!(fs::read(path).unwrap(), b"previous complete cache");
+    }
+
+    #[test]
+    fn pending_send_distinguishes_missing_valid_and_unreadable_journals() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("pending_send.json");
+
+        assert_eq!(load_pending_send_at(&path).unwrap(), None);
+
+        fs::write(&path, "  {\"signed\":true}\n").unwrap();
+        assert_eq!(
+            load_pending_send_at(&path).unwrap().as_deref(),
+            Some("{\"signed\":true}")
+        );
+
+        fs::write(&path, " \n\t").unwrap();
+        assert_eq!(
+            load_pending_send_at(&path).unwrap_err().kind(),
+            ErrorKind::InvalidData
+        );
+
+        fs::remove_file(&path).unwrap();
+        fs::create_dir(&path).unwrap();
+        assert!(load_pending_send_at(&path).is_err());
     }
 
     #[test]

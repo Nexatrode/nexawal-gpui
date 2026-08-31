@@ -2473,8 +2473,17 @@ impl Home {
     }
 
     fn recover_pending_send(&mut self, cx: &mut Context<Self>) {
-        if paths::load_pending_send().is_none() {
-            return;
+        match paths::load_pending_send() {
+            Ok(None) => return,
+            Ok(Some(_)) => {}
+            Err(err) => {
+                self.status = format!(
+                    "Pending send recovery data cannot be read; new sends are blocked: {err}"
+                )
+                .into();
+                cx.notify();
+                return;
+            }
         }
         self.apply_broadcast_proxy();
         let node = self.broadcast_node_url();
