@@ -229,7 +229,8 @@ fn theme_out() -> u32 {
 fn theme_border() -> u32 {
     match active_theme() {
         Theme::Classic => 0x3A4B63,
-        Theme::Neon => 0x2A3A2A,
+        // Brighter than the card fill so control chrome stays visible on black.
+        Theme::Neon => 0x3D6B3D,
     }
 }
 
@@ -243,7 +244,8 @@ fn theme_disabled() -> u32 {
 fn theme_button_text() -> u32 {
     match active_theme() {
         Theme::Classic => 0xFFFFFF,
-        Theme::Neon => 0x001A12,
+        // Pure black on neon fill — dark-green-on-green was effectively invisible.
+        Theme::Neon => 0x000000,
     }
 }
 
@@ -3514,18 +3516,21 @@ fn side_nav_button(
         .bg(rgb(if selected {
             theme_accent()
         } else {
-            theme_field()
-        }))
-        .text_color(rgb(if selected {
-            theme_button_text()
-        } else {
-            theme_text()
+            theme_row()
         }))
         .when(compact, |button| button.justify_center().text_lg())
         .aria_label(label)
         .cursor(CursorStyle::PointingHand)
         .on_click(listener)
-        .child(button_text)
+        .child(
+            div()
+                .text_color(rgb(if selected {
+                    theme_button_text()
+                } else {
+                    theme_text()
+                }))
+                .child(button_text),
+        )
 }
 
 fn header(_: &Home) -> impl IntoElement {
@@ -5883,22 +5888,32 @@ fn action_button(
     label: impl Into<SharedString>,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
+    let label = label.into();
     div()
         .id(id)
         .px_3()
         .py_2()
         .rounded_md()
         .bg(rgb(theme_accent()))
-        .text_color(rgb(theme_button_text()))
+        .flex()
+        .items_center()
+        .justify_center()
         .cursor(CursorStyle::PointingHand)
+        .aria_label(label.clone())
         .on_click(listener)
-        .child(label.into())
+        .child(
+            div()
+                .text_color(rgb(theme_button_text()))
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .child(theme_display_label(label)),
+        )
 }
 
 fn page_title(label: impl Into<SharedString>) -> impl IntoElement {
     div()
         .text_xl()
         .font_weight(gpui::FontWeight::SEMIBOLD)
+        .text_color(rgb(theme_text()))
         .child(theme_display_label(label.into()))
 }
 
@@ -5908,6 +5923,8 @@ fn section_card(label: impl Into<SharedString>, content: impl IntoElement) -> im
         .p_5()
         .rounded_lg()
         .bg(rgb(theme_card()))
+        .border_1()
+        .border_color(rgb(theme_border()))
         .flex()
         .flex_col()
         .gap_3()
@@ -5915,6 +5932,7 @@ fn section_card(label: impl Into<SharedString>, content: impl IntoElement) -> im
             div()
                 .text_sm()
                 .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(rgb(theme_text()))
                 .child(theme_display_label(label.into())),
         )
         .child(content)
@@ -5925,6 +5943,7 @@ fn wide_primary_action_button(
     label: impl Into<SharedString>,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
+    let label = label.into();
     div()
         .id(id)
         .w_full()
@@ -5932,12 +5951,18 @@ fn wide_primary_action_button(
         .py_3()
         .rounded_lg()
         .bg(rgb(theme_accent()))
-        .text_color(rgb(theme_button_text()))
-        .text_center()
-        .font_weight(gpui::FontWeight::SEMIBOLD)
+        .flex()
+        .items_center()
+        .justify_center()
         .cursor(CursorStyle::PointingHand)
+        .aria_label(label.clone())
         .on_click(listener)
-        .child(theme_display_label(label.into()))
+        .child(
+            div()
+                .text_color(rgb(theme_button_text()))
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .child(theme_display_label(label)),
+        )
 }
 
 fn wide_secondary_action_button(
@@ -5945,23 +5970,32 @@ fn wide_secondary_action_button(
     label: impl Into<SharedString>,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
+    let label = label.into();
     div()
         .id(id)
         .w_full()
         .px_4()
         .py_3()
         .rounded_lg()
-        .bg(rgb(theme_field()))
+        .bg(rgb(theme_row()))
         .border_1()
         .border_color(rgb(theme_border()))
-        .text_color(rgb(theme_accent()))
-        .text_center()
+        .flex()
+        .items_center()
+        .justify_center()
         .cursor(CursorStyle::PointingHand)
+        .aria_label(label.clone())
         .on_click(listener)
-        .child(theme_display_label(label.into()))
+        .child(
+            div()
+                .text_color(rgb(theme_text()))
+                .font_weight(gpui::FontWeight::MEDIUM)
+                .child(theme_display_label(label)),
+        )
 }
 
 fn disabled_action_button(id: &'static str, label: impl Into<SharedString>) -> impl IntoElement {
+    let label = label.into();
     div()
         .id(id)
         .w_full()
@@ -5969,9 +6003,17 @@ fn disabled_action_button(id: &'static str, label: impl Into<SharedString>) -> i
         .py_3()
         .rounded_lg()
         .bg(rgb(theme_disabled()))
-        .text_color(rgb(theme_muted()))
-        .text_center()
-        .child(theme_display_label(label.into()))
+        .border_1()
+        .border_color(rgb(theme_border()))
+        .flex()
+        .items_center()
+        .justify_center()
+        .aria_label(label.clone())
+        .child(
+            div()
+                .text_color(rgb(theme_muted()))
+                .child(theme_display_label(label)),
+        )
 }
 
 fn destructive_action_button(
@@ -5979,20 +6021,28 @@ fn destructive_action_button(
     label: impl Into<SharedString>,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
+    let label = label.into();
     div()
         .id(id)
         .w_full()
         .px_4()
         .py_3()
         .rounded_lg()
-        .bg(rgb(theme_field()))
+        .bg(rgb(theme_row()))
         .border_1()
         .border_color(rgb(theme_out()))
-        .text_color(rgb(theme_out()))
-        .text_center()
+        .flex()
+        .items_center()
+        .justify_center()
         .cursor(CursorStyle::PointingHand)
+        .aria_label(label.clone())
         .on_click(listener)
-        .child(theme_display_label(label.into()))
+        .child(
+            div()
+                .text_color(rgb(theme_out()))
+                .font_weight(gpui::FontWeight::MEDIUM)
+                .child(theme_display_label(label)),
+        )
 }
 
 fn secondary_action_button(
@@ -6000,19 +6050,27 @@ fn secondary_action_button(
     label: impl Into<SharedString>,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
+    let label = label.into();
     div()
         .id(id)
         .px_3()
         .py_2()
         .rounded_md()
-        .bg(rgb(theme_field()))
+        .bg(rgb(theme_row()))
         .border_1()
         .border_color(rgb(theme_border()))
         .text_sm()
-        .text_color(rgb(theme_accent()))
+        .flex()
+        .items_center()
+        .justify_center()
         .cursor(CursorStyle::PointingHand)
+        .aria_label(label.clone())
         .on_click(listener)
-        .child(theme_display_label(label.into()))
+        .child(
+            div()
+                .text_color(rgb(theme_text()))
+                .child(theme_display_label(label)),
+        )
 }
 
 fn wallet_action_button(
@@ -6030,16 +6088,19 @@ fn wallet_action_button(
         .h(px(56.))
         .rounded_lg()
         .bg(rgb(color))
-        .text_color(rgb(theme_button_text()))
-        .text_lg()
-        .font_weight(gpui::FontWeight::SEMIBOLD)
         .flex()
         .items_center()
         .justify_center()
         .cursor(CursorStyle::PointingHand)
         .aria_label(label)
         .on_click(listener)
-        .child(format!("{icon}  {display_label}"))
+        .child(
+            div()
+                .text_color(rgb(theme_button_text()))
+                .text_lg()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .child(format!("{icon}  {display_label}")),
+        )
 }
 
 fn initial_window_bounds(cx: &App) -> WindowBounds {
