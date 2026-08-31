@@ -37,17 +37,15 @@ pub fn send_exact(
     to_address: &str,
     amount: u64,
     from_subaddress: Option<u32>,
-) -> api::Result<SendResult> {
+) -> api::Result<(String, u64, u64)> {
     if let Some(recovered) = recover_pending(node_url)? {
-        return Ok(SendResult {
-            txid: recovered.txid,
-            fee: recovered.fee,
-        });
+        return Ok((recovered.txid, recovered.amount, recovered.fee));
     }
     let json =
         api::prepare_send_filtered(WALLET_ID, node_url, to_address, amount, from_subaddress)?;
     let prepared = api::parse_prepared(&json)?;
-    persist_and_relay(node_url, &json, prepared.fee)
+    let sent = persist_and_relay(node_url, &json, prepared.fee)?;
+    Ok((sent.txid, prepared.amount, sent.fee))
 }
 
 pub fn send_max(

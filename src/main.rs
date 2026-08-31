@@ -418,6 +418,8 @@ struct Home {
     send_from_subaddress: bool,
     send_source_index: u32,
     send_source_unlocked: Option<u64>,
+    /// True when the last subaddress balance fetch failed; last-known unlocked is retained.
+    send_source_balance_stale: bool,
     send_qr_busy: bool,
     recv_amount_mode: AmountMode,
     recv_amount: String,
@@ -571,6 +573,7 @@ impl Home {
             send_from_subaddress: false,
             send_source_index: 0,
             send_source_unlocked: None,
+            send_source_balance_stale: false,
             send_qr_busy: false,
             recv_amount_mode: AmountMode::Xmr,
             recv_amount: String::new(),
@@ -930,22 +933,29 @@ impl Home {
         self.send_from_subaddress.then_some(self.send_source_index)
     }
 
-    fn send_unlocked(&self) -> u64 {
+    fn send_unlocked(&self) -> Option<u64> {
         if self.send_from_subaddress {
-            self.send_source_unlocked.unwrap_or(0)
+            self.send_source_unlocked
         } else {
-            self.unlocked_piconero
+            Some(self.unlocked_piconero)
         }
     }
 
     fn refresh_send_source_balance(&mut self) {
         if !self.send_from_subaddress || !self.opened {
             self.send_source_unlocked = None;
+            self.send_source_balance_stale = false;
             return;
         }
         match api::get_balance_for_subaddress(WALLET_ID, self.send_source_index) {
-            Ok(balance) => self.send_source_unlocked = Some(balance.unlocked_piconero),
-            Err(_) => self.send_source_unlocked = None,
+            Ok(balance) => {
+                self.send_source_unlocked = Some(balance.unlocked_piconero);
+                self.send_source_balance_stale = false;
+            }
+            Err(_) => {
+                // Preserve last-known-good; never fabricate a zero on fetch failure.
+                self.send_source_balance_stale = true;
+            }
         }
     }
 
@@ -1116,12 +1126,25 @@ impl Home {
         self.clear_send_preview();
         self.refresh_send_source_balance();
         self.status = if self.send_from_subaddress {
-            format!(
-                "Spend from {} · unlocked {}.",
-                self.receive_book.display_label_for(self.send_source_index),
-                amount::format_xmr(self.send_unlocked())
-            )
-            .into()
+            match self.send_unlocked() {
+                Some(unlocked) if !self.send_source_balance_stale => format!(
+                    "Spend from {} · unlocked {}.",
+                    self.receive_book.display_label_for(self.send_source_index),
+                    amount::format_xmr(unlocked)
+                )
+                .into(),
+                Some(unlocked) => format!(
+                    "Spend from {} · unlocked {} (stale).",
+                    self.receive_book.display_label_for(self.send_source_index),
+                    amount::format_xmr(unlocked)
+                )
+                .into(),
+                None => format!(
+                    "Spend from {} · unlocked unavailable.",
+                    self.receive_book.display_label_for(self.send_source_index)
+                )
+                .into(),
+            }
         } else {
             l10n::t("Spend from the whole wallet.").into()
         };
@@ -1136,12 +1159,25 @@ impl Home {
         self.send_max = false;
         self.clear_send_preview();
         self.refresh_send_source_balance();
-        self.status = format!(
-            "Spend from {} · unlocked {}.",
-            self.receive_book.display_label_for(self.send_source_index),
-            amount::format_xmr(self.send_unlocked())
-        )
-        .into();
+        self.status = match self.send_unlocked() {
+            Some(unlocked) if !self.send_source_balance_stale => format!(
+                "Spend from {} · unlocked {}.",
+                self.receive_book.display_label_for(self.send_source_index),
+                amount::format_xmr(unlocked)
+            )
+            .into(),
+            Some(unlocked) => format!(
+                "Spend from {} · unlocked {} (stale).",
+                self.receive_book.display_label_for(self.send_source_index),
+                amount::format_xmr(unlocked)
+            )
+            .into(),
+            None => format!(
+                "Spend from {} · unlocked unavailable.",
+                self.receive_book.display_label_for(self.send_source_index)
+            )
+            .into(),
+        };
         cx.notify();
     }
 
@@ -2067,7 +2103,12 @@ impl Home {
         }
         self.send_max = true;
         self.send_amount_mode = AmountMode::Xmr;
-        self.send_amount = amount::format_for_input(self.send_unlocked());
+        let Some(unlocked) = self.send_unlocked() else {
+            self.status = l10n::t("Unlocked balance unavailable for this subaddress.").into();
+            cx.notify();
+            return;
+        };
+        self.send_amount = amount::format_for_input(unlocked);
         self.clear_send_preview();
         self.status = l10n::t("Send max · Preview to see the sweep amount and fee.").into();
         cx.notify();
@@ -2102,7 +2143,12 @@ impl Home {
             }
         };
         if let Some(amt) = amount {
-            if amt > self.send_unlocked() {
+            let Some(unlocked) = self.send_unlocked() else {
+                self.status = l10n::t("Unlocked balance unavailable for this subaddress.").into();
+                cx.notify();
+                return;
+            };
+            if amt > unlocked {
                 self.status = l10n::t("Amount is larger than unlocked balance.").into();
                 cx.notify();
                 return;
@@ -2191,10 +2237,17 @@ impl Home {
                 }
             }
         };
-        if !is_max && !api::has_unlocked_for_exact_send(amount, fee, self.send_unlocked()) {
-            self.status = l10n::t("Unlocked balance cannot cover amount + fee.").into();
-            cx.notify();
-            return;
+        if !is_max {
+            let Some(unlocked) = self.send_unlocked() else {
+                self.status = l10n::t("Unlocked balance unavailable for this subaddress.").into();
+                cx.notify();
+                return;
+            };
+            if !api::has_unlocked_for_exact_send(amount, fee, unlocked) {
+                self.status = l10n::t("Unlocked balance cannot cover amount + fee.").into();
+                cx.notify();
+                return;
+            }
         }
         if !self.authenticate_if_required("Authenticate to send Monero", cx) {
             return;
@@ -2213,7 +2266,6 @@ impl Home {
                         send_flow::send_max(&node, &dest, from)
                     } else {
                         send_flow::send_exact(&node, &dest, amount, from)
-                            .map(|r| (r.txid, amount, r.fee))
                     }
                 })
                 .await;
@@ -2742,6 +2794,7 @@ impl Home {
         self.send_from_subaddress = false;
         self.send_source_index = 0;
         self.send_source_unlocked = None;
+        self.send_source_balance_stale = false;
         self.send_qr_busy = false;
         self.clear_send_preview();
         self.recv_amount.clear();
@@ -4581,19 +4634,31 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
             line
         }
         _ => {
-            let unlocked = home.send_unlocked();
-            let mut line = if home.send_from_subaddress {
-                format!(
+            let mut line = match home.send_unlocked() {
+                Some(unlocked) if home.send_from_subaddress && home.send_source_balance_stale => {
+                    format!(
+                        "Unlocked {} (stale) · {}",
+                        amount::format_xmr(unlocked),
+                        home.receive_book.display_label_for(home.send_source_index)
+                    )
+                }
+                Some(unlocked) if home.send_from_subaddress => format!(
                     "Unlocked {} · {}",
                     amount::format_xmr(unlocked),
                     home.receive_book.display_label_for(home.send_source_index)
-                )
-            } else {
-                format!("Unlocked {}", amount::format_xmr(unlocked))
+                ),
+                Some(unlocked) => format!("Unlocked {}", amount::format_xmr(unlocked)),
+                None if home.send_from_subaddress => format!(
+                    "Unlocked unavailable · {}",
+                    home.receive_book.display_label_for(home.send_source_index)
+                ),
+                None => "Unlocked unavailable".into(),
             };
-            if let Some(fiat) = home.fiat_line(unlocked) {
-                line.push_str("  ·  ");
-                line.push_str(&fiat);
+            if let Some(unlocked) = home.send_unlocked() {
+                if let Some(fiat) = home.fiat_line(unlocked) {
+                    line.push_str("  ·  ");
+                    line.push_str(&fiat);
+                }
             }
             line
         }

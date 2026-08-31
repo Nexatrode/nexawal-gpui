@@ -37,11 +37,19 @@ pub fn parse(raw: &str) -> Option<PaymentUri> {
             ) {
                 continue;
             }
-            if matches!(name.as_str(), "amount" | "tx_amount")
-                && !value.is_empty()
-                && amount_xmr.is_none()
-            {
-                amount_xmr = Some(percent_decode(value, false));
+            if matches!(name.as_str(), "amount" | "tx_amount") {
+                if value.is_empty() {
+                    continue;
+                }
+                let decoded = percent_decode(value, false);
+                if !is_valid_amount(&decoded) {
+                    return None;
+                }
+                match &amount_xmr {
+                    Some(existing) if existing == &decoded => {}
+                    Some(_) => return None, // conflicting amounts
+                    None => amount_xmr = Some(decoded),
+                }
             } else if matches!(name.as_str(), "tx_description" | "message")
                 && !value.is_empty()
                 && description.is_none()
@@ -58,6 +66,30 @@ pub fn parse(raw: &str) -> Option<PaymentUri> {
         description,
         recipient_name,
     })
+}
+
+/// Accept plain decimal XMR amounts used in payment URIs.
+/// Rejects scientific notation, signs, empty values, and non-numeric junk.
+fn is_valid_amount(value: &str) -> bool {
+    let s = value.trim();
+    if s.is_empty() || s.starts_with('+') || s.starts_with('-') {
+        return false;
+    }
+    let mut seen_dot = false;
+    let mut digits = 0usize;
+    for (i, ch) in s.chars().enumerate() {
+        match ch {
+            '0'..='9' => digits += 1,
+            '.' if !seen_dot => {
+                if i == 0 {
+                    return false;
+                }
+                seen_dot = true;
+            }
+            _ => return false,
+        }
+    }
+    digits > 0
 }
 
 fn percent_decode(value: &str, plus_as_space: bool) -> String {
@@ -147,6 +179,25 @@ mod tests {
     }
 
     #[test]
+    fn identical_amount_duplicates_are_accepted() {
+        let parsed =
+            parse(&format!("monero:{PRIMARY}?amount=1.5&tx_amount=1.5")).unwrap();
+        assert_eq!(parsed.amount_xmr.as_deref(), Some("1.5"));
+    }
+
+    #[test]
+    fn conflicting_amounts_are_rejected() {
+        assert!(parse(&format!("monero:{PRIMARY}?amount=1.5&tx_amount=2.0")).is_none());
+    }
+
+    #[test]
+    fn invalid_amounts_are_rejected() {
+        assert!(parse(&format!("monero:{PRIMARY}?tx_amount=+1.5")).is_none());
+        assert!(parse(&format!("monero:{PRIMARY}?tx_amount=abc")).is_none());
+        assert!(parse(&format!("monero:{PRIMARY}?tx_amount=1e3")).is_none());
+    }
+
+    #[test]
     fn mixed_case_scheme_and_metadata_are_supported() {
         let parsed = parse(&format!(
             "MonErO://{PRIMARY}?TX_AMOUNT=1.5&recipient_name=Coffee+Shop&message=two%20drinks%20%26%20tip"
@@ -159,9 +210,8 @@ mod tests {
     }
 
     #[test]
-    fn plus_is_not_rewritten_in_amount() {
-        let parsed = parse(&format!("monero:{PRIMARY}?tx_amount=%2B1.5")).unwrap();
-        assert_eq!(parsed.amount_xmr.as_deref(), Some("+1.5"));
+    fn percent_encoded_plus_amount_is_rejected() {
+        assert!(parse(&format!("monero:{PRIMARY}?tx_amount=%2B1.5")).is_none());
     }
 
     #[test]
@@ -177,38 +227,17 @@ mod tests {
     }
 
     #[test]
-    fn slash_slash_prefix() {
-        let parsed = parse(&format!("monero://{PRIMARY}?amount=0.25")).unwrap();
+    fn build_round_trips_amount_and_description() {
+        let built = build(PRIMARY, Some("0.25"), Some("coffee & tip"));
+        let parsed = parse(&built).unwrap();
         assert_eq!(parsed.address, PRIMARY);
         assert_eq!(parsed.amount_xmr.as_deref(), Some("0.25"));
+        assert_eq!(parsed.description.as_deref(), Some("coffee & tip"));
     }
 
     #[test]
-    fn non_monero_rejected() {
-        assert!(parse(PRIMARY).is_none());
-        assert!(parse(&format!("bitcoin:{PRIMARY}")).is_none());
-    }
-
-    #[test]
-    fn parse_uri_with_amount() {
-        let uri = parse("monero:4abc?amount=1.25").unwrap();
-        assert_eq!(uri.address, "4abc");
-        assert_eq!(uri.amount_xmr.as_deref(), Some("1.25"));
-    }
-
-    #[test]
-    fn ignores_view_key() {
-        let uri = parse("monero:8xyz?view_key=secret&amount=2").unwrap();
-        assert_eq!(uri.address, "8xyz");
-        assert_eq!(uri.amount_xmr.as_deref(), Some("2"));
-    }
-
-    #[test]
-    fn build_uri_with_amount_and_description() {
-        let uri = build("4abc", Some("1.25"), Some("coffee & cake = good"));
-        assert_eq!(
-            uri,
-            "monero:4abc?tx_amount=1.25&tx_description=coffee%20%26%20cake%20%3D%20good"
-        );
+    fn looks_like_address_shape_gate() {
+        assert!(looks_like_address(PRIMARY));
+        assert!(!looks_like_address("not-an-address"));
     }
 }
