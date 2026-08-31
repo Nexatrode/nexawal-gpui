@@ -5880,30 +5880,65 @@ mod transfer_detail_tests {
     }
 }
 
+fn button_label_font() -> &'static str {
+    // Neon page chrome keeps Menlo; action labels use the system UI face.
+    match active_theme() {
+        Theme::Classic => theme_font_family(),
+        Theme::Neon => ".SystemUIFont",
+    }
+}
+
+/// Clickable row with label text on a *non-interactive* child.
+///
+/// Neon Settings painted empty boxes when the label SharedString/String was a
+/// direct child of an `on_click` row inside the main scroll view. Section titles
+/// (non-interactive) in the same scroll painted fine; sidebar clickable rows
+/// outside the scroll also painted fine. Keep the hit target on the outer node
+/// and mirror the section-title text path on the inner node.
+fn clickable_settings_row(
+    id: &'static str,
+    label: impl Into<SharedString>,
+    filled: bool,
+    destructive: bool,
+    listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    let label = label.into();
+    let display = theme_display_label(label.clone()).to_string();
+    let (fill, border, fg) = if filled {
+        (theme_accent(), theme_accent(), theme_button_text())
+    } else if destructive {
+        (theme_row(), theme_out(), theme_out())
+    } else {
+        (theme_row(), theme_accent(), theme_text())
+    };
+    div()
+        .id(id)
+        .w_full()
+        .px_2()
+        .py_2()
+        .rounded_md()
+        .bg(rgb(fill))
+        .border_1()
+        .border_color(rgb(border))
+        .cursor(CursorStyle::PointingHand)
+        .aria_label(label)
+        .on_click(listener)
+        .child(
+            div()
+                .w_full()
+                .text_sm()
+                .font_family(button_label_font())
+                .text_color(rgb(fg))
+                .child(display),
+        )
+}
+
 fn action_button(
     id: &'static str,
     label: impl Into<SharedString>,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
-    let label = label.into();
-    // Use a plain String child on the same node as `text_color` (sidebar pattern).
-    // Nested SharedString + text_center previously painted blank under Neon/Menlo.
-    let display = theme_display_label(label.clone()).to_string();
-    div()
-        .id(id)
-        .px_3()
-        .py_2()
-        .rounded_md()
-        .bg(rgb(theme_accent()))
-        .text_color(rgb(theme_button_text()))
-        .font_weight(gpui::FontWeight::SEMIBOLD)
-        .flex()
-        .items_center()
-        .justify_center()
-        .cursor(CursorStyle::PointingHand)
-        .aria_label(label)
-        .on_click(listener)
-        .child(display)
+    clickable_settings_row(id, label, true, false, listener)
 }
 
 fn page_title(label: impl Into<SharedString>) -> impl IntoElement {
@@ -5940,25 +5975,7 @@ fn wide_primary_action_button(
     label: impl Into<SharedString>,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
-    let label = label.into();
-    let display = theme_display_label(label.clone()).to_string();
-    div()
-        .id(id)
-        .w_full()
-        .px_4()
-        .py_3()
-        .min_h(px(44.))
-        .rounded_lg()
-        .bg(rgb(theme_accent()))
-        .text_color(rgb(theme_button_text()))
-        .font_weight(gpui::FontWeight::SEMIBOLD)
-        .flex()
-        .items_center()
-        .justify_center()
-        .cursor(CursorStyle::PointingHand)
-        .aria_label(label)
-        .on_click(listener)
-        .child(display)
+    clickable_settings_row(id, label, true, false, listener)
 }
 
 fn wide_secondary_action_button(
@@ -5966,27 +5983,7 @@ fn wide_secondary_action_button(
     label: impl Into<SharedString>,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
-    let label = label.into();
-    let display = theme_display_label(label.clone()).to_string();
-    div()
-        .id(id)
-        .w_full()
-        .px_4()
-        .py_3()
-        .min_h(px(44.))
-        .rounded_lg()
-        .bg(rgb(theme_row()))
-        .border_1()
-        .border_color(rgb(theme_accent()))
-        .text_color(rgb(theme_text()))
-        .font_weight(gpui::FontWeight::SEMIBOLD)
-        .flex()
-        .items_center()
-        .justify_center()
-        .cursor(CursorStyle::PointingHand)
-        .aria_label(label)
-        .on_click(listener)
-        .child(display)
+    clickable_settings_row(id, label, false, false, listener)
 }
 
 fn disabled_action_button(id: &'static str, label: impl Into<SharedString>) -> impl IntoElement {
@@ -5995,19 +5992,21 @@ fn disabled_action_button(id: &'static str, label: impl Into<SharedString>) -> i
     div()
         .id(id)
         .w_full()
-        .px_4()
-        .py_3()
-        .min_h(px(44.))
-        .rounded_lg()
+        .px_2()
+        .py_2()
+        .rounded_md()
         .bg(rgb(theme_disabled()))
         .border_1()
         .border_color(rgb(theme_border()))
-        .text_color(rgb(theme_muted()))
-        .flex()
-        .items_center()
-        .justify_center()
         .aria_label(label)
-        .child(display)
+        .child(
+            div()
+                .w_full()
+                .text_sm()
+                .font_family(button_label_font())
+                .text_color(rgb(theme_muted()))
+                .child(display),
+        )
 }
 
 fn destructive_action_button(
@@ -6015,27 +6014,7 @@ fn destructive_action_button(
     label: impl Into<SharedString>,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
-    let label = label.into();
-    let display = theme_display_label(label.clone()).to_string();
-    div()
-        .id(id)
-        .w_full()
-        .px_4()
-        .py_3()
-        .min_h(px(44.))
-        .rounded_lg()
-        .bg(rgb(theme_row()))
-        .border_1()
-        .border_color(rgb(theme_out()))
-        .text_color(rgb(theme_out()))
-        .font_weight(gpui::FontWeight::SEMIBOLD)
-        .flex()
-        .items_center()
-        .justify_center()
-        .cursor(CursorStyle::PointingHand)
-        .aria_label(label)
-        .on_click(listener)
-        .child(display)
+    clickable_settings_row(id, label, false, true, listener)
 }
 
 fn secondary_action_button(
@@ -6043,25 +6022,7 @@ fn secondary_action_button(
     label: impl Into<SharedString>,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
-    let label = label.into();
-    let display = theme_display_label(label.clone()).to_string();
-    div()
-        .id(id)
-        .px_3()
-        .py_2()
-        .rounded_md()
-        .bg(rgb(theme_row()))
-        .border_1()
-        .border_color(rgb(theme_accent()))
-        .text_sm()
-        .text_color(rgb(theme_text()))
-        .flex()
-        .items_center()
-        .justify_center()
-        .cursor(CursorStyle::PointingHand)
-        .aria_label(label)
-        .on_click(listener)
-        .child(display)
+    clickable_settings_row(id, label, false, false, listener)
 }
 
 fn wallet_action_button(
@@ -6079,16 +6040,21 @@ fn wallet_action_button(
         .h(px(56.))
         .rounded_lg()
         .bg(rgb(color))
-        .text_color(rgb(theme_button_text()))
-        .text_lg()
-        .font_weight(gpui::FontWeight::SEMIBOLD)
-        .flex()
-        .items_center()
-        .justify_center()
         .cursor(CursorStyle::PointingHand)
         .aria_label(label)
         .on_click(listener)
-        .child(display)
+        .child(
+            div()
+                .w_full()
+                .h_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .text_lg()
+                .font_family(button_label_font())
+                .text_color(rgb(theme_button_text()))
+                .child(display),
+        )
 }
 
 fn initial_window_bounds(cx: &App) -> WindowBounds {
