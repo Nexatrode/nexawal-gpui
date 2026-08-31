@@ -5803,6 +5803,8 @@ mod transfer_detail_tests {
             timestamp: Some(1_735_689_600),
             confirmations: 3,
             is_pending: false,
+            subaddress_major: None,
+            subaddress_minor: None,
         }];
         let csv = transfer_history_csv(&rows);
         assert!(csv.starts_with("direction,amount_xmr,amount_piconero"));

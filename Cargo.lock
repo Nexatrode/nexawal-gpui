@@ -346,7 +346,7 @@ dependencies = [
  "polling",
  "rustix 1.1.4",
  "slab",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -415,7 +415,7 @@ dependencies = [
  "rustix 1.1.4",
  "signal-hook-registry",
  "slab",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2844,7 +2844,7 @@ version = "0.5.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc627f471c528ff0c4a49e1d5e60450c8f6461dd6d10ba9dcd3a61d3dff7728d"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -3712,7 +3712,7 @@ checksum = "30d65c71f1ce40ab09135ce117d742b9f8a19ff91a41a8b57ed50bc2de59c427"
 dependencies = [
  "libc",
  "wasi",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -4848,7 +4848,7 @@ dependencies = [
  "hermit-abi",
  "pin-project-lite",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -6043,7 +6043,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6089,7 +6089,7 @@ dependencies = [
  "cfg-if 1.0.4",
  "libc",
  "psm",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6404,7 +6404,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6772,7 +6772,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7057,7 +7057,7 @@ dependencies = [
 [[package]]
 name = "walletcore"
 version = "0.1.2"
-source = "git+https://github.com/cacaosteve/MoneroWalletCoreFFI.git?rev=80940e383fe449f4a6ff3a07e5221c0c378ae997#80940e383fe449f4a6ff3a07e5221c0c378ae997"
+source = "git+https://github.com/cacaosteve/MoneroWalletCoreFFI.git?rev=4f9aecefc3949fd8a35415b50da47c053b56ff14#4f9aecefc3949fd8a35415b50da47c053b56ff14"
 dependencies = [
  "bincode",
  "bytes",
@@ -7542,7 +7542,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
