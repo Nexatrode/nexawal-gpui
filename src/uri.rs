@@ -24,6 +24,7 @@ pub fn parse(raw: &str) -> Option<PaymentUri> {
         return None;
     }
     let mut amount_xmr = None;
+    let mut amount_piconero: Option<u64> = None;
     let mut description = None;
     let mut recipient_name = None;
     if let Some(query) = query {
@@ -42,13 +43,16 @@ pub fn parse(raw: &str) -> Option<PaymentUri> {
                     continue;
                 }
                 let decoded = percent_decode(value, false);
-                if !is_valid_amount(&decoded) {
+                let Some(pico) = parse_amount_piconero(&decoded) else {
                     return None;
-                }
-                match &amount_xmr {
-                    Some(existing) if existing == &decoded => {}
+                };
+                match amount_piconero {
+                    Some(existing) if existing == pico => {}
                     Some(_) => return None, // conflicting amounts
-                    None => amount_xmr = Some(decoded),
+                    None => {
+                        amount_piconero = Some(pico);
+                        amount_xmr = Some(decoded);
+                    }
                 }
             } else if matches!(name.as_str(), "tx_description" | "message")
                 && !value.is_empty()
@@ -60,6 +64,7 @@ pub fn parse(raw: &str) -> Option<PaymentUri> {
             }
         }
     }
+    let _ = amount_piconero;
     Some(PaymentUri {
         address,
         amount_xmr,
@@ -68,28 +73,36 @@ pub fn parse(raw: &str) -> Option<PaymentUri> {
     })
 }
 
-/// Accept plain decimal XMR amounts used in payment URIs.
-/// Rejects scientific notation, signs, empty values, and non-numeric junk.
-fn is_valid_amount(value: &str) -> bool {
+/// Parse a plain decimal XMR amount into piconero (1 XMR = 1e12).
+///
+/// Rules: no sign/exponent, at most 12 fractional digits, checked `u64` range.
+pub fn parse_amount_piconero(value: &str) -> Option<u64> {
     let s = value.trim();
     if s.is_empty() || s.starts_with('+') || s.starts_with('-') {
-        return false;
+        return None;
     }
-    let mut seen_dot = false;
-    let mut digits = 0usize;
-    for (i, ch) in s.chars().enumerate() {
-        match ch {
-            '0'..='9' => digits += 1,
-            '.' if !seen_dot => {
-                if i == 0 {
-                    return false;
-                }
-                seen_dot = true;
-            }
-            _ => return false,
-        }
+    let (whole_s, frac_s) = match s.split_once('.') {
+        Some((w, f)) => (w, f),
+        None => (s, ""),
+    };
+    if whole_s.is_empty() || !whole_s.chars().all(|c| c.is_ascii_digit()) {
+        return None;
     }
-    digits > 0
+    if frac_s.len() > 12 || !frac_s.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    let whole: u64 = whole_s.parse().ok()?;
+    let mut frac: u64 = if frac_s.is_empty() {
+        0
+    } else {
+        frac_s.parse().ok()?
+    };
+    // Scale fractional part to 12 digits.
+    for _ in frac_s.len()..12 {
+        frac = frac.checked_mul(10)?;
+    }
+    let whole_pico = whole.checked_mul(1_000_000_000_000)?;
+    whole_pico.checked_add(frac)
 }
 
 fn percent_decode(value: &str, plus_as_space: bool) -> String {
@@ -183,6 +196,21 @@ mod tests {
         let parsed =
             parse(&format!("monero:{PRIMARY}?amount=1.5&tx_amount=1.5")).unwrap();
         assert_eq!(parsed.amount_xmr.as_deref(), Some("1.5"));
+    }
+
+    #[test]
+    fn equivalent_amount_aliases_normalize_to_same_piconero() {
+        let parsed =
+            parse(&format!("monero:{PRIMARY}?amount=1.5&tx_amount=1.500")).unwrap();
+        assert_eq!(parsed.amount_xmr.as_deref(), Some("1.5"));
+        assert_eq!(parse_amount_piconero("1.5"), parse_amount_piconero("1.500"));
+        assert_eq!(parse_amount_piconero("1.5"), Some(1_500_000_000_000));
+    }
+
+    #[test]
+    fn more_than_twelve_fractional_digits_rejected() {
+        assert!(parse_amount_piconero("1.1234567890123").is_none());
+        assert!(parse(&format!("monero:{PRIMARY}?tx_amount=1.1234567890123")).is_none());
     }
 
     #[test]
