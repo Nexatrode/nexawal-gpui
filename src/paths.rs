@@ -5,7 +5,25 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub const CURRENT_TERMS_VERSION: u32 = 1;
 pub const DEFAULT_NODE: &str = "https://rpc.nexatrode.com";
 
+#[cfg(all(test, feature = "ui-tests"))]
+thread_local! {
+    static TEST_DATA_DIR: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) };
+}
+
+/// UI lifecycle fixtures must never read a developer's wallet files or Keychain marker.
+#[cfg(all(test, feature = "ui-tests"))]
+pub(crate) fn with_test_data_dir<T>(path: PathBuf, test: impl FnOnce() -> T) -> T {
+    struct Reset(Option<PathBuf>);
+    impl Drop for Reset {
+        fn drop(&mut self) { TEST_DATA_DIR.with(|value| *value.borrow_mut() = self.0.take()); }
+    }
+    let _reset = Reset(TEST_DATA_DIR.with(|value| value.replace(Some(path))));
+    test()
+}
+
 pub fn data_dir() -> PathBuf {
+    #[cfg(all(test, feature = "ui-tests"))]
+    if let Some(path) = TEST_DATA_DIR.with(|value| value.borrow().clone()) { return path; }
     dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("nexawal")
@@ -219,11 +237,32 @@ pub fn append_scan_benchmark(line: &str) -> std::io::Result<()> {
 }
 
 pub fn load_cache() -> std::io::Result<Option<Vec<u8>>> {
-    match fs::read(cache_path()) {
+    match read_bounded_file(&cache_path(), 128 * 1024 * 1024) {
         Ok(bytes) => Ok(Some(bytes)),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(error),
     }
+}
+
+fn read_bounded_file(path: &Path, limit: u64) -> std::io::Result<Vec<u8>> {
+    use std::io::Read;
+    let file = fs::File::open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file() || metadata.len() > limit {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "wallet file exceeds size limit or is not a regular file",
+        ));
+    }
+    let mut bytes = Vec::new();
+    file.take(limit + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > limit {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "wallet file grew beyond size limit",
+        ));
+    }
+    Ok(bytes)
 }
 
 pub fn save_cache(bytes: &[u8]) -> std::io::Result<()> {
@@ -317,7 +356,10 @@ pub fn load_pending_send() -> std::io::Result<Option<String>> {
 }
 
 fn load_pending_send_at(path: &Path) -> std::io::Result<Option<String>> {
-    match fs::read_to_string(path) {
+    match read_bounded_file(path, 8 * 1024 * 1024).and_then(|bytes| {
+        String::from_utf8(bytes)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    }) {
         Ok(raw) => {
             let trimmed = raw.trim();
             if trimmed.is_empty() {
@@ -339,6 +381,14 @@ pub fn save_pending_send(json: &str) -> std::io::Result<()> {
 
 pub fn clear_pending_send() {
     let _ = fs::remove_file(pending_send_path());
+}
+
+pub fn archive_pending_send() -> std::io::Result<Option<PathBuf>> {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    quarantine_rejected_file_at(&pending_send_path(), timestamp)
 }
 
 pub fn mark_wallet_stored(restore_height: u64) -> std::io::Result<()> {
@@ -533,6 +583,16 @@ fn write_bytes_with(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn bounded_wallet_reads_reject_oversize_and_accept_exact_limit() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("bounded.cache");
+        std::fs::write(&path, [1, 2, 3, 4]).unwrap();
+        assert_eq!(super::read_bounded_file(&path, 4).unwrap().len(), 4);
+        assert!(super::read_bounded_file(&path, 3).is_err());
+        assert!(super::read_bounded_file(directory.path(), 4).is_err());
+    }
+
     use std::fs;
     use std::io::{Error, ErrorKind, Write};
 

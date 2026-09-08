@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::fs;
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering as AtomicOrdering};
@@ -24,6 +23,8 @@ mod daemon;
 mod device_auth;
 mod fiat;
 mod fiat_snapshot;
+mod history;
+mod history_focus;
 mod l10n;
 mod legal;
 mod network;
@@ -38,6 +39,9 @@ mod sync_status;
 mod text_field;
 mod uri;
 mod wallet_store;
+
+#[cfg(all(test, feature = "ui-tests"))]
+mod lock_tests;
 
 actions!(
     nexawal,
@@ -300,6 +304,8 @@ enum Field {
     RecvDesc,
     RecvLabel,
     TransferSearch,
+    HistoryFrom,
+    HistoryTo,
     Challenge,
     I2pNode,
     I2pProxy,
@@ -316,6 +322,7 @@ enum Screen {
     Terms,
     Restore,
     Wallet,
+    Transactions,
     Receive,
     Send,
     Settings,
@@ -333,6 +340,7 @@ enum TransferFilter {
     All,
     Received,
     Sent,
+    Pending,
 }
 
 struct Home {
@@ -382,10 +390,12 @@ struct Home {
     unlocked_piconero: u64,
     sync: Option<SyncStatus>,
     transfers: Vec<Transfer>,
-    selected_transfer: Option<usize>,
+    history_pages: history::Pager,
+    transfer_from: String,
+    transfer_to: String,
     transfer_filter: TransferFilter,
     transfer_search: String,
-    transfer_search_focus: FocusHandle,
+    history_focus: history_focus::HistoryFocus,
     theme: Theme,
     last_exported_scanned: Option<u64>,
     last_cache_persist_at: Option<Instant>,
@@ -413,7 +423,8 @@ struct Home {
     send_description: String,
     send_recipient_name: String,
     send_max: bool,
-    send_busy: bool,
+    send_operation: send_flow::SessionOperation,
+    send_preview_epoch: send_flow::PreviewEpoch,
     send_fee: Option<u64>,
     send_preview_amount: Option<u64>,
     send_amount_mode: AmountMode,
@@ -494,7 +505,7 @@ impl Home {
             recv_amount_focus: cx.focus_handle(),
             recv_desc_focus: cx.focus_handle(),
             recv_label_focus: cx.focus_handle(),
-            transfer_search_focus: cx.focus_handle(),
+            history_focus: history_focus::HistoryFocus::new(cx),
             challenge_focus: cx.focus_handle(),
             i2p_rpc_focus: cx.focus_handle(),
             i2p_proxy_focus: cx.focus_handle(),
@@ -538,7 +549,9 @@ impl Home {
             unlocked_piconero: 0,
             sync: None,
             transfers: Vec::new(),
-            selected_transfer: None,
+            history_pages: history::Pager::default(),
+            transfer_from: String::new(),
+            transfer_to: String::new(),
             transfer_filter: TransferFilter::All,
             transfer_search: String::new(),
             last_exported_scanned: None,
@@ -568,7 +581,8 @@ impl Home {
             send_description: String::new(),
             send_recipient_name: String::new(),
             send_max: false,
-            send_busy: false,
+            send_operation: send_flow::SessionOperation::default(),
+            send_preview_epoch: send_flow::PreviewEpoch::default(),
             send_fee: None,
             send_preview_amount: None,
             send_amount_mode: AmountMode::Xmr,
@@ -969,146 +983,92 @@ impl Home {
         self.refresh_send_source_balance();
     }
 
-    fn refresh_transfers_snapshot(&mut self) {
-        let Ok(mut rows) = api::list_transfers(WALLET_ID) else {
-            return;
-        };
-        sort_transfers(&mut rows);
-        if self.fiat_enabled {
-            let rate = self.live_rate().cloned();
-            let opted_in = paths::ensure_fiat_opted_in_at();
-            self.fiat_snapshots.record_new_transfers(
-                rows.iter().map(|t| (t.txid.as_str(), t.timestamp)),
-                rate.as_ref(),
-                opted_in,
-            );
-        }
-        if self
-            .selected_transfer
-            .is_some_and(|index| index >= rows.len())
-        {
-            self.selected_transfer = None;
-        }
-        self.transfers = rows;
-    }
-
-    fn refresh_wallet_snapshots(&mut self, cx: &mut Context<Self>) {
-        if !self.opened {
-            self.status = l10n::t("Open a wallet before refreshing transfers.").into();
-            cx.notify();
-            return;
-        }
-        self.refresh_balance_snapshot();
-        self.refresh_transfers_snapshot();
-        self.status = l10n::t("Transfers and balance refreshed.").into();
-        cx.notify();
-    }
-
-    fn select_transfer(&mut self, index: usize, cx: &mut Context<Self>) {
-        if index >= self.transfers.len() {
-            return;
-        }
-        self.selected_transfer = (self.selected_transfer != Some(index)).then_some(index);
-        cx.notify();
-    }
-
-    fn set_transfer_filter(&mut self, filter: TransferFilter, cx: &mut Context<Self>) {
-        self.transfer_filter = filter;
-        if let Some(index) = self.selected_transfer {
-            let matches = self
-                .transfers
-                .get(index)
-                .is_some_and(|row| transfer_matches_filter(row, filter));
-            if !matches {
-                self.selected_transfer = None;
-            }
-        }
-        cx.notify();
-    }
-
-    fn copy_transfer_txid(&mut self, index: usize, cx: &mut Context<Self>) {
-        let Some(row) = self.transfers.get(index) else {
-            return;
-        };
-        cx.write_to_clipboard(gpui::ClipboardItem::new_string(row.txid.clone()));
-        self.status = l10n::t("Transaction ID copied.").into();
-        cx.notify();
-    }
-
-    fn copy_transfer_amount(&mut self, index: usize, cx: &mut Context<Self>) {
-        let Some(row) = self.transfers.get(index) else {
-            return;
-        };
-        cx.write_to_clipboard(gpui::ClipboardItem::new_string(format_xmr(row.amount)));
-        self.status = l10n::t("Transaction amount copied.").into();
-        cx.notify();
-    }
-
     fn focus_history_search(
         &mut self,
         _: &FocusHistorySearch,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.opened && self.screen == Screen::Wallet {
+        if self.opened {
+            self.go_history(cx);
             self.focus_field(Field::TransferSearch, window, cx);
         }
     }
 
     fn export_transfer_history(&mut self, cx: &mut Context<Self>) {
-        let filter = self.transfer_filter;
-        let search = self.transfer_search.trim().to_lowercase();
-        let rows: Vec<Transfer> = self
-            .transfers
-            .iter()
-            .filter(|row| {
-                transfer_matches_filter(row, filter) && transfer_matches_search(row, &search)
-            })
-            .cloned()
-            .collect();
-        if rows.is_empty() {
-            self.status = l10n::t("There are no visible transfers to export.").into();
-            cx.notify();
-            return;
-        }
-
-        let csv = transfer_history_csv(&rows);
-        let save_dialog = cx.prompt_for_new_path(&paths::data_dir(), Some("nexawal-history.csv"));
-        self.status = l10n::t("Choose where to save the transaction CSV…").into();
-        cx.notify();
+        let mut query = match self.history_query() {
+            Ok(query) => query,
+            Err(error) => {
+                self.status = error.into();
+                cx.notify();
+                return;
+            }
+        };
+        query.limit = 200;
+        let dialog = cx.prompt_for_new_path(&paths::data_dir(), Some("nexawal-history.csv"));
+        let address = self.address.clone();
+        let generation = self.history_pages.generation;
         cx.spawn(async move |this, cx| {
-            let picked = save_dialog.await;
-            let path = match picked {
-                Ok(Ok(Some(path))) => path,
-                Ok(Ok(None)) => {
-                    let _ = this.update(cx, |this, cx| {
-                        this.status = l10n::t("Transaction export cancelled.").into();
-                        cx.notify();
-                    });
-                    return;
-                }
-                _ => {
-                    let _ = this.update(cx, |this, cx| {
-                        this.status = l10n::t("Could not open the save dialog.").into();
-                        cx.notify();
-                    });
-                    return;
-                }
+            let Ok(Ok(Some(path))) = dialog.await else {
+                return;
             };
-            let write_path = path.clone();
+            let valid = this
+                .update(cx, |this, _| {
+                    this.opened
+                        && this.address == address
+                        && this.history_pages.generation == generation
+                })
+                .unwrap_or(false);
+            if !valid {
+                return;
+            }
             let result = cx
                 .background_executor()
-                .spawn(async move { fs::write(write_path, csv) })
+                .spawn(async move {
+                    let mut rows = Vec::new();
+                    loop {
+                        let page =
+                            api::query_transfers(WALLET_ID, &query).map_err(|e| e.to_string())?;
+                        rows.extend(page.transfers);
+                        let Some(offset) = page.next_offset else {
+                            break;
+                        };
+                        query.offset = offset;
+                        query.revision = Some(page.revision);
+                    }
+                    // Intentional full export, not the four-page UI cache. A history change aborts
+                    // before writing, rather than producing a mixed-revision/truncated CSV.
+                    Ok::<_, String>((rows.len(), transfer_history_csv(&rows)))
+                })
+                .await;
+            let valid = this
+                .update(cx, |this, _| {
+                    this.opened
+                        && this.address == address
+                        && this.history_pages.generation == generation
+                })
+                .unwrap_or(false);
+            if !valid {
+                return;
+            }
+            let result = cx
+                .background_executor()
+                .spawn(async move {
+                    let (count, csv) = result?;
+                    fs::write(&path, csv).map_err(|e| e.to_string())?;
+                    Ok::<_, String>((count, path))
+                })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 this.status = match result {
-                    Ok(()) => format!(
-                        "Exported {} visible transfer(s) to {}.",
-                        rows.len(),
+                    Ok((count, path)) => format!(
+                        "Exported {count} matching transactions to {}.",
                         path.display()
                     )
                     .into(),
-                    Err(err) => format!("Transaction export failed: {err}").into(),
+                    Err(error) => {
+                        format!("Export failed: {error}. Retry when history is stable.").into()
+                    }
                 };
                 cx.notify();
             });
@@ -1117,7 +1077,7 @@ impl Home {
     }
 
     fn toggle_send_from_subaddress(&mut self, cx: &mut Context<Self>) {
-        if self.send_busy {
+        if self.send_operation.is_busy() {
             return;
         }
         self.send_from_subaddress = !self.send_from_subaddress;
@@ -1154,7 +1114,7 @@ impl Home {
     }
 
     fn cycle_send_source(&mut self, next: bool, cx: &mut Context<Self>) {
-        if self.send_busy || !self.send_from_subaddress {
+        if self.send_operation.is_busy() || !self.send_from_subaddress {
             return;
         }
         self.send_source_index = self.receive_book.cycle_index(self.send_source_index, next);
@@ -1200,9 +1160,14 @@ impl Home {
         }
         if self.send_amount_mode == AmountMode::Fiat {
             self.send_amount_mode = AmountMode::Xmr;
+            // Without a valid rate, a fiat number must never become an XMR amount.
+            self.send_amount.clear();
+            self.send_max = false;
+            self.clear_send_preview();
         }
         if self.recv_amount_mode == AmountMode::Fiat {
             self.recv_amount_mode = AmountMode::Xmr;
+            self.recv_amount.clear();
         }
     }
 
@@ -1214,6 +1179,7 @@ impl Home {
         };
         if send {
             let pico = self.send_piconero();
+            self.clear_send_preview();
             match self.send_amount_mode {
                 AmountMode::Xmr => {
                     if let Some(pico) = pico {
@@ -1499,7 +1465,8 @@ impl Home {
         self.total_piconero = 0;
         self.unlocked_piconero = 0;
         self.transfers.clear();
-        self.selected_transfer = None;
+        self.history_pages.clear();
+        self.history_pages.selected = None;
         self.last_exported_scanned = None;
         self.last_cache_persist_at = None;
         self.last_balance_poll_at = None;
@@ -1543,7 +1510,9 @@ impl Home {
             Field::RecvAmount => self.recv_amount_focus.focus(window, cx),
             Field::RecvDesc => self.recv_desc_focus.focus(window, cx),
             Field::RecvLabel => self.recv_label_focus.focus(window, cx),
-            Field::TransferSearch => self.transfer_search_focus.focus(window, cx),
+            Field::TransferSearch | Field::HistoryFrom | Field::HistoryTo => {
+                self.history_focus.for_field(field).focus(window, cx)
+            }
             Field::Challenge => self.challenge_focus.focus(window, cx),
             Field::I2pNode => self.i2p_rpc_focus.focus(window, cx),
             Field::I2pProxy => self.i2p_proxy_focus.focus(window, cx),
@@ -1567,6 +1536,8 @@ impl Home {
             Field::RecvDesc => self.recv_desc.clone(),
             Field::RecvLabel => self.recv_label.clone(),
             Field::TransferSearch => self.transfer_search.clone(),
+            Field::HistoryFrom => self.transfer_from.clone(),
+            Field::HistoryTo => self.transfer_to.clone(),
             Field::Challenge => {
                 self.challenge_answers[challenge_slot.unwrap_or(self.challenge_slot).min(2)].clone()
             }
@@ -1586,7 +1557,9 @@ impl Home {
             Field::RecvAmount => &self.recv_amount_focus,
             Field::RecvDesc => &self.recv_desc_focus,
             Field::RecvLabel => &self.recv_label_focus,
-            Field::TransferSearch => &self.transfer_search_focus,
+            Field::TransferSearch | Field::HistoryFrom | Field::HistoryTo => {
+                self.history_focus.for_field(field)
+            }
             Field::Challenge => &self.challenge_focus,
             Field::I2pNode => &self.i2p_rpc_focus,
             Field::I2pProxy => &self.i2p_proxy_focus,
@@ -1702,9 +1675,11 @@ impl Home {
                 self.recv_label = text;
                 self.persist_recv_label();
             }
+            Field::HistoryFrom => self.transfer_from = text,
+            Field::HistoryTo => self.transfer_to = text,
             Field::TransferSearch => {
                 self.transfer_search = text.to_lowercase();
-                self.selected_transfer = None;
+                self.history_pages.selected = None;
             }
             Field::Challenge => {
                 let slot = self.challenge_slot.min(2);
@@ -1838,7 +1813,11 @@ impl Home {
                 self.screen,
                 Screen::Send | Screen::Settings | Screen::Receive
             )
-            && !(self.screen == Screen::Wallet && self.active == Field::TransferSearch)
+            && !(self.screen == Screen::Transactions
+                && matches!(
+                    self.active,
+                    Field::TransferSearch | Field::HistoryFrom | Field::HistoryTo
+                ))
         {
             return;
         }
@@ -1913,7 +1892,11 @@ impl Home {
                 self.screen,
                 Screen::Send | Screen::Settings | Screen::Receive
             )
-            && !(self.screen == Screen::Wallet && self.active == Field::TransferSearch)
+            && !(self.screen == Screen::Transactions
+                && matches!(
+                    self.active,
+                    Field::TransferSearch | Field::HistoryFrom | Field::HistoryTo
+                ))
         {
             self.copy_address(cx);
             return;
@@ -1933,12 +1916,14 @@ impl Home {
                 Field::RecvDesc => self.recv_desc.clone(),
                 Field::RecvLabel => self.recv_label.clone(),
                 Field::TransferSearch => self.transfer_search.clone(),
+                Field::HistoryFrom => self.transfer_from.clone(),
+                Field::HistoryTo => self.transfer_to.clone(),
                 Field::Challenge => self.challenge_answers[self.challenge_slot.min(2)].clone(),
                 Field::I2pNode => self.i2p_rpc.clone(),
                 Field::I2pProxy => self.i2p_proxy.clone(),
             }
         };
-        if text.is_empty() && self.opened && self.active != Field::TransferSearch {
+        if text.is_empty() && self.opened && !matches!(self.active, Field::TransferSearch | Field::HistoryFrom | Field::HistoryTo) {
             self.copy_address(cx);
             return;
         }
@@ -1978,6 +1963,7 @@ impl Home {
     }
 
     fn clear_send_preview(&mut self) {
+        self.send_preview_epoch.invalidate();
         self.send_fee = None;
         self.send_preview_amount = None;
     }
@@ -2100,7 +2086,7 @@ impl Home {
     }
 
     fn fill_send_max(&mut self, cx: &mut Context<Self>) {
-        if self.send_busy {
+        if self.send_operation.is_busy() {
             return;
         }
         self.send_max = true;
@@ -2117,7 +2103,7 @@ impl Home {
     }
 
     fn run_preview(&mut self, cx: &mut Context<Self>) {
-        if self.send_busy {
+        if !self.opened || self.send_operation.is_busy() {
             return;
         }
         if matches!(api::refresh_job(WALLET_ID), RefreshJob::Running) {
@@ -2156,12 +2142,15 @@ impl Home {
                 return;
             }
         }
-        self.send_busy = true;
+        self.send_operation.start();
         self.status = l10n::t("Estimating fee…").into();
+        self.clear_send_preview();
+        let preview_token = self.send_preview_epoch.token();
         cx.notify();
         self.apply_broadcast_proxy();
         let node = self.broadcast_node_url();
         let from = self.send_from_minor();
+        let preview_node = node.clone();
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
@@ -2177,8 +2166,14 @@ impl Home {
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                this.send_busy = false;
-                this.apply_scan_proxy();
+                if !this.finish_send_operation(cx) { return; }
+                if !this.opened || !this.send_preview_epoch.accepts(preview_token)
+                    || this.broadcast_node_url() != preview_node || this.send_from_minor() != from
+                    || (!is_max && this.send_piconero() != amount) {
+                    this.status = l10n::t("Send details changed. Preview the fee again.").into();
+                    cx.notify();
+                    return;
+                }
                 match result {
                     Ok((amt, fee, was_max)) => {
                         this.send_preview_amount = Some(amt);
@@ -2207,7 +2202,7 @@ impl Home {
     }
 
     fn run_send(&mut self, cx: &mut Context<Self>) {
-        if self.send_busy {
+        if !self.opened || self.send_operation.is_busy() {
             return;
         }
         if matches!(api::refresh_job(WALLET_ID), RefreshJob::Running) {
@@ -2240,6 +2235,12 @@ impl Home {
             }
         };
         if !is_max {
+            if !send_flow::preview_amount_matches(self.send_preview_amount, amount) {
+                self.clear_send_preview();
+                self.status = l10n::t("Send amount changed. Preview the fee again.").into();
+                cx.notify();
+                return;
+            }
             let Some(unlocked) = self.send_unlocked() else {
                 self.status = l10n::t("Unlocked balance unavailable for this subaddress.").into();
                 cx.notify();
@@ -2254,7 +2255,7 @@ impl Home {
         if !self.authenticate_if_required("Authenticate to send Monero", cx) {
             return;
         }
-        self.send_busy = true;
+        self.send_operation.start();
         self.status = l10n::t("Sending…").into();
         cx.notify();
         self.apply_broadcast_proxy();
@@ -2265,15 +2266,14 @@ impl Home {
                 .background_executor()
                 .spawn(async move {
                     if is_max {
-                        send_flow::send_max(&node, &dest, from)
+                        send_flow::send_max(&node, &dest, from, fee)
                     } else {
-                        send_flow::send_exact(&node, &dest, amount, from)
+                        send_flow::send_exact(&node, &dest, amount, from, fee)
                     }
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                this.send_busy = false;
-                this.apply_scan_proxy();
+                if !this.finish_send_operation(cx) { return; }
                 match result {
                     Ok((txid, amt, fee)) => {
                         this.clear_send_preview();
@@ -2296,7 +2296,7 @@ impl Home {
                         this.status = format!("Send failed: {err}").into();
                     }
                 }
-                this.poll_core();
+                this.poll_core(cx);
                 cx.notify();
             });
         })
@@ -2313,7 +2313,11 @@ impl Home {
             && self.screen != Screen::Send
             && self.screen != Screen::Settings
             && self.screen != Screen::Receive
-            && !(self.screen == Screen::Wallet && self.active == Field::TransferSearch)
+            && !(self.screen == Screen::Transactions
+                && matches!(
+                    self.active,
+                    Field::TransferSearch | Field::HistoryFrom | Field::HistoryTo
+                ))
         {
             return;
         }
@@ -2346,7 +2350,11 @@ impl Home {
             && self.screen != Screen::Send
             && self.screen != Screen::Settings
             && self.screen != Screen::Receive
-            && !(self.screen == Screen::Wallet && self.active == Field::TransferSearch)
+            && !(self.screen == Screen::Transactions
+                && matches!(
+                    self.active,
+                    Field::TransferSearch | Field::HistoryFrom | Field::HistoryTo
+                ))
         {
             return;
         }
@@ -2366,6 +2374,7 @@ impl Home {
     }
 
     fn create_seed(&mut self, cx: &mut Context<Self>) {
+        if self.blocked_by_locked_operation(cx) { return; }
         match api::generate_mnemonic_english() {
             Ok(mnemonic) => {
                 self.seed = normalize_seed(&mnemonic);
@@ -2394,6 +2403,7 @@ impl Home {
     }
 
     fn open_from_form(&mut self, cx: &mut Context<Self>) {
+        if self.blocked_by_locked_operation(cx) { return; }
         if self.blocked_by_terms() {
             self.screen = Screen::Terms;
             self.status = l10n::t("Accept the Terms of Use first.").into();
@@ -2419,6 +2429,7 @@ impl Home {
     }
 
     fn open_with_mnemonic(&mut self, mnemonic: &str, restore_height: u64, cx: &mut Context<Self>) {
+        if self.blocked_by_locked_operation(cx) { return; }
         if let Err(err) = api::open_from_mnemonic(WALLET_ID, mnemonic, restore_height, true) {
             self.status = format!("Open failed: {err}").into();
             cx.notify();
@@ -2519,7 +2530,7 @@ impl Home {
         if let Some(err) = store_error {
             self.status = format!("{} Secure-store save skipped: {err}", self.status).into();
         }
-        self.poll_core();
+        self.poll_core(cx);
         self.start_poll(cx);
         self.maybe_refresh_fiat(cx);
         self.recover_pending_send(cx);
@@ -2527,6 +2538,7 @@ impl Home {
     }
 
     fn recover_pending_send(&mut self, cx: &mut Context<Self>) {
+        if !self.opened || self.send_operation.is_busy() { return; }
         match paths::load_pending_send() {
             Ok(None) => return,
             Ok(Some(_)) => {}
@@ -2539,6 +2551,7 @@ impl Home {
                 return;
             }
         }
+        self.send_operation.start();
         self.apply_broadcast_proxy();
         let node = self.broadcast_node_url();
         self.status = l10n::t("Relaying a pending send…").into();
@@ -2548,6 +2561,7 @@ impl Home {
                 .spawn(async move { send_flow::recover_pending(&node) })
                 .await;
             let _ = this.update(cx, |this, cx| {
+                if !this.finish_send_operation(cx) { return; }
                 match result {
                     Ok(Some(recovered)) => {
                         let rate = this.live_rate().cloned();
@@ -2567,7 +2581,7 @@ impl Home {
                     }
                 }
                 this.apply_scan_proxy();
-                this.poll_core();
+                this.poll_core(cx);
                 cx.notify();
             });
         })
@@ -2668,7 +2682,7 @@ impl Home {
                 };
                 this.benchmark_status = Some(status.clone().into());
                 this.status = status.into();
-                this.poll_core();
+                this.poll_core(cx);
                 cx.notify();
             });
         })
@@ -2763,9 +2777,35 @@ impl Home {
         .detach();
     }
 
+    fn blocked_by_locked_operation(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.send_operation.is_busy() {
+            self.status = l10n::t("Wallet is locked. The in-flight operation is finishing; reopen is available afterward.").into();
+            cx.notify();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn finish_send_operation(&mut self, cx: &mut Context<Self>) -> bool {
+        let locked = self.send_operation.finish();
+        self.apply_scan_proxy();
+        if locked {
+            // Preserve any pending/relayed ledger updates before clearing native state.
+            // The existing signed-send journal is left intact on failure for recovery.
+            self.persist_scan_cache();
+            let _ = api::refresh_cancel(WALLET_ID);
+            let _ = api::reset_tracked_outputs(WALLET_ID);
+            self.status = l10n::t("Wallet is locked. Use Open existing wallet to unlock.").into();
+            cx.notify();
+            return false;
+        }
+        self.opened
+    }
+
     fn forget(&mut self, cx: &mut Context<Self>) {
-        let _ = api::refresh_cancel(WALLET_ID);
-        let _ = api::reset_tracked_outputs(WALLET_ID);
+        let cleanup_now = self.send_operation.lock();
+        // Hide and invalidate presentation immediately, even when a fee RPC is stalled.
         self.opened = false;
         self.unlocking = false;
         self.unlock_started = false;
@@ -2775,7 +2815,8 @@ impl Home {
         self.unlocked_piconero = 0;
         self.sync = None;
         self.transfers.clear();
-        self.selected_transfer = None;
+        self.history_pages.clear();
+        self.history_pages.selected = None;
         self.last_exported_scanned = None;
         self.last_cache_persist_at = None;
         self.last_balance_poll_at = None;
@@ -2792,7 +2833,6 @@ impl Home {
         self.send_description.clear();
         self.send_recipient_name.clear();
         self.send_max = false;
-        self.send_busy = false;
         self.send_from_subaddress = false;
         self.send_source_index = 0;
         self.send_source_unlocked = None;
@@ -2804,6 +2844,7 @@ impl Home {
         self.recv_label.clear();
         self.qr_uri.clear();
         self.qr_image = None;
+        self.scan_restart_generation = self.scan_restart_generation.wrapping_add(1);
         self.seed.clear();
         self.mnemonic.clear();
         self.rescan_height_text = "0".into();
@@ -2824,10 +2865,22 @@ impl Home {
         } else {
             l10n::t("Session cleared.").into()
         };
+        if cleanup_now {
+            let _ = api::refresh_cancel(WALLET_ID);
+            let _ = api::reset_tracked_outputs(WALLET_ID);
+        } else {
+            self.status = l10n::t("Wallet is locked. The in-flight operation is finishing; reopen is available afterward.").into();
+        }
         cx.notify();
     }
 
     fn remove_stored_wallet(&mut self, cx: &mut Context<Self>) {
+        if self.send_operation.is_busy() { self.forget(cx); return; }
+        if let Err(error) = paths::archive_pending_send() {
+            self.status = format!("Could not preserve pending-send recovery data; wallet removal stopped: {error}").into();
+            cx.notify();
+            return;
+        }
         self.forget(cx);
         if let Err(err) = wallet_store::delete() {
             self.has_stored = wallet_store::is_marked_stored();
@@ -2837,7 +2890,6 @@ impl Home {
             return;
         }
         let _ = fs::remove_file(paths::cache_path());
-        paths::clear_pending_send();
         receive_book::clear();
         self.receive_book = receive_book::Book::primary();
         self.has_stored = false;
@@ -2848,6 +2900,7 @@ impl Home {
     }
 
     fn try_unlock_stored(&mut self, cx: &mut Context<Self>) {
+        if self.blocked_by_locked_operation(cx) { return; }
         if self.blocked_by_terms() || self.opened || self.unlock_started {
             return;
         }
@@ -3111,6 +3164,9 @@ impl Home {
                             paths::load_fiat_rate().filter(|r| r.currency == this.fiat_currency);
                     }
                 }
+                if this.send_amount_mode == AmountMode::Fiat {
+                    this.clear_send_preview();
+                }
                 cx.notify();
             });
         })
@@ -3137,7 +3193,7 @@ impl Home {
                 if this
                     .update(cx, |this, cx| {
                         if this.opened {
-                            this.poll_core();
+                            this.poll_core(cx);
                             this.maybe_refresh_fiat(cx);
                             cx.notify();
                         }
@@ -3151,8 +3207,8 @@ impl Home {
         .detach();
     }
 
-    fn poll_core(&mut self) {
-        if self.benchmark_running {
+    fn poll_core(&mut self, cx: &mut Context<Self>) {
+        if !self.opened || self.benchmark_running {
             return;
         }
         if let Some(status) = self.benchmark_status.clone() {
@@ -3269,7 +3325,7 @@ impl Home {
                         now.saturating_duration_since(last) >= ACTIVE_SYNC_AUX_POLL_INTERVAL
                     });
                 if transfers_due {
-                    self.refresh_transfers_snapshot();
+                    self.refresh_history_preview(cx);
                     self.last_transfers_poll_at = Some(now);
                 }
                 self.coerce_amount_modes();
@@ -3310,6 +3366,7 @@ impl Render for Home {
 
         let body = div()
             .id("main-scroll")
+            .min_w(px(0.))
             .track_scroll(&self.main_scroll_handle)
             .flex_1()
             .min_h(px(0.))
@@ -3345,7 +3402,7 @@ impl Render for Home {
                 body.child(status_line(self))
             })
             .when(self.opened && self.screen == Screen::Wallet, |body| {
-                body.child(history(self, window, cx))
+                body.child(history::preview(self, cx))
             });
 
         let shell = div()
@@ -3358,14 +3415,22 @@ impl Render for Home {
                 self.opened
                     && matches!(
                         self.screen,
-                        Screen::Wallet | Screen::Receive | Screen::Send | Screen::Settings
+                        Screen::Wallet
+                            | Screen::Transactions
+                            | Screen::Receive
+                            | Screen::Send
+                            | Screen::Settings
                     ),
                 |shell| {
                     let compact = window.viewport_size().width < px(760.);
                     shell.child(side_rail(self, cx, compact))
                 },
             )
-            .child(body);
+            .child(
+                body.when(self.opened && self.screen == Screen::Transactions, |body| {
+                    body.child(history::screen(self, window, cx))
+                }),
+            );
 
         div()
             .size_full()
@@ -3402,13 +3467,18 @@ impl Render for Home {
             .on_action(cx.listener(Self::show_wallet))
             .on_action(cx.listener(Self::show_settings))
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+                if event.keystroke.key == "escape" && this.history_pages.selected.is_some() {
+                    this.history_pages.selected = None;
+                    cx.notify();
+                    return;
+                }
                 if event.keystroke.key == "escape"
-                    && this.screen == Screen::Wallet
+                    && this.screen == Screen::Transactions
                     && this.active == Field::TransferSearch
                     && !this.transfer_search.is_empty()
                 {
                     this.transfer_search.clear();
-                    this.selected_transfer = None;
+                    this.history_pages.selected = None;
                     this.reset_edit_cursor(Field::TransferSearch);
                     cx.notify();
                 }
@@ -3416,6 +3486,17 @@ impl Render for Home {
             .child(header(self))
             .child(shell)
             .child(scrollbar(&self.main_scroll_handle, "main-scrollbar"))
+            .when(
+                self.opened
+                    && self.screen == Screen::Transactions
+                    && self.history_pages.selected.is_none(),
+                |root| {
+                    root.child(scrollbar(
+                        &self.history_pages.scroll.0.borrow().base_handle,
+                        "history-scrollbar",
+                    ))
+                },
+            )
             .child(resize_handles())
     }
 }
@@ -3464,6 +3545,14 @@ fn side_rail(home: &Home, cx: &mut Context<Home>, compact: bool) -> impl IntoEle
             home.screen == Screen::Wallet,
             compact,
             cx.listener(|this, _: &ClickEvent, _, cx| this.go_wallet(cx)),
+        ))
+        .child(side_nav_button(
+            "rail-transactions",
+            "≡",
+            "Transactions",
+            home.screen == Screen::Transactions,
+            compact,
+            cx.listener(|this, _: &ClickEvent, _, cx| this.go_history(cx)),
         ))
         .child(side_nav_button(
             "rail-receive",
@@ -4258,7 +4347,7 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
             .into_any_element();
     };
     let has_tip = sync_status::has_observed_tip(sync);
-    let synced = sync_status::is_synced(sync, running, home.transfers.is_empty());
+    let synced = sync_status::is_synced(sync, running, home.history_pages.total == 0);
     let remaining = sync_status::remaining_blocks(sync);
     let progress = sync_status::progress(sync);
     let error = home.last_scan_error.as_deref();
@@ -4857,20 +4946,20 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
                         .text_color(rgb(theme_muted()))
                         .child(home.network_policy.label()),
                 )
-                .when(home.send_busy, |content| {
+                .when(home.send_operation.is_busy(), |content| {
                     content.child(disabled_action_button("send-preview", l10n::t("Working…")))
                 })
-                .when(!home.send_busy, |content| {
+                .when(!home.send_operation.is_busy(), |content| {
                     content.child(wide_primary_action_button(
                         "send-preview",
                         l10n::t("Preview Fee"),
                         cx.listener(|this, _: &ClickEvent, _, cx| this.run_preview(cx)),
                     ))
                 })
-                .when(home.send_fee.is_none() || home.send_busy, |content| {
+                .when(home.send_fee.is_none() || home.send_operation.is_busy(), |content| {
                     content.child(disabled_action_button("send-broadcast", l10n::t("Send")))
                 })
-                .when(home.send_fee.is_some() && !home.send_busy, |content| {
+                .when(home.send_fee.is_some() && !home.send_operation.is_busy(), |content| {
                     content.child(wide_primary_action_button(
                         "send-broadcast",
                         l10n::t("Send"),
@@ -5381,262 +5470,6 @@ fn status_line(home: &Home) -> impl IntoElement {
         .child(home.status.clone())
 }
 
-fn history(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoElement {
-    let filter = home.transfer_filter;
-    let search = home.transfer_search.trim().to_lowercase();
-    let visible_transfers: Vec<_> = home
-        .transfers
-        .iter()
-        .enumerate()
-        .filter(|(_, row)| {
-            transfer_matches_filter(row, filter) && transfer_matches_search(row, &search)
-        })
-        .collect();
-    let no_transfers = home.transfers.is_empty();
-    let no_matches = !no_transfers && visible_transfers.is_empty();
-    let selected = home.selected_transfer.and_then(|index| {
-        home.transfers
-            .get(index)
-            .filter(|row| {
-                transfer_matches_filter(row, filter) && transfer_matches_search(row, &search)
-            })
-            .cloned()
-            .map(|row| (index, row))
-    });
-
-    div()
-        .id("history")
-        .flex()
-        .flex_col()
-        .gap_2()
-        .p_5()
-        .rounded_lg()
-        .bg(rgb(theme_card()))
-        .child(
-            div()
-                .flex()
-                .flex_row()
-                .items_center()
-                .justify_between()
-                .child(
-                    div()
-                        .text_sm()
-                        .font_weight(gpui::FontWeight::SEMIBOLD)
-                        .child(l10n::t("Recent Transactions")),
-                )
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(rgb(theme_muted()))
-                        .child(home.transfers.len().to_string()),
-                ),
-        )
-        .child(field_input(
-            home,
-            window,
-            cx,
-            Field::TransferSearch,
-            "history-search",
-            "Search transaction ID",
-            false,
-            true,
-        ))
-        .child(
-            div()
-                .flex()
-                .flex_row()
-                .gap_1()
-                .child(history_filter_button(
-                    "history-filter-all",
-                    l10n::t("All"),
-                    filter == TransferFilter::All,
-                    cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.set_transfer_filter(TransferFilter::All, cx);
-                    }),
-                ))
-                .child(history_filter_button(
-                    "history-filter-received",
-                    l10n::t("Received"),
-                    filter == TransferFilter::Received,
-                    cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.set_transfer_filter(TransferFilter::Received, cx);
-                    }),
-                ))
-                .child(history_filter_button(
-                    "history-filter-sent",
-                    l10n::t("Sent"),
-                    filter == TransferFilter::Sent,
-                    cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.set_transfer_filter(TransferFilter::Sent, cx);
-                    }),
-                )),
-        )
-        .when(!home.transfer_search.is_empty(), |list| {
-            list.child(secondary_action_button(
-                "history-clear-search",
-                l10n::t("Clear search"),
-                cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.transfer_search.clear();
-                    this.selected_transfer = None;
-                    cx.notify();
-                }),
-            ))
-        })
-        .child(
-            div()
-                .flex()
-                .flex_row()
-                .gap_2()
-                .when(!home.transfers.is_empty(), |actions| {
-                    actions.child(secondary_action_button(
-                        "history-export-csv",
-                        l10n::t("Export CSV"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.export_transfer_history(cx);
-                        }),
-                    ))
-                })
-                .child(secondary_action_button(
-                    "history-refresh-transfers",
-                    l10n::t("Refresh transfers"),
-                    cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.refresh_wallet_snapshots(cx);
-                    }),
-                )),
-        )
-        .when(no_transfers, |list| {
-            list.child(
-                div()
-                    .p_4()
-                    .rounded_md()
-                    .bg(rgb(theme_row()))
-                    .text_sm()
-                    .text_color(rgb(theme_muted()))
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .child(l10n::t("No transfers found yet."))
-                    .child(div().text_xs().child(l10n::t(
-                        "New transactions will appear here after the wallet scan.",
-                    ))),
-            )
-        })
-        .when(no_matches, |list| {
-            list.child(
-                div()
-                    .p_4()
-                    .rounded_md()
-                    .bg(rgb(theme_row()))
-                    .text_sm()
-                    .text_color(rgb(theme_muted()))
-                    .child(l10n::t("No transfers match this filter.")),
-            )
-        })
-        .children(visible_transfers.into_iter().map(|(idx, row)| {
-            let color = match row.direction.as_str() {
-                "in" => theme_in(),
-                "out" => theme_out(),
-                _ => theme_muted(),
-            };
-            let label = match row.direction.as_str() {
-                "in" => "Received",
-                "out" => "Sent",
-                "self" => "Self",
-                other => other,
-            };
-            let sign = match row.direction.as_str() {
-                "in" => "+ ",
-                "out" => "− ",
-                _ => "",
-            };
-            let conf = if row.is_pending || row.confirmations == 0 {
-                l10n::t("Pending").to_string()
-            } else {
-                format!("{} confirmations", row.confirmations)
-            };
-            let height = row
-                .height
-                .map(|height| height.to_string())
-                .unwrap_or_else(|| l10n::t("Pending").to_string());
-            div()
-                .id(("tx", idx))
-                .px_3()
-                .py_2()
-                .rounded_md()
-                .bg(rgb(theme_row()))
-                .border_1()
-                .border_color(rgb(if home.selected_transfer == Some(idx) {
-                    theme_accent()
-                } else {
-                    theme_row()
-                }))
-                .cursor(CursorStyle::PointingHand)
-                .flex()
-                .flex_row()
-                .items_center()
-                .justify_between()
-                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                    this.select_transfer(idx, cx);
-                }))
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(rgb(color))
-                                .child(format!("{label} {sign}{}", format_xmr(row.amount))),
-                        )
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(rgb(theme_muted()))
-                                .child(format!(
-                                    "{} · {} · {}",
-                                    height,
-                                    &row.txid.chars().take(8).collect::<String>(),
-                                    conf
-                                )),
-                        )
-                        .when_some(row.fee, |col, fee| {
-                            col.child(
-                                div()
-                                    .text_xs()
-                                    .text_color(rgb(theme_muted()))
-                                    .child(format!("Fee {}", format_xmr(fee))),
-                            )
-                        })
-                        .when_some(
-                            home.fiat_snapshots.get(&row.txid).map(|snap| {
-                                fiat::recorded_approx(row.amount, snap.fiat_per_xmr, &snap.currency)
-                            }),
-                            |col, line| {
-                                col.child(
-                                    div().text_xs().text_color(rgb(theme_muted())).child(line),
-                                )
-                            },
-                        ),
-                )
-        }))
-        .when_some(selected, |list, (index, row)| {
-            list.child(transfer_detail(&row, index, cx))
-        })
-}
-
-fn transfer_matches_filter(row: &Transfer, filter: TransferFilter) -> bool {
-    match filter {
-        TransferFilter::All => true,
-        TransferFilter::Received => row.direction == "in",
-        TransferFilter::Sent => row.direction == "out",
-    }
-}
-
-fn transfer_matches_search(row: &Transfer, search: &str) -> bool {
-    search.is_empty() || row.txid.to_lowercase().contains(search)
-}
-
 fn transfer_history_csv(rows: &[Transfer]) -> String {
     let mut csv = String::from(
         "direction,amount_xmr,amount_piconero,fee_xmr,fee_piconero,block,timestamp_utc,confirmations,status,txid\n",
@@ -5713,21 +5546,25 @@ fn history_filter_button(
         .child(label.into())
 }
 
-fn transfer_detail(row: &Transfer, index: usize, cx: &mut Context<Home>) -> impl IntoElement {
+fn transfer_detail(row: &Transfer, chain_height: u64, cx: &mut Context<Home>) -> impl IntoElement {
+    let txid = row.txid.clone();
+    let amount = row.amount;
     let direction = match row.direction.as_str() {
         "in" => l10n::t("Received").to_string(),
         "out" => l10n::t("Sent").to_string(),
         "self" => l10n::t("Self").to_string(),
         other => other.to_string(),
     };
-    let status = if row.is_pending || row.confirmations == 0 {
+    let confirmations =
+        history::confirmations(row.height, row.is_pending, chain_height, row.confirmations);
+    let status = if row.is_pending || confirmations == 0 {
         l10n::t("Pending").to_string()
     } else {
-        format!("{} confirmations", row.confirmations)
+        format!("{} confirmations", confirmations)
     };
     let fee = row
         .fee
-        .map(format_xmr)
+        .map(|fee| format!("{} XMR", amount::format_for_input(fee)))
         .unwrap_or_else(|| l10n::t("Not available").to_string());
     let height = row
         .height
@@ -5736,7 +5573,29 @@ fn transfer_detail(row: &Transfer, index: usize, cx: &mut Context<Home>) -> impl
     let timestamp = format_timestamp(row.timestamp);
 
     div()
-        .id(("transfer-detail", index))
+        .id("transfer-detail")
+        .child(secondary_action_button(
+            "close-transaction-detail",
+            "Back to transactions",
+            cx.listener(|this, _, _, cx| {
+                this.history_pages.selected = None;
+                cx.notify();
+            }),
+        ))
+        .when(row.direction == "in", |view| {
+            view.child(
+                div()
+                    .text_sm()
+                    .child("Network fee paid by the sender; not deducted from your receipt."),
+            )
+        })
+        .when(row.direction == "out", |view| {
+            view.child(
+                div()
+                    .text_sm()
+                    .child("Amount is the total wallet debit, including the network fee."),
+            )
+        })
         .p_3()
         .rounded_md()
         .bg(rgb(theme_card()))
@@ -5761,7 +5620,11 @@ fn transfer_detail(row: &Transfer, index: usize, cx: &mut Context<Home>) -> impl
             div()
                 .text_xs()
                 .text_color(rgb(theme_muted()))
-                .child(format!("{}: {}", l10n::t("Amount"), format_xmr(row.amount))),
+                .child(format!(
+                    "{}: {}",
+                    l10n::t("Amount"),
+                    format!("{} XMR", amount::format_for_input(row.amount))
+                )),
         )
         .child(
             div()
@@ -5796,14 +5659,18 @@ fn transfer_detail(row: &Transfer, index: usize, cx: &mut Context<Home>) -> impl
             "copy-transfer-txid",
             l10n::t("Copy transaction ID"),
             cx.listener(move |this, _: &ClickEvent, _, cx| {
-                this.copy_transfer_txid(index, cx);
+                cx.write_to_clipboard(gpui::ClipboardItem::new_string(txid.clone()));
+                this.status = "Transaction ID copied.".into();
             }),
         ))
         .child(action_button(
             "copy-transfer-amount",
             l10n::t("Copy amount"),
             cx.listener(move |this, _: &ClickEvent, _, cx| {
-                this.copy_transfer_amount(index, cx);
+                cx.write_to_clipboard(gpui::ClipboardItem::new_string(amount::format_for_input(
+                    amount,
+                )));
+                this.status = "Transaction amount copied.".into();
             }),
         ))
 }
@@ -6118,18 +5985,6 @@ fn truncate_middle(value: &str, head: usize, tail: usize) -> String {
         chars[..head].iter().collect::<String>(),
         chars[chars.len() - tail..].iter().collect::<String>()
     )
-}
-
-fn sort_transfers(rows: &mut [Transfer]) {
-    rows.sort_by(|a, b| match (a.is_pending, b.is_pending) {
-        (true, false) => Ordering::Less,
-        (false, true) => Ordering::Greater,
-        _ => b
-            .height
-            .unwrap_or(0)
-            .cmp(&a.height.unwrap_or(0))
-            .then_with(|| a.txid.cmp(&b.txid)),
-    });
 }
 
 fn quit(_: &Quit, cx: &mut App) {

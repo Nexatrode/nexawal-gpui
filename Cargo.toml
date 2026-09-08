@@ -8,6 +8,10 @@ repository = "https://github.com/nexatrode/nexawal-gpui"
 publish = false
 build = "build.rs"
 
+[features]
+# Headless input/focus regressions; never enabled in release builds by default.
+ui-tests = ["gpui/test-support"]
+
 [package.metadata.bundle]
 name = "NexaWal"
 identifier = "com.nexatrode.nexawal"
