@@ -4058,7 +4058,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                             .text_xs()
                             .text_color(rgb(theme_muted()))
                             .child(l10n::t(
-                                "This is your recovery seed. Write it down on paper and store it somewhere safe. Anyone with these words can access your funds.",
+                                "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.",
                             )),
                     )
                     .child(

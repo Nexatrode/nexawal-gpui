@@ -347,11 +347,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "عند التفعيل، سيتطلب فتح المحفظة المحفوظة وإرسال الأموال مصادقة الجهاز.",
     "Word #%lld:": "الكلمة رقم %lld:",
     "Word(s) don't match yet.": "الكلمة (أو الكلمات) غير مطابقة حتى الآن.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "اكتب هذه الكلمات بالترتيب واحفظها في مكان آمن. ستحتاج إليها لاستعادة محفظتك — لا يتم تخزينها مطلقًا على هذا الجهاز.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "عقدة خاطئة؟ غيّر طريقة الاتصال أو العقدة أعلاه — لست بحاجة إلى إعادة مسح.\nأموال مفقودة؟ أعد المسح من ارتفاع استعادتك.\nالحل الأخير: إعادة مسح كاملة من الكتلة 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "يمكنك استخدام Face ID لحماية محفظتك.",
-    "Your recovery seed:": "عبارة الاستعادة الخاصة بك:"
+    "Your recovery seed:": "عبارة الاستعادة الخاصة بك:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "اكتب هذه الكلمات بالترتيب واحفظها بأمان دون اتصال. ستحتاج إليها لاستعادة المحفظة إذا فُقد هذا الهاتف. تحتفظ NexaWal أيضًا بنسخة مشفّرة على الجهاز لفتح القفل — عامل النسخة الاحتياطية مثل النقود."
   },
   "az": {
     "\nAmount %@": "\nMəbləğ %@",
@@ -701,11 +701,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Aktiv edildikdə, saxlanılan pulqabını açmaq və vəsait göndərmək üçün cihaz autentifikasiyası tələb olunacaq.",
     "Word #%lld:": "Söz #%lld:",
     "Word(s) don't match yet.": "Söz(lər) hələ uyğun gəlmir.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Bu sözləri ardıcıllıqla yazın və təhlükəsiz bir yerdə saxlayın. Pulqabınızı bərpa etmək üçün onlara ehtiyacınız olacaq — onlar heç vaxt bu cihazda saxlanılmır.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Node səhvdir? Qoşulma üsulunu və ya yuxarıdakı node-u dəyişin — yenidən skanə ehtiyac yoxdur.\nVəsait yoxdur? Bərpa hündürlüyünüzdən yenidən skan edin.\nSon çara: 0-cı blokdan tam yenidən skan.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Pulqabınızı qorumaq üçün Face ID istifadə edə bilərsiniz.",
-    "Your recovery seed:": "Bərpa seed-iniz:"
+    "Your recovery seed:": "Bərpa seed-iniz:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Bu sözləri ardıcıllıqla yazın və onları oflayn təhlükəsiz yerdə saxlayın. Bu telefon itərsə, pulqabını bərpa etmək üçün onlara ehtiyacınız olacaq. NexaWal kilidi açmaq üçün cihazda şifrələnmiş nüsxə də saxlayır — ehtiyat nüsxəyə nağd pul kimi yanaşın."
   },
   "bg": {
     "\nAmount %@": "\nСума %@",
@@ -1055,11 +1055,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Когато е включено, отварянето на запазения портфейл и изпращането на средства ще изисква удостоверяване на устройството.",
     "Word #%lld:": "Дума №%lld:",
     "Word(s) don't match yet.": "Думата (думите) все още не съвпадат.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Запишете тези думи по ред и ги съхранявайте на безопасно място. Ще имате нужда от тях, за да възстановите портфейла си — те никога не се съхраняват на това устройство.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Грешен възел? Променете начина на свързване или възела по-горе — не се нуждаете от повторно сканиране.\nЛипсват средства? Сканирайте отново от височината за възстановяване.\nКрайна мярка: пълно повторно сканиране от блок 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Можете да използвате Face ID, за да защитите портфейла си.",
-    "Your recovery seed:": "Вашата фраза за възстановяване:"
+    "Your recovery seed:": "Вашата фраза за възстановяване:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Запишете тези думи по ред и ги съхранявайте безопасно офлайн. Ще имате нужда от тях, за да възстановите портфейла, ако този телефон бъде загубен. NexaWal също пази шифровано копие на устройството за отключване — третирайте резервното копие като пари в брой."
   },
   "bn": {
     "\nAmount %@": "\nপরিমাণ %@",
@@ -1409,11 +1409,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "চালু করা হলে, সংরক্ষিত ওয়ালেট খোলা এবং ফান্ড পাঠাতে ডিভাইস প্রমাণীকরণ প্রয়োজন হবে।",
     "Word #%lld:": "শব্দ #%lld:",
     "Word(s) don't match yet.": "শব্দ(গুলো) এখনও মিলছে না।",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "এই শব্দগুলো ক্রম অনুযায়ী লিখে রাখুন এবং কোথাও নিরাপদ জায়গায় সংরক্ষণ করুন। আপনার ওয়ালেট পুনরুদ্ধার করতে এগুলো প্রয়োজন হবে — এই ডিভাইসে এগুলো কখনো সংরক্ষিত হয় না।",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "ভুল নোড? সংযোগের পদ্ধতি বা উপরের নোডটি পরিবর্তন করুন — আপনার পুনরায় স্ক্যানের প্রয়োজন নেই।\nফান্ড অনুপস্থিত? আপনার রিস্টোর হাইট থেকে পুনরায় স্ক্যান করুন।\nশেষ উপায়: ব্লক 0 থেকে সম্পূর্ণ পুনরায় স্ক্যান।",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "আপনি আপনার ওয়ালেট সুরক্ষিত করতে Face ID ব্যবহার করতে পারেন।",
-    "Your recovery seed:": "আপনার রিকভারি সিড:"
+    "Your recovery seed:": "আপনার রিকভারি সিড:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "এই শব্দগুলো ক্রম অনুযায়ী লিখে অফলাইনে নিরাপদ জায়গায় সংরক্ষণ করুন। এই ফোন হারিয়ে গেলে ওয়ালেট পুনরুদ্ধার করতে এগুলো প্রয়োজন হবে। NexaWal আনলকের জন্য ডিভাইসে একটি এনক্রিপ্টেড কপিও রাখে — ব্যাকআপকে নগদের মতো গুরুত্ব দিন।"
   },
   "ca": {
     "\nAmount %@": "\nImport %@",
@@ -1763,11 +1763,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Quan estigui activat, obrir la cartera desada i enviar fons requerirà autenticació del dispositiu.",
     "Word #%lld:": "Paraula núm. %lld:",
     "Word(s) don't match yet.": "Les paraules encara no coincideixen.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Escriu aquestes paraules en ordre i guarda-les en un lloc segur. Les necessitaràs per restaurar la cartera — mai es desen en aquest dispositiu.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Node incorrecte? Canvia la manera de connectar-te o el node anterior — no cal tornar a escanejar.\nFalten fons? Torna a escanejar des de la teva alçada de restauració.\nÚltim recurs: torna a escanejar completament des del bloc 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Pots utilitzar Face ID per protegir la teva cartera.",
-    "Your recovery seed:": "La teva llavor de recuperació:"
+    "Your recovery seed:": "La teva llavor de recuperació:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Escriu aquestes paraules en ordre i guarda-les de forma segura fora de línia. Les necessitaràs per restaurar la cartera si perds aquest telèfon. NexaWal també conserva una còpia xifrada al dispositiu per al desbloqueig — tracta la còpia de seguretat com diners en efectiu."
   },
   "cs": {
     "\nAmount %@": "\nČástka %@",
@@ -2117,11 +2117,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Když je zapnuto, otevření uložené peněženky a odesílání prostředků bude vyžadovat ověření zařízení.",
     "Word #%lld:": "Slovo #%lld:",
     "Word(s) don't match yet.": "Slovo (slova) ještě nesouhlasí.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Zapište si tato slova v pořadí a uložte je na bezpečném místě. Budete je potřebovat k obnovení peněženky — na tomto zařízení nejsou nikdy uložena.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Špatný uzel? Změňte způsob připojení nebo uzel výše — přeskenování není potřeba.\nChybí prostředky? Přeskenujte od své výšky obnovení.\nPoslední možnost: úplné přeskenování od bloku 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Svou peněženku můžete zabezpečit pomocí Face ID.",
-    "Your recovery seed:": "Vaše fráze pro obnovení:"
+    "Your recovery seed:": "Vaše fráze pro obnovení:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Zapište si tato slova v pořadí a uložte je bezpečně offline. Budete je potřebovat k obnovení peněženky, pokud tento telefon ztratíte. NexaWal také uchovává šifrovanou kopii v zařízení pro odemknutí — zacházejte se zálohou jako s hotovostí."
   },
   "da": {
     "\nAmount %@": "\nBeløb %@",
@@ -2471,11 +2471,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Når dette er aktiveret, kræver det enhedsgodkendelse at åbne den gemte tegnebog og sende midler.",
     "Word #%lld:": "Ord #%lld:",
     "Word(s) don't match yet.": "Ordene matcher ikke endnu.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Skriv disse ord ned i rækkefølge, og opbevar dem et sikkert sted. Du får brug for dem til at gendanne din tegnebog — de gemmes aldrig på denne enhed.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Forkert node? Skift, hvordan du opretter forbindelse, eller noden ovenfor — du behøver ikke en genscanning.\nManglende midler? Genscan fra din gendannelseshøjde.\nSidste udvej: fuld genscanning fra blok 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Du kan bruge Face ID til at beskytte din tegnebog.",
-    "Your recovery seed:": "Din gendannelsesfrase:"
+    "Your recovery seed:": "Din gendannelsesfrase:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Skriv disse ord ned i rækkefølge, og opbevar dem sikkert offline. Du får brug for dem til at gendanne tegnebogen, hvis denne telefon bliver væk. NexaWal gemmer også en krypteret kopi på enheden til oplåsning — behandl sikkerhedskopien som kontanter."
   },
   "de": {
     "\nAmount %@": "\nBetrag %@",
@@ -2825,11 +2825,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Wenn aktiviert, sind zum Öffnen der gespeicherten Wallet und zum Senden von Geldern eine Geräteauthentifizierung erforderlich.",
     "Word #%lld:": "Wort Nr. %lld:",
     "Word(s) don't match yet.": "Wort/Wörter stimmen noch nicht überein.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Schreibe diese Wörter in der richtigen Reihenfolge auf und bewahre sie an einem sicheren Ort auf. Du brauchst sie, um deine Wallet wiederherzustellen — sie werden niemals auf diesem Gerät gespeichert.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Falscher Node? Ändere die Verbindungsart oder den Node oben — dafür ist kein Rescan nötig.\nFehlende Gelder? Führe einen Rescan ab deiner Wiederherstellungshöhe durch.\nLetzter Ausweg: vollständiger Rescan ab Block 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Du kannst Face ID verwenden, um deine Wallet zu schützen.",
-    "Your recovery seed:": "Dein Wiederherstellungs-Seed:"
+    "Your recovery seed:": "Dein Wiederherstellungs-Seed:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Schreibe diese Wörter in der richtigen Reihenfolge auf und bewahre sie offline an einem sicheren Ort auf. Du brauchst sie, um die Wallet wiederherzustellen, falls dieses Telefon verloren geht. NexaWal speichert zusätzlich eine verschlüsselte Kopie auf dem Gerät zum Entsperren — behandle das Backup wie Bargeld."
   },
   "el": {
     "\nAmount %@": "\nΠοσό %@",
@@ -3179,11 +3179,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Όταν είναι ενεργοποιημένο, το άνοιγμα του αποθηκευμένου πορτοφολιού και η αποστολή κεφαλαίων θα απαιτούν έλεγχο ταυτότητας συσκευής.",
     "Word #%lld:": "Λέξη #%lld:",
     "Word(s) don't match yet.": "Οι λέξεις δεν ταιριάζουν ακόμη.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Γράψτε αυτές τις λέξεις με τη σειρά και αποθηκεύστε τις σε ασφαλές μέρος. Θα τις χρειαστείτε για να επαναφέρετε το πορτοφόλι σας — δεν αποθηκεύονται ποτέ σε αυτή τη συσκευή.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Λάθος κόμβος; Αλλάξτε τον τρόπο σύνδεσης ή τον παραπάνω κόμβο — δεν χρειάζεστε επανασάρωση.\nΛείπουν κεφάλαια; Επαναλάβετε τη σάρωση από το ύψος επαναφοράς σας.\nΈσχατη λύση: πλήρης επανασάρωση από το μπλοκ 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Μπορείτε να χρησιμοποιήσετε το Face ID για να προστατεύσετε το πορτοφόλι σας.",
-    "Your recovery seed:": "Η φράση ανάκτησής σας:"
+    "Your recovery seed:": "Η φράση ανάκτησής σας:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Γράψτε αυτές τις λέξεις με τη σειρά και αποθηκεύστε τις με ασφάλεια offline. Θα τις χρειαστείτε για να επαναφέρετε το πορτοφόλι αν χαθεί αυτό το τηλέφωνο. Το NexaWal κρατά επίσης ένα κρυπτογραφημένο αντίγραφο στη συσκευή για ξεκλείδωμα — αντιμετωπίστε το αντίγραφο ασφαλείας σαν μετρητά."
   },
   "en": {
     "\nAmount %@": "\nAmount %@",
@@ -3535,7 +3535,6 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "When enabled, opening the stored wallet and sending funds will require device authentication.",
     "Word #%lld:": "Word #%lld:",
     "Word(s) don't match yet.": "Word(s) don't match yet.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "You can use Face ID to secure your wallet.",
@@ -3546,7 +3545,8 @@
     "Use Open existing wallet to try again, or restore from seed.": "Use Open existing wallet to try again, or restore from seed.",
     "Opening the wallet from secure storage.": "Opening the wallet from secure storage.",
     "Paste here only to restore a different wallet.": "Paste here only to restore a different wallet.",
-    "Click this box, then ⌘V or Edit → Paste. Open is a separate button.": "Click this box, then ⌘V or Edit → Paste. Open is a separate button."
+    "Click this box, then ⌘V or Edit → Paste. Open is a separate button.": "Click this box, then ⌘V or Edit → Paste. Open is a separate button.",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash."
   },
   "eo": {
     "\nAmount %@": "\nSumo %@",
@@ -3896,11 +3896,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Kiam ebligita, malfermo de la konservita monujo kaj sendo de fonduso postulos aparat-aŭtentigon.",
     "Word #%lld:": "Vorto #%lld:",
     "Word(s) don't match yet.": "La vorto(j) ankoraŭ ne kongruas.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Skribu ĉi tiujn vortojn en ordo kaj konservu ilin ie sekure. Vi bezonos ilin por restaŭri vian monujon — ili neniam estas konservitaj sur ĉi tiu aparato.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Malĝusta nodo? Ŝanĝu kiel konekti aŭ la nodon supre — vi ne bezonas reskanon.\nMankantaj fondusoj? Reskanu de via restaŭra alto.\nLasta rimedo: plena reskano de bloko 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Vi povas uzi Face ID por sekurigi vian monujon.",
-    "Your recovery seed:": "Via restaŭra semo:"
+    "Your recovery seed:": "Via restaŭra semo:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Skribu ĉi tiujn vortojn en ordo kaj konservu ilin sekure eksterrete. Vi bezonos ilin por restaŭri la monujon se ĉi tiu telefono perdiĝas. NexaWal ankaŭ tenas ĉifritan kopion sur la aparato por malŝlosado — traktu la savkopion kiel kontantan monon."
   },
   "es": {
     "\nAmount %@": "\nCantidad %@",
@@ -4242,10 +4242,10 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Si está activado, abrir la cartera guardada y enviar fondos requerirá autenticación del dispositivo.",
     "Word #%lld:": "Palabra #%lld:",
     "Word(s) don't match yet.": "Las palabras aún no coinciden.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Anota estas palabras en orden y guárdalas en un lugar seguro. Las necesitarás para restaurar tu cartera — nunca se almacenan en este dispositivo.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "¿Nodo incorrecto? Cambia cómo conectar o el nodo de arriba — no necesitas reescanear.\n¿Faltan fondos? Reescanear desde tu altura de restauración.\nÚltimo recurso: reescaneo completo desde el bloque 0.",
     "You can use Face ID to secure your wallet.": "Puedes usar Face ID para proteger tu cartera.",
-    "Your recovery seed:": "Tu frase de recuperación:"
+    "Your recovery seed:": "Tu frase de recuperación:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Anota estas palabras en orden y guárdalas en un lugar seguro fuera de línea. Las necesitarás para restaurar la cartera si pierdes este teléfono. NexaWal también guarda una copia cifrada en el dispositivo para el desbloqueo — trata la copia de seguridad como dinero en efectivo."
   },
   "et": {
     "\nAmount %@": "\nSumma %@",
@@ -4595,11 +4595,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Kui see on lubatud, nõuab salvestatud rahakoti avamine ja vahendite saatmine seadme autentimist.",
     "Word #%lld:": "Sõna nr %lld:",
     "Word(s) don't match yet.": "Sõnad ei klapi veel.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Kirjutage need sõnad järjekorras üles ja hoidke neid turvalises kohas. Vajate neid rahakoti taastamiseks — neid ei salvestata kunagi selles seadmes.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Vale sõlm? Muutke ühendumise viisi või ülaltoodud sõlme — te ei vaja uuesti skannimist.\nVahendid puuduvad? Skannige uuesti alates taastamiskõrgusest.\nViimane võimalus: täielik uuesti skannimine plokist 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Rahakoti kaitsmiseks võite kasutada Face ID-d.",
-    "Your recovery seed:": "Teie taastefraas:"
+    "Your recovery seed:": "Teie taastefraas:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Kirjutage need sõnad järjekorras üles ja hoidke neid turvaliselt võrguühenduseta. Vajate neid rahakoti taastamiseks, kui see telefon kaob. NexaWal hoiab avamiseks ka krüpteeritud koopiat seadmes — kohtlege varukoopiat nagu sularaha."
   },
   "eu": {
     "\nAmount %@": "\nKopurua %@",
@@ -4949,11 +4949,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Aktibatuta dagoenean, gordetako zorroa irekitzeko eta funtsak bidaltzeko gailuaren autentifikazioa beharko da.",
     "Word #%lld:": "Hitza #%lld:",
     "Word(s) don't match yet.": "Hitzak ez datoz oraindik bat.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Idatzi hitz hauek ordenan eta gorde leku seguru batean. Zure zorroa leheneratzeko beharko dituzu — ez dira inoiz gailu honetan gordetzen.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Nodo okerra? Aldatu konektatzeko modua edo goiko nodoa — ez duzu berreskaneorik behar.\nFuntsak falta? Berreskaneatu zure leheneratze-altueratik.\nAzken aukera: berreskaneo osoa 0 blokeotik.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Face ID erabil dezakezu zure zorroa babesteko.",
-    "Your recovery seed:": "Zure leheneratze-hazia:"
+    "Your recovery seed:": "Zure leheneratze-hazia:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Idatzi hitz hauek ordenan eta gorde itzazu seguru lineaz kanpo. Telefono hau galtzen baduzu, zorroa leheneratzeko beharko dituzu. NexaWal-ek desblokeatzeko gailuan kopia enkriptatu bat ere gordetzen du — tratatu babeskopia eskudirutan bezala."
   },
   "fa": {
     "\nAmount %@": "\nمقدار %@",
@@ -5303,11 +5303,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "وقتی فعال باشد، باز کردن کیف پول ذخیره‌شده و ارسال وجوه به احراز هویت دستگاه نیاز خواهد داشت.",
     "Word #%lld:": "کلمه #%lld:",
     "Word(s) don't match yet.": "کلمه(ها) هنوز مطابقت ندارند.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "این کلمات را به ترتیب یادداشت کنید و در جای امنی نگه دارید. برای بازیابی کیف پول خود به آن‌ها نیاز خواهید داشت — آن‌ها هرگز روی این دستگاه ذخیره نمی‌شوند.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "گره اشتباه است؟ نحوه اتصال یا گره بالا را تغییر دهید — نیازی به اسکن مجدد ندارید.\nوجوه گم شده؟ از ارتفاع بازیابی خود دوباره اسکن کنید.\nراه‌حل آخر: اسکن مجدد کامل از بلوک 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "می‌توانید از Face ID برای ایمن‌سازی کیف پول خود استفاده کنید.",
-    "Your recovery seed:": "عبارت بازیابی شما:"
+    "Your recovery seed:": "عبارت بازیابی شما:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "این کلمات را به ترتیب یادداشت کنید و آن‌ها را به‌صورت آفلاین در جای امنی نگه دارید. اگر این گوشی گم شود، برای بازیابی کیف پول به آن‌ها نیاز خواهید داشت. NexaWal همچنین یک رونوشت رمزنگاری‌شده روی دستگاه برای باز کردن قفل نگه می‌دارد — از پشتیبان مثل پول نقد مراقبت کنید."
   },
   "fi": {
     "\nAmount %@": "\nMäärä %@",
@@ -5657,11 +5657,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Kun käytössä, tallennetun lompakon avaaminen ja varojen lähettäminen vaatii laitteen todennuksen.",
     "Word #%lld:": "Sana #%lld:",
     "Word(s) don't match yet.": "Sana(t) eivät täsmää vielä.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Kirjoita nämä sanat järjestyksessä ylös ja säilytä ne turvallisessa paikassa. Tarvitset niitä lompakkosi palauttamiseen — niitä ei koskaan tallenneta tälle laitteelle.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Väärä solmu? Muuta yhteystapaa tai yllä olevaa solmua — uudelleenskannausta ei tarvita.\nPuuttuvia varoja? Skannaa uudelleen palautuskorkeudestasi.\nViimeinen keino: täysi uudelleenskannaus lohkosta 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Voit käyttää Face ID:tä lompakkosi suojaamiseen.",
-    "Your recovery seed:": "Palautussiemenesi:"
+    "Your recovery seed:": "Palautussiemenesi:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Kirjoita nämä sanat järjestyksessä ylös ja säilytä ne turvallisesti offline-tilassa. Tarvitset niitä lompakon palauttamiseen, jos tämä puhelin katoaa. NexaWal säilyttää myös salatun kopion laitteella lukituksen avaamista varten — käsittele varmuuskopiota kuin käteistä."
   },
   "fil": {
     "\nAmount %@": "\nHalaga %@",
@@ -6011,11 +6011,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Kung pinagana, mangangailangan ng device authentication ang pagbukas ng nakaimbak na wallet at pagpadala ng pondo.",
     "Word #%lld:": "Salita #%lld:",
     "Word(s) don't match yet.": "Hindi pa tugma ang (mga) salita.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Isulat ang mga salitang ito ayon sa pagkasunod-sunod at itago sa ligtas na lugar. Kakailanganin mo ito para i-restore ang iyong wallet — hindi ito kailanman naimbak sa device na ito.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Mali ang node? Palitan kung paano kumonekta o ang node sa itaas — hindi mo kailangan ng rescan.\\nNawawalang pondo? Mag-rescan mula sa iyong restore height.\\nHuling opsyon: buong rescan mula sa block 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Maaari mong gamitin ang Face ID para protektahan ang iyong wallet.",
-    "Your recovery seed:": "Ang iyong recovery seed:"
+    "Your recovery seed:": "Ang iyong recovery seed:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Isulat ang mga salitang ito ayon sa pagkasunod-sunod at itago ang mga ito nang ligtas offline. Kakailanganin mo ito para i-restore ang wallet kung mawala ang teleponong ito. May encrypted na kopya rin ang NexaWal sa device para sa unlock — ituring ang backup na parang pera."
   },
   "fr": {
     "\nAmount %@": "\nMontant %@",
@@ -6365,11 +6365,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Une fois activée, l'ouverture du portefeuille enregistré et l'envoi de fonds nécessiteront une authentification de l'appareil.",
     "Word #%lld:": "Mot n° %lld :",
     "Word(s) don't match yet.": "Les mots ne correspondent pas encore.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Note ces mots dans l'ordre et conserve-les en lieu sûr. Tu en auras besoin pour restaurer ton portefeuille — ils ne sont jamais stockés sur cet appareil.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Mauvais nœud ? Change le mode de connexion ou le nœud ci-dessus — pas besoin de réanalyse.\nFonds manquants ? Réanalyse depuis ta hauteur de restauration.\nEn dernier recours : réanalyse complète depuis le bloc 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Tu peux utiliser Face ID pour protéger ton portefeuille.",
-    "Your recovery seed:": "Ta phrase de récupération :"
+    "Your recovery seed:": "Ta phrase de récupération :",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Note ces mots dans l'ordre et conserve-les hors ligne en lieu sûr. Tu en auras besoin pour restaurer le portefeuille si ce téléphone est perdu. NexaWal conserve aussi une copie chiffrée sur l'appareil pour le déverrouillage — traite la sauvegarde comme de l'argent liquide."
   },
   "ga": {
     "\nAmount %@": "\nMéid %@",
@@ -6719,11 +6719,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Nuair a bheidh sé cumasaithe, éileoidh oscailt an sparáin stóráilte agus seoladh cistí fíordheimhniú gléasta.",
     "Word #%lld:": "Focal #%lld:",
     "Word(s) don't match yet.": "Níl na focail ag teacht le chéile fós.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Scríobh na focail seo in ord agus stóráil iad in áit shábháilte. Beidh siad de dhíth ort chun do sparán a aischur — ní stóráiltear iad ar an ghléas seo riamh.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "An nód mícheart? Athraigh conas a cheanglaítear nó an nód thuas — ní gá athscanadh.\nCistí ar iarraidh? Athscan ó d'airde aisghabhála.\nRogha dheireanach: athscanadh iomlán ón bhloc 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Is féidir leat Face ID a úsáid chun do sparán a chosaint.",
-    "Your recovery seed:": "Do shíol aisghabhála:"
+    "Your recovery seed:": "Do shíol aisghabhála:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Scríobh na focail seo in ord agus stóráil iad go sábháilte as líne. Beidh siad de dhíth ort chun an sparán a aischur má chailltear an fón seo. Coinníonn NexaWal cóip chriptithe ar an ngléas freisin le haghaidh díghlasála — caith leis an gcúltaca mar airgead tirim."
   },
   "gl": {
     "\nAmount %@": "\nCantidade %@",
@@ -7073,11 +7073,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Cando está activada, abrir a carteira gardada e enviar fondos requirirá autenticación do dispositivo.",
     "Word #%lld:": "Palabra #%lld:",
     "Word(s) don't match yet.": "As palabras aínda non coinciden.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Anota estas palabras en orde e gárdaas nun lugar seguro. Necesitarás delas para restaurar a túa carteira — nunca se gardan neste dispositivo.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Nodo incorrecto? Cambia como conectar ou o nodo de arriba — non precisas reescanear.\nFaltan fondos? Reescanea desde a túa altura de restauración.\nÚltimo recurso: reescaneo completo desde o bloque 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Podes usar Face ID para protexer a túa carteira.",
-    "Your recovery seed:": "A túa semente de recuperación:"
+    "Your recovery seed:": "A túa semente de recuperación:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Anota estas palabras en orde e gárdaas de forma segura fóra de liña. Necesitarás delas para restaurar a carteira se perdas este teléfono. NexaWal tamén garda unha copia cifrada no dispositivo para o desbloqueo — trata a copia de seguridade como diñeiro en efectivo."
   },
   "gn": {
     "\nAmount %@": "\nCantidad %@",
@@ -7427,11 +7427,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Oñemyendýrõ, eipe'a hag̃ua ñongatuha ñeñongatupyre ha emondo hag̃ua viru, tekotevẽta autenticación dispositivo-gua.",
     "Word #%lld:": "Ñe'ẽ #%lld:",
     "Word(s) don't match yet.": "Umi ñe'ẽ ndojojahái gueteri.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Ehai ko'ã ñe'ẽ oĩháicha ha eñongatu tenda segurohápe. Eikotevẽta hese ñongatuha ñemoĩ jey hag̃ua — araka'eve ndaha'éi ñeñongatupyre ko dispositivo-pe.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "¿Nodo ivaíva? Emyengovia mba'éichapa oñekonekta térã pe nodo yvategua — ndaikotevẽi reskanea jey.\n¿Ndojehecháiva viru? Eskanea jey nde altura de restauración guive.\nRemedio paha: escaneo mbykymby bloque 0 guive.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Ikatu eiporu Face ID emo'ã hag̃ua nde ñongatuha.",
-    "Your recovery seed:": "Nde frase mnemónica:"
+    "Your recovery seed:": "Nde frase mnemónica:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Ehai ko'ã ñe'ẽ oĩháicha ha eñongatu chupekuéra segurohápe ñanduti'ỹre. Eikotevẽta hesekuéra ñongatuha ñemoĩ jey hag̃ua ko pumbyry ojeheja ramo. NexaWal oñongatu avei peteĩ kopia cifrada dispositivo-pe ijepe'a hag̃ua — eñangareko backup rehe viruicha."
   },
   "ha": {
     "\nAmount %@": "\nAdadi %@",
@@ -7781,11 +7781,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Idan an kunna, buɗe walat da ajiye da aika kuɗaɗe za su buƙaci tantancewar na'ura.",
     "Word #%lld:": "Kalma #%lld:",
     "Word(s) don't match yet.": "Kalma(kalmomi) ba su dace ba tukuna.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Rubuta waɗannan kalmomi bisa jeri kuma ajiye su a wuri mai aminci. Za ka buƙace su don dawo da walatinka — ba a ajiye su a wannan na'urar ba a ko yaushe.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Node mara daidai? Canza yadda za a haɗa ko node da ke sama — ba kwa buƙatar sake bincike.\nKuɗaɗe sun ɓace? Sake bincika daga tsayin dawowarka.\nMataki na ƙarshe: cikakken sake bincike daga toshe 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Za ka iya amfani da Face ID don kiyaye walatinka.",
-    "Your recovery seed:": "Kalmomin dawowar ku:"
+    "Your recovery seed:": "Kalmomin dawowar ku:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Rubuta waɗannan kalmomi bisa jeri kuma ajiye su a aminci a waje da yanar gizo. Za ka buƙace su don dawo da walati idan wannan wayar ta ɓace. NexaWal kuma yana ajiye kwafin da aka ɓoye a na'urar don buɗewa — ɗauki baya a matsayin kuɗi na hannu."
   },
   "he": {
     "\nAmount %@": "\nסכום %@",
@@ -8135,11 +8135,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "כשמופעל, פתיחת הארנק השמור ושליחת כספים ידרשו אימות מכשיר.",
     "Word #%lld:": "מילה מספר %lld:",
     "Word(s) don't match yet.": "המילה (או המילים) עדיין לא תואמות.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "כתוב מילים אלה לפי הסדר ושמור אותן במקום בטוח. תזדקק להן כדי לשחזר את הארנק שלך — הן לעולם לא נשמרות במכשיר זה.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "צומת שגויה? שנה את אופן ההתחברות או את הצומת שלמעלה — אינך צריך סריקה חוזרת.\nכספים חסרים? סרוק מחדש מגובה השחזור שלך.\nכפתרון אחרון: סריקה חוזרת מלאה מבלוק 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "אתה יכול להשתמש ב-Face ID כדי להגן על הארנק שלך.",
-    "Your recovery seed:": "ביטוי השחזור שלך:"
+    "Your recovery seed:": "ביטוי השחזור שלך:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "כתוב מילים אלה לפי הסדר ושמור אותן בבטחה במצב לא מקוון. תזדקק להן כדי לשחזר את הארנק אם הטלפון הזה יאבד. NexaWal גם שומר עותק מוצפן במכשיר לצורך ביטול נעילה — התייחס לגיבוי כמו למזומן."
   },
   "hi": {
     "\nAmount %@": "\nराशि %@",
@@ -8489,11 +8489,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "सक्षम होने पर, संग्रहित वॉलेट खोलने और फंड भेजने के लिए डिवाइस प्रमाणीकरण आवश्यक होगा।",
     "Word #%lld:": "शब्द #%lld:",
     "Word(s) don't match yet.": "शब्द अभी मेल नहीं खाते।",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "इन शब्दों को क्रम में लिखें और किसी सुरक्षित जगह रखें। अपना वॉलेट रिस्टोर करने के लिए आपको इनकी आवश्यकता होगी — ये इस डिवाइस पर कभी संग्रहित नहीं किए जाते।",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "गलत नोड? कनेक्ट करने का तरीका या ऊपर दिया गया नोड बदलें — आपको रीस्कैन की आवश्यकता नहीं है।\nफंड गुम हैं? अपनी रिस्टोर हाइट से रीस्कैन करें।\nअंतिम उपाय: ब्लॉक 0 से पूरा रीस्कैन करें।",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "आप अपने वॉलेट को सुरक्षित करने के लिए Face ID का उपयोग कर सकते हैं।",
-    "Your recovery seed:": "आपकी रिकवरी सीड:"
+    "Your recovery seed:": "आपकी रिकवरी सीड:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "इन शब्दों को क्रम में लिख लें और इन्हें ऑफ़लाइन किसी सुरक्षित जगह रखें। अगर यह फ़ोन खो जाए तो वॉलेट रीस्टोर करने के लिए इनकी ज़रूरत होगी। NexaWal अनलॉक के लिए डिवाइस पर एक एन्क्रिप्टेड प्रति भी रखता है — बैकअप को नकदी की तरह समझें।"
   },
   "hr": {
     "\nAmount %@": "\nIznos %@",
@@ -8843,11 +8843,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Kada je omogućeno, otvaranje spremljenog novčanika i slanje sredstava zahtijevat će autentifikaciju uređaja.",
     "Word #%lld:": "Riječ #%lld:",
     "Word(s) don't match yet.": "Riječi se još ne podudaraju.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Zapišite ove riječi po redu i pohranite ih na sigurno mjesto. Trebat će vam za obnovu novčanika — nikada se ne pohranjuju na ovom uređaju.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Pogrešan čvor? Promijenite način povezivanja ili čvor iznad — nije potrebno ponovno skeniranje.\nNedostaju sredstva? Ponovno skenirajte od svoje visine obnove.\nZadnja opcija: potpuno ponovno skeniranje od bloka 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Možete koristiti Face ID za zaštitu svog novčanika.",
-    "Your recovery seed:": "Vaš sjemenski kod za obnovu:"
+    "Your recovery seed:": "Vaš sjemenski kod za obnovu:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Zapišite ove riječi po redu i pohranite ih sigurno offline. Trebat će vam za obnovu novčanika ako ovaj telefon bude izgubljen. NexaWal također čuva šifriranu kopiju na uređaju za otključavanje — tretirajte sigurnosnu kopiju kao gotovinu."
   },
   "hu": {
     "\nAmount %@": "\nÖsszeg %@",
@@ -9197,11 +9197,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Ha bekapcsolod, a tárolt pénztárca megnyitásához és a küldéshez eszközhitelesítés szükséges.",
     "Word #%lld:": "%lld. szó:",
     "Word(s) don't match yet.": "A szó(ak) még nem egyeznek.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Írd le ezeket a szavakat sorrendben, és tárold biztonságos helyen. Szükséged lesz rájuk a pénztárcád visszaállításához — az eszközön soha nem tároljuk őket.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Rossz a csomópont? Módosítsd a csatlakozás módját vagy a fenti csomópontot — nincs szükség újraszkennelésre.\nHiányzó pénzeszközök? Szkennelj újra a visszaállítási magasságtól.\nVégső megoldás: teljes újraszkennelés a 0. blokktól.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Face ID-t használhatsz a pénztárcád védelmére.",
-    "Your recovery seed:": "A helyreállítási seeded:"
+    "Your recovery seed:": "A helyreállítási seeded:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Írd le ezeket a szavakat sorrendben, és tárold őket biztonságosan offline. Szükséged lesz rájuk a pénztárca visszaállításához, ha ez a telefon elveszik. A NexaWal a feloldáshoz titkosított másolatot is tart az eszközön — kezeld a biztonsági mentést készpénzként."
   },
   "hy": {
     "\nAmount %@": "\nԳումար՝ %@",
@@ -9551,11 +9551,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Երբ միացված է, պահված դրամապանակը բացելը և միջոցներ ուղարկելը կպահանջեն սարքի նույնականացում։",
     "Word #%lld:": "Բառ #%lld՝",
     "Word(s) don't match yet.": "Բառ(եր)ը դեռ չեն համընկնում։",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Գրի առեք այս բառերը հաջորդականությամբ և պահեք ապահով վայրում։ Դրանք անհրաժեշտ կլինեն ձեր դրամապանակը վերականգնելու համար — դրանք երբեք չեն պահվում այս սարքում։",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Սխալ հանգույց? Փոխեք միացման եղանակը կամ վերևի հանգույցը — վերասկանավորում պետք չէ։\nՄիջոցներ բացակայում են? Վերասկանավորեք ձեր վերականգնման բարձրությունից։\nԱմենավերջին միջոց՝ ամբողջական վերասկանավորում 0 բլոկից։",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Դուք կարող եք օգտագործել Face ID ձեր դրամապանակը պաշտպանելու համար։",
-    "Your recovery seed:": "Ձեր վերականգնման բառերը՝"
+    "Your recovery seed:": "Ձեր վերականգնման բառերը՝",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Գրի առեք այս բառերը հաջորդականությամբ և պահեք դրանք անվտանգ՝ առանց ցանցի։ Դրանք անհրաժեշտ կլինեն դրամապանակը վերականգնելու համար, եթե այս հեռախոսը կորի։ NexaWal-ը ապակողպման համար սարքում նաև պահում է գաղտնագրված պատճեն — պահուստը վերաբերվեք որպես կանխիկի։"
   },
   "id": {
     "\nAmount %@": "\nJumlah %@",
@@ -9905,11 +9905,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Jika diaktifkan, membuka dompet yang tersimpan dan mengirim dana akan memerlukan autentikasi perangkat.",
     "Word #%lld:": "Kata #%lld:",
     "Word(s) don't match yet.": "Kata belum cocok.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Tuliskan kata-kata ini secara berurutan dan simpan di tempat yang aman. Anda akan membutuhkannya untuk memulihkan dompet Anda — kata-kata ini tidak pernah disimpan di perangkat ini.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Node salah? Ubah cara menghubungkan atau node di atas — Anda tidak perlu memindai ulang.\nDana hilang? Pindai ulang dari tinggi pemulihan Anda.\nPilihan terakhir: pindai ulang penuh dari blok 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Anda dapat menggunakan Face ID untuk mengamankan dompet Anda.",
-    "Your recovery seed:": "Seed pemulihan Anda:"
+    "Your recovery seed:": "Seed pemulihan Anda:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Tulis kata-kata ini secara berurutan dan simpan secara offline di tempat yang aman. Anda akan membutuhkannya untuk memulihkan dompet jika ponsel ini hilang. NexaWal juga menyimpan salinan terenkripsi di perangkat untuk membuka kunci — perlakukan cadangan seperti uang tunai."
   },
   "it": {
     "\nAmount %@": "\nImporto %@",
@@ -10259,11 +10259,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Se attivato, l'apertura del wallet memorizzato e l'invio di fondi richiederanno l'autenticazione del dispositivo.",
     "Word #%lld:": "Parola #%lld:",
     "Word(s) don't match yet.": "La parola/le parole non corrispondono ancora.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Scrivi queste parole in ordine e conservale in un luogo sicuro. Ti serviranno per ripristinare il tuo wallet — non vengono mai memorizzate su questo dispositivo.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Nodo sbagliato? Cambia la modalità di connessione o il nodo sopra — non serve una riscansione.\nFondi mancanti? Riscansiona dalla tua altezza di ripristino.\nUltima risorsa: riscansione completa dal blocco 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Puoi usare Face ID per proteggere il tuo wallet.",
-    "Your recovery seed:": "Il tuo seed di recupero:"
+    "Your recovery seed:": "Il tuo seed di recupero:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Scrivi queste parole in ordine e conservale offline in un luogo sicuro. Ti serviranno per ripristinare il wallet se perdi questo telefono. NexaWal conserva anche una copia crittografata sul dispositivo per lo sblocco — tratta il backup come contanti."
   },
   "ja": {
     "\nAmount %@": "\n金額 %@",
@@ -10613,11 +10613,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "有効にすると、保存されたウォレットを開く際や資金送付時にデバイス認証が必要になります。",
     "Word #%lld:": "単語 #%lld:",
     "Word(s) don't match yet.": "単語がまだ一致していません。",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "これらの単語を順番に書き留め、安全な場所に保管してください。ウォレットの復元に必要です — このデバイスには保存されません。",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "ノードが間違っている場合?上の接続方法やノードを変更するだけで、再スキャンは不要です。\n資金が見当たらない場合?復元高さから再スキャンしてください。\n最終手段:ブロック0から完全に再スキャンします。",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Face IDでウォレットを保護できます。",
-    "Your recovery seed:": "あなたの復元シード:"
+    "Your recovery seed:": "あなたの復元シード:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "これらの単語を順番に書き留め、オフラインの安全な場所に保管してください。このスマートフォンを紛失した場合、ウォレットの復元に必要です。NexaWalはロック解除のため端末にも暗号化コピーを保持します — バックアップは現金と同じように扱ってください。"
   },
   "ko": {
     "\nAmount %@": "\n금액 %@",
@@ -10967,11 +10967,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "이 옵션을 활성화하면 저장된 지갑을 열거나 자금을 전송할 때 기기 인증이 필요합니다.",
     "Word #%lld:": "단어 #%lld:",
     "Word(s) don't match yet.": "단어가 아직 일치하지 않습니다.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "이 단어들을 순서대로 받아 적어 안전한 곳에 보관하세요. 지갑을 복구할 때 필요합니다 — 이 기기에는 절대 저장되지 않습니다.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "노드가 잘못되었나요? 연결 방법이나 위의 노드를 변경하세요 — 재스캔은 필요하지 않습니다.\n자금이 보이지 않나요? 복구 높이부터 재스캔하세요.\n최후의 수단: 블록 0부터 전체 재스캔하세요.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Face ID를 사용하여 지갑을 보호할 수 있습니다.",
-    "Your recovery seed:": "복구 시드:"
+    "Your recovery seed:": "복구 시드:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "이 단어들을 순서대로 적어서 오프라인의 안전한 곳에 보관하세요. 이 휴대폰을 잃어버리면 지갑을 복구할 때 필요합니다. NexaWal은 잠금 해제를 위해 기기에 암호화된 사본도 보관합니다 — 백업을 현금처럼 다루세요."
   },
   "ky": {
     "\nAmount %@": "\nСумма: %@",
@@ -11321,11 +11321,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Иштетилгенде, сакталган капчыкты ачуу жана каражат жөнөтүү түзмөк аутентификациясын талап кылат.",
     "Word #%lld:": "Сөз №%lld:",
     "Word(s) don't match yet.": "Сөз(дөр) азырынча дал келбейт.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Бул сөздөрдү тартип менен жазып, коопсуз жерде сактаңыз. Алар сизге капчыгыңызды калыбына келтирүү үчүн керек болот — алар бул түзмөктө эч качан сакталбайт.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Түйүн туура эмеспи? Туташуу ыкмасын же жогорудагы түйүндү өзгөртүңүз — кайра скандоо талап кылынбайт.\nКаражат жетишпейт беле? Калыбына келтирүү бийиктигинен кайра скандаңыз.\nАкыркы чара: 0-блоктон толук кайра скандоо.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Капчыгыңызды коргоо үчүн Face ID колдоно аласыз.",
-    "Your recovery seed:": "Сиздин калыбына келтирүү сөздөрүңүз:"
+    "Your recovery seed:": "Сиздин калыбына келтирүү сөздөрүңүз:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Бул сөздөрдү тартип менен жазып, аларды оффлайн коопсуз жерде сактаңыз. Бул телефон жоголсо, капчыкты калыбына келтирүү үчүн алар керек болот. NexaWal кулпуну ачуу үчүн түзмөктө шифрленген көчүрмөнү да сактайт — камдык көчүрмөнү накталай акчадай мамиле кылыңыз."
   },
   "lt": {
     "\nAmount %@": "\nSuma %@",
@@ -11675,11 +11675,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Kai įjungta, saugomos piniginės atidarymui ir lėšų siuntimui reikės įrenginio tapatybės patvirtinimo.",
     "Word #%lld:": "Žodis Nr. %lld:",
     "Word(s) don't match yet.": "Žodis (-iai) kol kas nesutampa.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Užsirašykite šiuos žodžius tokia tvarka ir laikykite juos saugioje vietoje. Jų reikės piniginei atkurti — jie niekada nesaugomi šiame įrenginyje.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Netinkamas tinklo taškas? Pakeiskite prisijungimo būdą arba tinklo tašką aukščiau — pakartotinis skenavimas nereikalingas.\nTrūksta lėšų? Skenuokite pakartotinai nuo savo atkūrimo aukščio.\nPaskutinė išeitis: pilnas pakartotinis skenavimas nuo bloko 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Galite naudoti Face ID savo piniginei apsaugoti.",
-    "Your recovery seed:": "Jūsų atkūrimo sėkla:"
+    "Your recovery seed:": "Jūsų atkūrimo sėkla:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Užsirašykite šiuos žodžius tokia tvarka ir laikykite juos saugiai neprisijungę. Jų reikės piniginei atkurti, jei šis telefonas bus prarastas. NexaWal taip pat saugo šifruotą kopiją įrenginyje atrakinimui — elkitės su atsargine kopija kaip su grynaisiais."
   },
   "lv": {
     "\nAmount %@": "\nSumma %@",
@@ -12029,11 +12029,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Kad iespējots, saglabātā maka atvēršanai un līdzekļu sūtīšanai būs nepieciešama ierīces autentifikācija.",
     "Word #%lld:": "Vārds Nr. %lld:",
     "Word(s) don't match yet.": "Vārds(-i) vēl nesakrīt.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Pierakstiet šos vārdus secībā un glabājiet tos drošā vietā. Tie būs nepieciešami maka atjaunošanai — tie nekad netiek glabāti šajā ierīcē.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Nepareizs mezgls? Mainiet savienojuma veidu vai mezglu iepriekš — atkārtota skenēšana nav nepieciešama.\nTrūkst līdzekļu? Skenējiet atkārtoti no jūsu atjaunošanas augstuma.\nPēdējais līdzeklis: pilna atkārtota skenēšana no bloka 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Jūs varat izmantot Face ID, lai aizsargātu savu maku.",
-    "Your recovery seed:": "Jūsu atjaunošanas sēkla:"
+    "Your recovery seed:": "Jūsu atjaunošanas sēkla:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Pierakstiet šos vārdus secībā un glabājiet tos droši bezsaistē. Tie būs nepieciešami, lai atjaunotu maku, ja šis tālrunis tiek pazaudēts. NexaWal arī glabā šifrētu kopiju ierīcē atbloķēšanai — izturieties pret dublējumu kā pret skaidru naudu."
   },
   "ms": {
     "\nAmount %@": "\nJumlah %@",
@@ -12383,11 +12383,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Jika didayakan, membuka dompet yang disimpan dan menghantar wang akan memerlukan pengesahan peranti.",
     "Word #%lld:": "Perkataan #%lld:",
     "Word(s) don't match yet.": "Perkataan belum sepadan.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Tulis perkataan ini mengikut susunan dan simpan di tempat yang selamat. Anda akan memerlukannya untuk memulihkan dompet anda — ia tidak sekali-kali disimpan pada peranti ini.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Node salah? Tukar cara anda menyambung atau node di atas — anda tidak perlu mengimbas semula.\\nWang hilang? Imbas semula daripada ketinggian pemulihan anda.\\nPilihan terakhir: imbasan semula penuh daripada blok 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Anda boleh menggunakan Face ID untuk melindungi dompet anda.",
-    "Your recovery seed:": "Benih pemulihan anda:"
+    "Your recovery seed:": "Benih pemulihan anda:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Tulis perkataan ini mengikut susunan dan simpan secara luar talian di tempat yang selamat. Anda akan memerlukannya untuk memulihkan dompet jika telefon ini hilang. NexaWal juga menyimpan salinan disulitkan pada peranti untuk membuka kunci — anggap sandaran seperti wang tunai."
   },
   "my": {
     "\nAmount %@": "\nပမာဏ %@",
@@ -12737,11 +12737,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "ဖွင့်ထားပါက၊ သိမ်းဆည်းထားသော ပိုက်ဆံအိတ်ကို ဖွင့်ခြင်းနှင့် ငွေပို့ခြင်းအတွက် စက်ပစ္စည်း အထောက်အထားစိစစ်မှု လိုအပ်မည်။",
     "Word #%lld:": "စကားလုံး #%lld:",
     "Word(s) don't match yet.": "စကားလုံး(များ) မကိုက်ညီသေးပါ။",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "ဤစကားလုံးများကို အစဉ်လိုက် ရေးမှတ်ပြီး လုံခြုံသော နေရာတွင် သိမ်းဆည်းထားပါ။ သင့်ပိုက်ဆံအိတ်ကို ပြန်လည်ရယူရန် ၎င်းတို့ကို လိုအပ်မည် — ၎င်းတို့ကို ဤစက်ပစ္စည်းတွင် ဘယ်တော့မှ သိမ်းဆည်းမည် မဟုတ်ပါ။",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Node မှားနေသလား? ပြန်စကင်ဖတ်ရန် မလိုအပ်ဘဲ ဆက်သွယ်ပုံ သို့မဟုတ် အထက်ပါ node ကို ပြောင်းလဲနိုင်သည်။\\nငွေများ ပျောက်နေသလား? သင်၏ ပြန်လည်ရယူရန် အမြင့်မှ ပြန်စကင်ဖတ်ပါ။\\nနောက်ဆုံးရွေးချယ်စရာ: block 0 မှ အပြည့်အစုံ ပြန်စကင်ဖတ်ပါ။",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "သင့်ပိုက်ဆံအိတ်ကို ကာကွယ်ရန် Face ID ကို အသုံးပြုနိုင်သည်။",
-    "Your recovery seed:": "သင်၏ ပြန်လည်ရယူရန် မျိုးစေ့:"
+    "Your recovery seed:": "သင်၏ ပြန်လည်ရယူရန် မျိုးစေ့:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "ဤစကားလုံးများကို အစဉ်လိုက် ရေးမှတ်ပြီး အော့ဖ်လိုင်းတွင် လုံခြုံစွာ သိမ်းဆည်းထားပါ။ ဤဖုန်း ပျောက်ဆုံးပါက ပိုက်ဆံအိတ် ပြန်လည်ရယူရန် ၎င်းတို့ လိုအပ်မည်။ NexaWal သည် သော့ဖွင့်ရန် စက်ပေါ်တွင် စာဝှက်ထားသော မိတ္တူကိုလည်း သိမ်းဆည်းထားသည် — အရန်သိမ်းဆည်းမှုကို ငွေသားကဲ့သို့ ဆက်ဆံပါ။"
   },
   "nb": {
     "\nAmount %@": "\nBeløp %@",
@@ -13091,11 +13091,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Når dette er aktivert, vil åpning av den lagrede lommeboken og sending av midler kreve enhetsautentisering.",
     "Word #%lld:": "Ord #%lld:",
     "Word(s) don't match yet.": "Ordet/ordene stemmer ikke ennå.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Skriv ned disse ordene i riktig rekkefølge og oppbevar dem et trygt sted. Du vil trenge dem for å gjenopprette lommeboken din — de lagres aldri på denne enheten.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Feil node? Endre tilkoblingsmåte eller noden ovenfor — du trenger ikke en ny skanning.\nMangler midler? Skann på nytt fra gjenopprettingshøyden din.\nSiste utvei: full skanning på nytt fra blokk 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Du kan bruke Face ID for å sikre lommeboken din.",
-    "Your recovery seed:": "Gjenopprettingsfrasen din:"
+    "Your recovery seed:": "Gjenopprettingsfrasen din:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Skriv ned disse ordene i riktig rekkefølge og oppbevar dem trygt offline. Du vil trenge dem for å gjenopprette lommeboken hvis denne telefonen blir borte. NexaWal beholder også en kryptert kopi på enheten for opplåsing — behandle sikkerhetskopien som kontanter."
   },
   "nl": {
     "\nAmount %@": "\nBedrag %@",
@@ -13445,11 +13445,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Indien ingeschakeld, is apparaatverificatie vereist om de opgeslagen wallet te openen en tegoeden te verzenden.",
     "Word #%lld:": "Woord #%lld:",
     "Word(s) don't match yet.": "Woord(en) komen nog niet overeen.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Schrijf deze woorden in volgorde op en bewaar ze op een veilige plek. Je hebt ze nodig om je wallet te herstellen — ze worden nooit op dit apparaat opgeslagen.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Verkeerde node? Wijzig de verbindingsmethode of de node hierboven — een herscan is niet nodig.\nOntbrekende tegoeden? Herscan vanaf je hersteldhoogte.\nLaatste redmiddel: volledige herscan vanaf blok 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Je kunt Face ID gebruiken om je wallet te beveiligen.",
-    "Your recovery seed:": "Je herstelseed:"
+    "Your recovery seed:": "Je herstelseed:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Schrijf deze woorden in volgorde op en bewaar ze offline op een veilige plek. Je hebt ze nodig om de portemonnee te herstellen als je deze telefoon kwijtraakt. NexaWal bewaart ook een versleutelde kopie op het apparaat om te ontgrendelen — behandel de back-up als contant geld."
   },
   "pl": {
     "\nAmount %@": "\nKwota %@",
@@ -13799,11 +13799,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Gdy włączone, otwieranie zapisanego portfela i wysyłanie środków będzie wymagać uwierzytelnienia urządzenia.",
     "Word #%lld:": "Słowo nr %lld:",
     "Word(s) don't match yet.": "Słowa jeszcze się nie zgadzają.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Zapisz te słowa w podanej kolejności i przechowuj je w bezpiecznym miejscu. Będziesz ich potrzebować, aby przywrócić portfel — nigdy nie są przechowywane na tym urządzeniu.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Nieprawidłowy węzeł? Zmień sposób łączenia lub węzeł powyżej — ponowne skanowanie nie jest potrzebne.\nBrakujące środki? Przeskanuj ponownie od swojej wysokości przywracania.\nOstatnia opcja: pełne ponowne skanowanie od bloku 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Możesz użyć Face ID, aby zabezpieczyć swój portfel.",
-    "Your recovery seed:": "Twoja fraza odzyskiwania:"
+    "Your recovery seed:": "Twoja fraza odzyskiwania:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Zapisz te słowa w podanej kolejności i przechowuj je bezpiecznie offline. Będziesz ich potrzebować, aby przywrócić portfel, jeśli ten telefon zostanie utracony. NexaWal przechowuje także zaszyfrowaną kopię na urządzeniu do odblokowania — traktuj kopię zapasową jak gotówkę."
   },
   "pt-BR": {
     "\nAmount %@": "\nValor %@",
@@ -14153,11 +14153,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Quando ativado, abrir a carteira armazenada e enviar fundos exigirá autenticação do dispositivo.",
     "Word #%lld:": "Palavra nº %lld:",
     "Word(s) don't match yet.": "A(s) palavra(s) ainda não coincide(m).",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Anote estas palavras em ordem e guarde-as em um lugar seguro. Você vai precisar delas para restaurar sua carteira — elas nunca são armazenadas neste dispositivo.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Nó errado? Altere a forma de conectar ou o nó acima — você não precisa refazer a varredura.\nFaltam fundos? Refaça a varredura a partir da sua altura de restauração.\nÚltimo recurso: nova varredura completa a partir do bloco 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Você pode usar o Face ID para proteger sua carteira.",
-    "Your recovery seed:": "Sua semente de recuperação:"
+    "Your recovery seed:": "Sua semente de recuperação:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Anote estas palavras em ordem e guarde-as offline em um lugar seguro. Você vai precisar delas para restaurar a carteira se este telefone for perdido. O NexaWal também mantém uma cópia criptografada no dispositivo para o desbloqueio — trate o backup como dinheiro vivo."
   },
   "ro": {
     "\nAmount %@": "\nSumă %@",
@@ -14507,11 +14507,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Când este activată, deschiderea portofelului salvat și trimiterea de fonduri vor necesita autentificarea dispozitivului.",
     "Word #%lld:": "Cuvântul #%lld:",
     "Word(s) don't match yet.": "Cuvântul (sau cuvintele) nu se potrivesc încă.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Notează aceste cuvinte în ordine și păstrează-le într-un loc sigur. Vei avea nevoie de ele pentru a-ți restaura portofelul — nu sunt niciodată salvate pe acest dispozitiv.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Nod greșit? Schimbă modul de conectare sau nodul de mai sus — nu ai nevoie de o rescanare.\nFonduri lipsă? Rescanează de la înălțimea ta de restaurare.\nUltima soluție: rescanare completă de la blocul 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Poți folosi Face ID pentru a-ți proteja portofelul.",
-    "Your recovery seed:": "Cheia ta de recuperare:"
+    "Your recovery seed:": "Cheia ta de recuperare:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Notează aceste cuvinte în ordine și păstrează-le în siguranță offline. Vei avea nevoie de ele pentru a restaura portofelul dacă acest telefon este pierdut. NexaWal păstrează și o copie criptată pe dispozitiv pentru deblocare — tratează backupul ca pe numerar."
   },
   "ru": {
     "\nAmount %@": "\nСумма %@",
@@ -14861,11 +14861,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Если включено, для открытия сохранённого кошелька и отправки средств потребуется аутентификация устройства.",
     "Word #%lld:": "Слово #%lld:",
     "Word(s) don't match yet.": "Слова пока не совпадают.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Запишите эти слова по порядку и храните их в надёжном месте. Они понадобятся вам для восстановления кошелька — они никогда не хранятся на этом устройстве.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Неправильный узел? Измените способ подключения или узел выше — повторное сканирование не требуется.\nПропали средства? Выполните повторное сканирование с высоты восстановления.\nКрайний случай: полное сканирование с блока 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Вы можете использовать Face ID для защиты кошелька.",
-    "Your recovery seed:": "Ваша сид-фраза для восстановления:"
+    "Your recovery seed:": "Ваша сид-фраза для восстановления:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Запишите эти слова по порядку и храните их безопасно офлайн. Они понадобятся для восстановления кошелька, если этот телефон будет потерян. NexaWal также хранит зашифрованную копию на устройстве для разблокировки — относитесь к резервной копии как к наличным."
   },
   "sk": {
     "\nAmount %@": "\nSuma %@",
@@ -15215,11 +15215,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Keď je zapnuté, otvorenie uloženej peňaženky a odosielanie prostriedkov bude vyžadovať overenie zariadenia.",
     "Word #%lld:": "Slovo #%lld:",
     "Word(s) don't match yet.": "Slovo (slová) ešte nesúhlasí.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Zapíšte si tieto slová v poradí a uložte ich na bezpečnom mieste. Budete ich potrebovať na obnovenie peňaženky — na tomto zariadení nie sú nikdy uložené.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Nesprávny uzol? Zmeňte spôsob pripojenia alebo uzol vyššie — opätovné skenovanie nie je potrebné.\nChýbajú prostriedky? Znova skenujte od svojej výšky obnovenia.\nPosledná možnosť: úplné opätovné skenovanie od bloku 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Na zabezpečenie peňaženky môžete použiť Face ID.",
-    "Your recovery seed:": "Vaša fráza na obnovenie:"
+    "Your recovery seed:": "Vaša fráza na obnovenie:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Zapíšte si tieto slová v poradí a uložte ich bezpečne offline. Budete ich potrebovať na obnovenie peňaženky, ak tento telefón stratíte. NexaWal tiež uchováva šifrovanú kópiu v zariadení na odomknutie — zaobchádzajte so zálohou ako s hotovosťou."
   },
   "sl": {
     "\nAmount %@": "\nZnesek %@",
@@ -15569,11 +15569,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Ko je omogočeno, bo za odpiranje shranjene denarnice in pošiljanje sredstev potrebno preverjanje naprave.",
     "Word #%lld:": "Beseda #%lld:",
     "Word(s) don't match yet.": "Beseda(-e) se še ne ujemajo.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Zapiši te besede v pravem vrstnem redu in jih shrani na varno mesto. Potreboval jih boš za obnovitev denarnice — na tej napravi niso nikoli shranjene.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Napačno vozlišče? Spremeni način povezave ali zgornje vozlišče — ponovno preiskovanje ni potrebno.\nManjkajoča sredstva? Ponovno preišči od svoje višine za obnovitev.\nSkrajna možnost: popolno ponovno preiskovanje od bloka 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Za zaščito denarnice lahko uporabiš Face ID.",
-    "Your recovery seed:": "Tvoj obnovitveni seed:"
+    "Your recovery seed:": "Tvoj obnovitveni seed:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Zapiši te besede v pravem vrstnem redu in jih shrani varno offline. Potreboval jih boš za obnovitev denarnice, če ta telefon izgubiš. NexaWal hrani tudi šifrirano kopijo na napravi za odklepanje — varnostno kopijo obravnavaj kot gotovino."
   },
   "sq": {
     "\nAmount %@": "\nShuma %@",
@@ -15923,11 +15923,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Kur aktivizohet, hapja e portofolit të ruajtur dhe dërgimi i fondeve do të kërkojnë autentikim të pajisjes.",
     "Word #%lld:": "Fjala #%lld:",
     "Word(s) don't match yet.": "Fjala(ët) nuk përputhet(en) ende.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Shkruaji këto fjalë me radhë dhe ruaji në një vend të sigurt. Do t'i nevojiten për të rikuperuar portofolin tënd — ato nuk ruhen kurrë në këtë pajisje.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Nyje e gabuar? Ndrysho mënyrën e lidhjes ose nyjen sipër — nuk ke nevojë për riskanim.\nFonde që mungojnë? Riskano nga lartësia jote e rikuperimit.\nZgjidhja e fundit: riskanim i plotë nga blloku 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Mund të përdorësh Face ID për të siguruar portofolin tënd.",
-    "Your recovery seed:": "Fraza jote e rikuperimit:"
+    "Your recovery seed:": "Fraza jote e rikuperimit:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Shkruaji këto fjalë me radhë dhe ruaji ato të sigurta jashtë linje. Do t'i nevojiten për të rikuperuar portofolin nëse humbet ky telefon. NexaWal mban gjithashtu një kopje të enkriptuar në pajisje për shkyçje — trajtoje kopjen rezervë si para në dorë."
   },
   "sv": {
     "\nAmount %@": "\nBelopp %@",
@@ -16277,11 +16277,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "När detta är aktiverat krävs enhetsautentisering för att öppna den sparade plånboken och skicka tillgångar.",
     "Word #%lld:": "Ord nr %lld:",
     "Word(s) don't match yet.": "Orden matchar inte ännu.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Skriv ner dessa ord i ordning och förvara dem på ett säkert ställe. Du behöver dem för att återställa din plånbok — de sparas aldrig på den här enheten.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Fel nod? Ändra hur du ansluter eller noden ovan — du behöver ingen omskanning.\nSaknade tillgångar? Skanna om från din återställningshöjd.\nSista utväg: fullständig omskanning från block 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Du kan använda Face ID för att skydda din plånbok.",
-    "Your recovery seed:": "Din återställningsfras:"
+    "Your recovery seed:": "Din återställningsfras:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Skriv ner dessa ord i ordning och förvara dem säkert offline. Du behöver dem för att återställa plånboken om den här telefonen förloras. NexaWal sparar också en krypterad kopia på enheten för upplåsning — behandla säkerhetskopian som kontanter."
   },
   "th": {
     "\nAmount %@": "\nจำนวน %@",
@@ -16631,11 +16631,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "เมื่อเปิดใช้งาน การเปิดกระเป๋าเงินที่จัดเก็บไว้และการส่งเงินจะต้องยืนยันตัวตนอุปกรณ์",
     "Word #%lld:": "คำที่ %lld:",
     "Word(s) don't match yet.": "คำยังไม่ตรงกัน",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "จดคำเหล่านี้ตามลำดับและเก็บไว้ในที่ปลอดภัย คุณจะต้องใช้คำเหล่านี้เพื่อกู้คืนกระเป๋าเงินของคุณ — คำเหล่านี้จะไม่ถูกจัดเก็บไว้บนอุปกรณ์นี้เลย",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "โหนดผิด? เปลี่ยนวิธีเชื่อมต่อหรือโหนดด้านบน — คุณไม่ต้องสแกนซ้ำ\nเงินขาดไปหรือไม่? สแกนซ้ำจากความสูงการกู้คืนของคุณ\nวิธีสุดท้าย: สแกนซ้ำทั้งหมดจากบล็อก 0",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "คุณสามารถใช้ Face ID เพื่อรักษาความปลอดภัยกระเป๋าเงินของคุณได้",
-    "Your recovery seed:": "วลีกู้คืนของคุณ:"
+    "Your recovery seed:": "วลีกู้คืนของคุณ:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "จดคำเหล่านี้ตามลำดับและเก็บไว้อย่างปลอดภัยแบบออฟไลน์ คุณจะต้องใช้คำเหล่านี้เพื่อกู้คืนกระเป๋าเงินหากโทรศัพท์เครื่องนี้สูญหาย NexaWal ยังเก็บสำเนาที่เข้ารหัสไว้บนอุปกรณ์สำหรับการปลดล็อกด้วย — ปฏิบัติต่อข้อมูลสำรองเหมือนเงินสด"
   },
   "tr": {
     "\nAmount %@": "\nMiktar %@",
@@ -16985,11 +16985,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Etkinleştirildiğinde, kayıtlı cüzdanı açmak ve fon göndermek cihaz kimlik doğrulaması gerektirir.",
     "Word #%lld:": "Kelime #%lld:",
     "Word(s) don't match yet.": "Kelime(ler) henüz eşleşmiyor.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Bu kelimeleri sırayla yazın ve güvenli bir yerde saklayın. Cüzdanınızı geri yüklemek için bunlara ihtiyacınız olacak — bu cihazda hiçbir zaman saklanmazlar.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Yanlış düğüm mü? Yukarıdaki bağlantı yöntemini veya düğümü değiştirin — yeniden taramaya gerek yok.\nFonlar mı eksik? Kurtarma yüksekliğinizden yeniden tarayın.\nSon çare: blok 0'dan tam yeniden tarama.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Cüzdanınızı güvence altına almak için Face ID kullanabilirsiniz.",
-    "Your recovery seed:": "Kurtarma tohumunuz:"
+    "Your recovery seed:": "Kurtarma tohumunuz:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Bu kelimeleri sırasıyla yaz ve çevrimdışı güvenli bir yerde sakla. Bu telefon kaybolursa cüzdanı geri yüklemek için bunlara ihtiyacın olacak. NexaWal, kilit açma için cihazda şifreli bir kopya da tutar — yedeği nakit gibi koru."
   },
   "uk": {
     "\nAmount %@": "\nСума %@",
@@ -17339,11 +17339,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Якщо увімкнено, відкриття збереженого гаманця та надсилання коштів вимагатиме автентифікації пристрою.",
     "Word #%lld:": "Слово №%lld:",
     "Word(s) don't match yet.": "Слова ще не збігаються.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Запишіть ці слова по порядку і зберігайте їх у безпечному місці. Вони знадобляться для відновлення гаманця — вони ніколи не зберігаються на цьому пристрої.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Неправильний вузол? Змініть спосіб підключення або вузол вище — повторне сканування не потрібне.\nБракує коштів? Проскануйте повторно з вашої висоти відновлення.\nОстанній варіант: повне повторне сканування з блоку 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Ви можете використовувати Face ID для захисту свого гаманця.",
-    "Your recovery seed:": "Ваша фраза відновлення:"
+    "Your recovery seed:": "Ваша фраза відновлення:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Запишіть ці слова по порядку і зберігайте їх безпечно офлайн. Вони знадобляться для відновлення гаманця, якщо цей телефон буде втрачено. NexaWal також зберігає зашифровану копію на пристрої для розблокування — ставтеся до резервної копії як до готівки."
   },
   "ur": {
     "\nAmount %@": "\nرقم %@",
@@ -17693,11 +17693,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "فعال ہونے پر، محفوظ والٹ کھولنے اور فنڈز بھیجنے کے لیے ڈیوائس تصدیق درکار ہو گی۔",
     "Word #%lld:": "لفظ #%lld:",
     "Word(s) don't match yet.": "الفاظ ابھی میچ نہیں ہو رہے۔",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "یہ الفاظ ترتیب سے لکھ لیں اور کسی محفوظ جگہ رکھیں۔ آپ کو اپنا والٹ بحال کرنے کے لیے ان کی ضرورت ہو گی — یہ اس ڈیوائس پر کبھی محفوظ نہیں ہوتے۔",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "غلط نوڈ؟ اوپر دیے گئے نوڈ یا کنکشن کا طریقہ تبدیل کریں — ری اسکین کی ضرورت نہیں۔\nفنڈز غائب ہیں؟ اپنی ریسٹور ہائٹ سے ری اسکین کریں۔\nآخری چارہ: بلاک 0 سے مکمل ری اسکین۔",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "آپ اپنے والٹ کو محفوظ بنانے کے لیے Face ID استعمال کر سکتے ہیں۔",
-    "Your recovery seed:": "آپ کی ریکوری سیڈ:"
+    "Your recovery seed:": "آپ کی ریکوری سیڈ:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "یہ الفاظ ترتیب سے لکھ لیں اور انہیں آف لائن کسی محفوظ جگہ رکھیں۔ اگر یہ فون گم ہو جائے تو والٹ بحال کرنے کے لیے ان کی ضرورت ہو گی۔ NexaWal ان لاک کے لیے ڈیوائس پر ایک مرموز کاپی بھی رکھتا ہے — بیک اپ کو نقدی کی طرح سمجھیں۔"
   },
   "vi": {
     "\nAmount %@": "\nSố tiền %@",
@@ -18047,11 +18047,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Khi được bật, việc mở ví đã lưu và gửi tiền sẽ yêu cầu xác thực thiết bị.",
     "Word #%lld:": "Từ số %lld:",
     "Word(s) don't match yet.": "Các từ chưa khớp.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Ghi lại các từ này theo đúng thứ tự và lưu giữ ở nơi an toàn. Bạn sẽ cần chúng để khôi phục ví — chúng không bao giờ được lưu trên thiết bị này.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Node sai? Thay đổi cách kết nối hoặc node ở trên — bạn không cần quét lại.\nThiếu tiền? Quét lại từ độ cao khôi phục của bạn.\nGiải pháp cuối cùng: quét lại toàn bộ từ khối 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "Bạn có thể dùng Face ID để bảo vệ ví của mình.",
-    "Your recovery seed:": "Cụm từ khôi phục của bạn:"
+    "Your recovery seed:": "Cụm từ khôi phục của bạn:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Ghi lại các từ này theo đúng thứ tự và lưu giữ chúng an toàn ngoại tuyến. Bạn sẽ cần chúng để khôi phục ví nếu chiếc điện thoại này bị mất. NexaWal cũng giữ một bản sao được mã hóa trên thiết bị để mở khóa — hãy coi bản sao lưu như tiền mặt."
   },
   "yo": {
     "\nAmount %@": "\nIye %@",
@@ -18401,11 +18401,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "Bí a bá gbé e ṣíṣẹ́, ṣíṣí àpamọ́wọ́ tí a fi pamọ́ àti fífi owó ránṣẹ́ yóò nílò ìmúdájú ẹ̀rọ.",
     "Word #%lld:": "Ọ̀rọ̀ #%lld:",
     "Word(s) don't match yet.": "Ọ̀rọ̀ (àwọn) kò tíì bára mu.",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "Kọ àwọn ọ̀rọ̀ yìí sílẹ̀ ní ìlọ́tẹ̀léra kí o sì fi pamọ́sí ibi tí ó dájú. O óò nílò wọn láti dá àpamọ́wọ́ rẹ padà — a kò fi wọ́n pamọ́ sórí ẹ̀rọ yìí láé.",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "Node kò tọ́? Yí bí a ṣe ń so pọ̀ padà tàbí node lókè yìí — o kò nílò tún yẹ̀wò.\\nOwó ń dánù? Tún yẹ̀wò láti ipele ìpadàbọ̀ rẹ.\\nÀṣàyàn ìkẹyìn: tún yẹ̀wò pátápátá láti bulọ́ọ̀kì 0.",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "O lè lo Face ID láti dáàbò bo àpamọ́wọ́ rẹ.",
-    "Your recovery seed:": "Ọ̀rọ̀ ìpadàbọ̀ rẹ:"
+    "Your recovery seed:": "Ọ̀rọ̀ ìpadàbọ̀ rẹ:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "Kọ àwọn ọ̀rọ̀ yìí sílẹ̀ ní ìtòlẹ́sẹẹsẹ kí o sì fi wọ́n pamọ́ síbi àìsí-ayélujára tí ó dájú. O óò nílò wọn láti dá àpamọ́wọ́ padà tí fóònù yìí bá sọnù. NexaWal tún pa àdàkọ tí a fi ọ̀rọ̀-ìpamọ́ pamọ́ sórí ẹ̀rọ fún ṣíṣí — lo àdàkọ ìpamọ́ bí owó ọwọ́."
   },
   "zh-Hans": {
     "\nAmount %@": "\n金额 %@",
@@ -18755,11 +18755,11 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "启用后,打开已保存的钱包和发送资金都需要进行设备身份验证。",
     "Word #%lld:": "第 %lld 个词:",
     "Word(s) don't match yet.": "词语尚不匹配。",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "请按顺序写下这些词并存放在安全的地方。恢复钱包时需要用到它们 — 它们不会存储在此设备上。",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "节点错了?更改上方的连接方式或节点即可,无需重新扫描。\n资金缺失?请从您的恢复高度重新扫描。\n最后手段:从区块 0 开始完整重新扫描。",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "您可以使用 Face ID 保护您的钱包。",
-    "Your recovery seed:": "您的恢复种子:"
+    "Your recovery seed:": "您的恢复种子:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "请按顺序写下这些词，并离线存放在安全的地方。如果这台手机丢失，恢复钱包时需要用到它们。NexaWal 还会在设备上保留一份加密副本用于解锁 — 请像对待现金一样对待备份。"
   },
   "zh-Hant": {
     "\nAmount %@": "\n金額 %@",
@@ -19109,10 +19109,10 @@
     "When enabled, opening the stored wallet and sending funds will require device authentication.": "啓用後,打開已保存的錢包和發送資金都需要進行設備身份驗證。",
     "Word #%lld:": "第 %lld 個詞:",
     "Word(s) don't match yet.": "詞語尚不匹配。",
-    "Write these words down in order and store them somewhere safe. You'll need them to restore your wallet — they are never stored on this device.": "請按順序寫下這些詞並存放在安全的地方。恢復錢包時需要用到它們 — 它們不會存儲在此設備上。",
     "Wrong node? Change how to connect or the node above — you do not need a rescan.\nMissing funds? Rescan from your restore height.\nLast resort: full rescan from block 0.": "節點錯了?更改上方的連接方式或節點即可,無需重新掃描。\n資金缺失?請從您的恢復高度重新掃描。\n最後手段:從區塊 0 開始完整重新掃描。",
     "XMR": "XMR",
     "You can use Face ID to secure your wallet.": "您可以使用 Face ID 保護您的錢包。",
-    "Your recovery seed:": "您的恢復種子:"
+    "Your recovery seed:": "您的恢復種子:",
+    "Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash.": "請按順序寫下這些詞，並離線存放在安全的地方。如果這支手機遺失，恢復錢包時需要用到它們。NexaWal 也會在裝置上保留一份加密副本用於解鎖 — 請像對待現金一樣對待備份。"
   }
 }
