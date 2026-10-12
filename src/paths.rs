@@ -437,28 +437,38 @@ pub fn save_fiat_currency(code: &str) -> std::io::Result<()> {
 
 pub fn load_fiat_rate() -> Option<crate::fiat::Rate> {
     let raw = fs::read_to_string(fiat_rate_path()).ok()?;
+    decode_fiat_rate(&raw)
+}
+
+fn decode_fiat_rate(raw: &str) -> Option<crate::fiat::Rate> {
     let mut lines = raw.lines();
     let currency = lines.next()?.trim().to_string();
     let fiat_per_xmr: f64 = lines.next()?.trim().parse().ok()?;
     let fetched_at_ms: u64 = lines.next()?.trim().parse().ok()?;
     let source = lines.next().unwrap_or("kraken").trim().to_string();
-    if !crate::fiat::is_supported(&currency) || fiat_per_xmr <= 0.0 {
+    // Do not reuse a legacy quote whose server expiry was discarded.
+    let expires_at_ms: u64 = lines.next()?.trim().parse().ok()?;
+    if !crate::fiat::is_supported(&currency) || !fiat_per_xmr.is_finite()
+        || fiat_per_xmr <= 0.0 || expires_at_ms <= fetched_at_ms
+    {
         return None;
     }
     Some(crate::fiat::Rate {
         currency,
         fiat_per_xmr,
         fetched_at_ms,
+        expires_at_ms,
         source,
     })
 }
 
 pub fn save_fiat_rate(rate: &crate::fiat::Rate) -> std::io::Result<()> {
-    let body = format!(
-        "{}\n{}\n{}\n{}\n",
-        rate.currency, rate.fiat_per_xmr, rate.fetched_at_ms, rate.source
-    );
-    write_bytes(fiat_rate_path(), body.as_bytes())
+    write_bytes(fiat_rate_path(), encode_fiat_rate(rate).as_bytes())
+}
+
+fn encode_fiat_rate(rate: &crate::fiat::Rate) -> String {
+    format!("{}\n{}\n{}\n{}\n{}\n", rate.currency, rate.fiat_per_xmr,
+        rate.fetched_at_ms, rate.source, rate.expires_at_ms)
 }
 
 pub fn clear_fiat_rate() {
@@ -583,6 +593,17 @@ fn write_bytes_with(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn fiat_cache_preserves_deadline_and_rejects_legacy_quotes() {
+        let rate = crate::fiat::Rate { currency: "USD".into(), fiat_per_xmr: 100.0,
+            fetched_at_ms: 1_000_000, expires_at_ms: 1_001_000, source: "nexatrode".into() };
+        let restored = super::decode_fiat_rate(&super::encode_fiat_rate(&rate)).unwrap();
+        assert_eq!(restored.expires_at_ms, rate.expires_at_ms);
+        assert!(crate::fiat::live(Some(&restored), rate.expires_at_ms).is_none());
+        assert!(super::decode_fiat_rate("USD\n100\n1000000\nnexatrode\n").is_none());
+        assert!(super::decode_fiat_rate("USD\nNaN\n1000000\nnexatrode\n1001000\n").is_none());
+    }
+
     #[test]
     fn bounded_wallet_reads_reject_oversize_and_accept_exact_limit() {
         let directory = tempfile::tempdir().unwrap();

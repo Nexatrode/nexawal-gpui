@@ -62,7 +62,7 @@ impl Store {
             if self.snapshots.contains_key(trimmed) {
                 continue;
             }
-            let Some(rate) = rate.filter(|r| fiat::is_fresh(r.fetched_at_ms, now)) else {
+            let Some(rate) = fiat::live(rate, now) else {
                 continue;
             };
             self.snapshots.insert(
@@ -92,7 +92,7 @@ impl Store {
         self.observed.insert(trimmed.to_string());
         save_observed(&self.observed);
         let now = fiat::now_ms();
-        let Some(rate) = rate.filter(|r| fiat::is_fresh(r.fetched_at_ms, now)) else {
+        let Some(rate) = fiat::live(rate, now) else {
             return;
         };
         if self.snapshots.contains_key(trimmed) {

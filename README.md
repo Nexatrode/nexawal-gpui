@@ -20,7 +20,7 @@ The Catalyst app can stay as the App Store / iPhone+iPad Mac companion. This bin
 ## Status
 
 Walletcore is linked as a Rust crate (`rlib`) from a pinned revision of the
-source-only `cargo-walletcore` branch in
+source-only `main` branch in
 [MoneroWalletCoreFFI](https://github.com/cacaosteve/MoneroWalletCoreFFI). This
 keeps the dependency fetch small and lets this repository build from a standalone
 clone. The restore screen has seed and restore-height fields; **Open & sync** is
@@ -57,6 +57,17 @@ chosen, which applies the saved mode and endpoint through the normal safe scan
 cancel/restart path.
 
 Keyring v3 does not enable a native backend by default. This repository enables each platform backend explicitly; builds before this change used a temporary in-memory backend and require entering the seed one final time to migrate it into persistent secure storage.
+
+Manual **Lock** hides presentation immediately, cancels scanning, checkpoints the final committed
+batch, and drops both native spend and view keys. Reopening stays blocked while an in-flight
+signing operation or native teardown still owns the wallet. Teardown timeouts automatically
+retry while reopening remains blocked; unexpected errors fail closed and Open retries cleanup.
+Pending-send recovery journals are preserved.
+
+Dependency maintenance notices are tracked in `deny.toml`, with reasons and a 2027-01-12
+review deadline. These narrow exceptions do not disable checks for new vulnerabilities.
+Run `bash scripts/check-advisories.sh` before release; desktop font-stack migrations need
+macOS, Windows and Linux rendering QA.
 
 ## Run
 

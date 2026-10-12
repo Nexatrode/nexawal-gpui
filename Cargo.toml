@@ -57,6 +57,7 @@ rqrr = "0.8"
 nokhwa = { version = "0.10", default-features = false, features = ["input-native"] }
 unicode-segmentation = "1"
 tempfile = "3"
+zeroize = "1"
 
 [build-dependencies]
 winresource = "0.1.31"

@@ -35,6 +35,7 @@ mod receive_book;
 mod scan_tuning;
 mod seed_backup;
 mod send_flow;
+mod session_lock;
 mod sync_status;
 mod text_field;
 mod uri;
@@ -373,6 +374,8 @@ struct Home {
     main_scroll_handle: ScrollHandle,
     status: SharedString,
     opened: bool,
+    native_close_pending: bool,
+    native_close_failed: bool,
     screen: Screen,
     legal_doc: legal::Document,
     legal_return: Screen,
@@ -530,6 +533,8 @@ impl Home {
                     .into()
             },
             opened: false,
+            native_close_pending: false,
+            native_close_failed: false,
             screen: if needs_terms {
                 Screen::Terms
             } else {
@@ -644,7 +649,7 @@ impl Home {
         self.created_seed = false;
         self.wrote_seed_down = false;
         self.challenge_indices.clear();
-        self.challenge_answers = Default::default();
+        zeroize::Zeroize::zeroize(&mut self.challenge_answers);
         self.challenge_slot = 0;
     }
 
@@ -2792,7 +2797,10 @@ impl Home {
     }
 
     fn blocked_by_locked_operation(&mut self, cx: &mut Context<Self>) -> bool {
-        if self.send_operation.is_busy() {
+        if self.native_close_failed && !self.native_close_pending {
+            self.close_locked_wallet(cx);
+        }
+        if self.send_operation.is_busy() || self.native_close_pending {
             self.status = l10n::t("Wallet is locked. The in-flight operation is finishing; reopen is available afterward.").into();
             cx.notify();
             true
@@ -2801,15 +2809,49 @@ impl Home {
         }
     }
 
+    fn close_locked_wallet(&mut self, cx: &mut Context<Self>) {
+        if self.native_close_pending { return; }
+        self.native_close_pending = true;
+        self.native_close_failed = false;
+        let cache_path = paths::cache_path();
+        let persist_cache = !CACHE_PERSISTENCE_SUPPRESSED.load(AtomicOrdering::Relaxed);
+        cx.spawn(async move |this, cx| {
+            let executor = cx.background_executor().clone();
+            let result = session_lock::retry_until_stopped(
+                || {
+                    let cache_path = cache_path.clone();
+                    executor.spawn(async move {
+                        session_lock::close(WALLET_ID, cache_path, persist_cache)
+                    })
+                },
+                || executor.timer(Duration::from_secs(1)),
+            ).await;
+            let _ = this.update(cx, |this, cx| {
+                this.native_close_pending = false;
+                match result {
+                    Ok(None) => {}
+                    Ok(Some(error)) => {
+                        this.status = format!("Wallet locked; final cache could not be saved: {error}").into();
+                    }
+                    Err(error) => {
+                        // Do not let a new wallet replace keys whose teardown timed out.
+                        // Open/restore retries teardown, never bypasses it.
+                        this.native_close_failed = true;
+                        this.status = format!("Wallet hidden; native cleanup failed: {error}. Retry unlock to finish cleanup.").into();
+                    }
+                }
+                cx.notify();
+            });
+        }).detach();
+    }
+
     fn finish_send_operation(&mut self, cx: &mut Context<Self>) -> bool {
         let locked = self.send_operation.finish();
         self.apply_scan_proxy();
         if locked {
             // Preserve any pending/relayed ledger updates before clearing native state.
             // The existing signed-send journal is left intact on failure for recovery.
-            self.persist_scan_cache();
-            let _ = api::refresh_cancel(WALLET_ID);
-            let _ = api::reset_tracked_outputs(WALLET_ID);
+            self.close_locked_wallet(cx);
             self.status = l10n::t("Wallet is locked. Use Open existing wallet to unlock.").into();
             cx.notify();
             return false;
@@ -2859,13 +2901,13 @@ impl Home {
         self.qr_uri.clear();
         self.qr_image = None;
         self.scan_restart_generation = self.scan_restart_generation.wrapping_add(1);
-        self.seed.clear();
-        self.mnemonic.clear();
+        zeroize::Zeroize::zeroize(&mut self.seed);
+        zeroize::Zeroize::zeroize(&mut self.mnemonic);
         self.rescan_height_text = "0".into();
         self.created_seed = false;
         self.wrote_seed_down = false;
         self.challenge_indices.clear();
-        self.challenge_answers = Default::default();
+        zeroize::Zeroize::zeroize(&mut self.challenge_answers);
         self.challenge_slot = 0;
         self.maintenance_confirmation = None;
         self.receive_address = "".into();
@@ -2880,8 +2922,7 @@ impl Home {
             l10n::t("Session cleared.").into()
         };
         if cleanup_now {
-            let _ = api::refresh_cancel(WALLET_ID);
-            let _ = api::reset_tracked_outputs(WALLET_ID);
+            self.close_locked_wallet(cx);
         } else {
             self.status = l10n::t("Wallet is locked. The in-flight operation is finishing; reopen is available afterward.").into();
         }
@@ -2889,12 +2930,18 @@ impl Home {
     }
 
     fn remove_stored_wallet(&mut self, cx: &mut Context<Self>) {
+        if self.native_close_pending || self.native_close_failed {
+            self.blocked_by_locked_operation(cx);
+            return;
+        }
         if self.send_operation.is_busy() { self.forget(cx); return; }
         if let Err(error) = paths::archive_pending_send() {
             self.status = format!("Could not preserve pending-send recovery data; wallet removal stopped: {error}").into();
             cx.notify();
             return;
         }
+        // Removal must not let the asynchronous lock export resurrect a deleted cache.
+        CACHE_PERSISTENCE_SUPPRESSED.store(true, AtomicOrdering::Relaxed);
         self.forget(cx);
         if let Err(err) = wallet_store::delete() {
             self.has_stored = wallet_store::is_marked_stored();
@@ -3150,7 +3197,7 @@ impl Home {
         if let Some(rate) = &self.fiat_rate {
             if rate.source == "nexatrode"
                 && rate.currency == self.fiat_currency
-                && fiat::is_fresh(rate.fetched_at_ms, now)
+                && fiat::live(Some(rate), now).is_some()
             {
                 if now.saturating_sub(rate.fetched_at_ms) < fiat::REFRESH_INTERVAL_MS {
                     return;

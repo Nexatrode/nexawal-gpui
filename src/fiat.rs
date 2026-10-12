@@ -16,6 +16,7 @@ pub struct Rate {
     pub currency: String,
     pub fiat_per_xmr: f64,
     pub fetched_at_ms: u64,
+    pub expires_at_ms: u64,
     pub source: String,
 }
 
@@ -45,7 +46,7 @@ pub fn is_fresh(fetched_at_ms: u64, now: u64) -> bool {
 }
 
 pub fn live<'a>(rate: Option<&'a Rate>, now: u64) -> Option<&'a Rate> {
-    rate.filter(|r| is_fresh(r.fetched_at_ms, now))
+    rate.filter(|r| is_fresh(r.fetched_at_ms, now) && now < r.expires_at_ms)
 }
 
 pub fn decimal_places(currency: &str) -> usize {
@@ -218,7 +219,8 @@ pub fn parse_nexatrode_rate(json: &str, currency: &str, now: u64) -> Result<Rate
     if !price.is_finite() || price <= 0.0 {
         return Err("rates response contains an invalid price".into());
     }
-    if checked_at > now
+    if checked_at == 0
+        || checked_at > now
         || expires_at <= now
         || expires_at.saturating_sub(checked_at) > MAX_AGE_MS
         || !is_fresh(checked_at, now)
@@ -230,6 +232,7 @@ pub fn parse_nexatrode_rate(json: &str, currency: &str, now: u64) -> Result<Rate
         currency: code,
         fiat_per_xmr: price,
         fetched_at_ms: checked_at,
+        expires_at_ms: expires_at,
         source: "nexatrode".into(),
     })
 }
@@ -265,6 +268,7 @@ mod tests {
         assert_eq!(rate.currency, "USD");
         assert_eq!(rate.fiat_per_xmr, 547.38);
         assert_eq!(rate.fetched_at_ms, now - 10_000);
+        assert_eq!(rate.expires_at_ms, now + 1_790_000);
         assert_eq!(rate.source, "nexatrode");
     }
 
@@ -297,6 +301,7 @@ mod tests {
             currency: "USD".into(),
             fiat_per_xmr: 100.0,
             fetched_at_ms: 1,
+            expires_at_ms: 1 + MAX_AGE_MS,
             source: "test".into(),
         };
         assert_eq!(piconero_from_fiat("50", &rate), Some(500_000_000_000));
@@ -307,6 +312,17 @@ mod tests {
         assert_eq!(piconero_from_fiat("0", &rate), Some(0));
         assert_eq!(piconero_from_fiat("", &rate), None);
         assert_eq!(piconero_from_fiat("abc", &rate), None);
+    }
+
+    #[test]
+    fn live_quote_expires_at_server_deadline_not_local_maximum() {
+        let rate = Rate { currency: "USD".into(), fiat_per_xmr: 100.0,
+            fetched_at_ms: 1_000_000, expires_at_ms: 1_001_000, source: "nexatrode".into() };
+        assert!(live(Some(&rate), 1_000_999).is_some());
+        assert!(live(Some(&rate), 1_001_000).is_none());
+        assert!(live(Some(&rate), 999_999).is_none());
+        let extended = Rate { expires_at_ms: u64::MAX, ..rate };
+        assert!(live(Some(&extended), 1_000_000 + MAX_AGE_MS).is_none());
     }
 
     #[test]

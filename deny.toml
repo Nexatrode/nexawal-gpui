@@ -1,0 +1,12 @@
+[advisories]
+unmaintained = "all"
+unused-ignored-advisory = "deny"
+# Reviewed 2026-10-12; temporary maintenance exceptions expire 2027-01-12.
+# scripts/check-advisories.sh enforces the deadline before running cargo-deny.
+# Future vulnerability-class advisories remain errors.
+ignore = [
+  { id = "RUSTSEC-2025-0141", reason = "WalletCore's bounded cache-v3 codec needs a compatible, regression-tested migration before replacement. Review by 2027-01-12." },
+  { id = "RUSTSEC-2024-0436", reason = "Compile-time paste macros enter through the pinned epee/GPUI dependency graph; replace with a tested dependency update, not a wire-format fork. Review by 2027-01-12." },
+  { id = "RUSTSEC-2026-0206", reason = "rustybuzz is transitive SVG text shaping in the tested GPUI/usvg pin. A GPUI/font stack update needs Linux/Windows/macOS rendering regression checks. Review by 2027-01-12." },
+  { id = "RUSTSEC-2026-0192", reason = "ttf-parser is transitive font/SVG parsing in GPUI. Keep the tested renderer pin while validating its maintained replacement across desktop platforms. Review by 2027-01-12." },
+]
