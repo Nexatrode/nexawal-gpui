@@ -1,6 +1,7 @@
 //! Virtualized desktop history, backed by bounded local WalletCore pages.
 use super::*;
 use api::{HistoryFilter, HistoryPage, HistoryQuery};
+use chrono::{Datelike, Local, NaiveDate, TimeZone};
 
 const ROW_HEIGHT: f32 = 132.;
 use std::collections::{BTreeMap, HashSet, VecDeque};
@@ -70,32 +71,50 @@ impl Pager {
     }
 }
 
-/// Date fields are explicitly UTC, just like desktop transaction timestamps.
+/// Resolve local midnight, advancing through a rare midnight DST gap if necessary.
+/// Computing the next date separately preserves 23/25-hour days across DST.
+fn local_start_of_day(date: NaiveDate) -> Option<i64> {
+    for minute in 0..(24 * 60) {
+        let time = date.and_hms_opt((minute / 60) as u32, (minute % 60) as u32, 0)?;
+        if let Some(local) = Local.from_local_datetime(&time).earliest() {
+            return Some(local.timestamp());
+        }
+    }
+    None
+}
+
 fn date_seconds(value: &str, end: bool) -> Result<Option<u64>, String> {
     if value.trim().is_empty() {
         return Ok(None);
     }
-    let parts: Vec<_> = value.trim().split('-').collect();
-    if parts.len() != 3 || parts[0].len() != 4 || parts[1].len() != 2 || parts[2].len() != 2 {
-        return Err("Use YYYY-MM-DD for dates (UTC).".into());
+    let value = value.trim();
+    if value.len() != 10 {
+        return Err(
+            l10n::t("Enter valid dates in YYYY-MM-DD format, or leave them blank.").to_string(),
+        );
     }
-    let y: i32 = parts[0].parse().map_err(|_| "Invalid year")?;
-    let m: u32 = parts[1].parse().map_err(|_| "Invalid month")?;
-    let d: u32 = parts[2].parse().map_err(|_| "Invalid day")?;
-    if !(1970..=9999).contains(&y) || !(1..=12).contains(&m) || !(1..=31).contains(&d) {
-        return Err("Invalid date.".into());
+    let date = NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| {
+        l10n::t("Enter valid dates in YYYY-MM-DD format, or leave them blank.").to_string()
+    })?;
+    if !(1970..=9999).contains(&date.year()) {
+        return Err(
+            l10n::t("Enter valid dates in YYYY-MM-DD format, or leave them blank.").to_string(),
+        );
     }
-    let year = i64::from(y) - i64::from(m <= 2);
-    let era = year / 400;
-    let yoe = year - era * 400;
-    let mp = i64::from(m) + if m > 2 { -3 } else { 9 };
-    let days = era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + (153 * mp + 2) / 5 + i64::from(d)
-        - 1
-        - 719468;
-    if civil_date_from_days(days) != (y, m, d) {
-        return Err("Invalid date.".into());
+    let boundary_date = if end {
+        date.succ_opt().ok_or_else(|| {
+            l10n::t("Enter valid dates in YYYY-MM-DD format, or leave them blank.").to_string()
+        })?
+    } else {
+        date
+    };
+    let mut seconds = local_start_of_day(boundary_date).ok_or_else(|| {
+        l10n::t("Enter valid dates in YYYY-MM-DD format, or leave them blank.").to_string()
+    })?;
+    if end {
+        seconds = seconds.saturating_sub(1);
     }
-    Ok(Some(days as u64 * 86400 + if end { 86399 } else { 0 }))
+    Ok(Some(seconds.max(0) as u64))
 }
 
 impl Home {
@@ -103,7 +122,9 @@ impl Home {
         let from = date_seconds(&self.transfer_from, false)?;
         let to = date_seconds(&self.transfer_to, true)?;
         if from.zip(to).is_some_and(|(a, b)| a > b) {
-            return Err("The date range is reversed.".into());
+            return Err(
+                l10n::t("Enter valid dates in YYYY-MM-DD format, or leave them blank.").to_string(),
+            );
         }
         Ok(HistoryQuery {
             filter: match self.transfer_filter {
@@ -405,27 +426,26 @@ pub(super) fn preview(home: &Home, cx: &mut Context<Home>) -> gpui::AnyElement {
         .p_4()
         .bg(rgb(theme_card()))
         .rounded_lg()
-        .child(div().text_sm().child(format!(
-            "Recent Transactions · {} total",
-            home.history_pages.total
-        )))
+        .child(div().text_sm().child(l10n::t("Recent Transactions")))
         .children(
             home.transfers
                 .iter()
                 .map(|transfer| row(transfer, home, cx)),
         )
         .when(home.transfers.is_empty(), |view| {
-            view.child(div().text_sm().child("No transactions found yet."))
+            view.child(div().text_sm().child(l10n::t("No transactions yet.")))
         })
         .child(secondary_action_button(
             "view-all-history",
-            format!("View all transactions ({})", home.history_pages.total),
+            format!("{}", l10n::t("View all transactions (%lld)"))
+                .replace("%lld", &home.history_pages.total.to_string()),
             cx.listener(|this, _, _, cx| this.go_history(cx)),
         ))
         .when(home.history_pages.pending > 0, |view| {
             view.child(secondary_action_button(
                 "view-pending-history",
-                format!("{} pending transactions", home.history_pages.pending),
+                format!("{}", l10n::t("%lld pending transactions"))
+                    .replace("%lld", &home.history_pages.pending.to_string()),
                 cx.listener(|this, _, _, cx| {
                     this.transfer_filter = TransferFilter::Pending;
                     this.go_history(cx);
@@ -461,14 +481,14 @@ pub(super) fn screen(home: &mut Home, window: &Window, cx: &mut Context<Home>) -
         .p_4()
         .bg(rgb(theme_card()))
         .rounded_lg()
-        .child(div().text_lg().child("Transactions"))
+        .child(div().text_lg().child(l10n::t("Transactions")))
         .child(field_input(
             home,
             window,
             cx,
             Field::TransferSearch,
             "transactions-search",
-            "Search transaction ID",
+            l10n::t("Search transaction ID"),
             false,
             true,
         ))
@@ -484,7 +504,7 @@ pub(super) fn screen(home: &mut Home, window: &Window, cx: &mut Context<Home>) -
                 .map(|(id, label, filter)| {
                     history_filter_button(
                         id,
-                        label,
+                        l10n::t(label),
                         home.transfer_filter == filter,
                         cx.listener(move |this, _, _, cx| {
                             this.transfer_filter = filter;
@@ -504,7 +524,7 @@ pub(super) fn screen(home: &mut Home, window: &Window, cx: &mut Context<Home>) -
                     cx,
                     Field::HistoryFrom,
                     "history-from",
-                    "From YYYY-MM-DD (UTC)",
+                    format!("{} (YYYY-MM-DD)", l10n::t("From")),
                     false,
                     true,
                 )))
@@ -514,26 +534,29 @@ pub(super) fn screen(home: &mut Home, window: &Window, cx: &mut Context<Home>) -
                     cx,
                     Field::HistoryTo,
                     "history-to",
-                    "Through YYYY-MM-DD (UTC)",
+                    format!("{} (YYYY-MM-DD)", l10n::t("Through")),
                     false,
                     true,
                 ))),
         )
-        .child(div().text_sm().child(format!(
-            "{} matching · {} total",
-            count, home.history_pages.total
-        )))
+        .child(
+            div().text_sm().child(
+                l10n::t("%1$d matching · %2$d total")
+                    .replace("%1$d", &count.to_string())
+                    .replace("%2$d", &home.history_pages.total.to_string()),
+            ),
+        )
         .when(home.scan_was_running || home.scan_needs_retry, |view| {
             view.child(
                 div()
                     .text_sm()
-                    .child("History may be incomplete while syncing."),
+                    .child(l10n::t("History may be incomplete while syncing.")),
             )
         })
         .when(home.history_pages.changed, |view| {
             view.child(secondary_action_button(
                 "history-reload",
-                "History changed · Reload transactions",
+                l10n::t("History changed · Reload transactions"),
                 cx.listener(|this, _, _, cx| {
                     this.reload_history(cx);
                 }),
@@ -543,7 +566,7 @@ pub(super) fn screen(home: &mut Home, window: &Window, cx: &mut Context<Home>) -
             view.child(div().text_sm().child(error))
                 .child(secondary_action_button(
                     "history-retry",
-                    "Retry loading history",
+                    l10n::t("Retry loading history"),
                     cx.listener(|this, _, _, cx| {
                         let offsets: Vec<_> = this.history_pages.failed.drain().collect();
                         this.history_pages.error = None;
@@ -554,7 +577,7 @@ pub(super) fn screen(home: &mut Home, window: &Window, cx: &mut Context<Home>) -
                 ))
         })
         .when(!home.history_pages.in_flight.is_empty(), |view| {
-            view.child(div().text_sm().child("Loading transactions…"))
+            view.child(div().text_sm().child(l10n::t("Loading transaction…")))
         })
         .when(
             count == 0
@@ -562,9 +585,9 @@ pub(super) fn screen(home: &mut Home, window: &Window, cx: &mut Context<Home>) -
                 && home.history_pages.error.is_none(),
             |view| {
                 view.child(div().text_sm().child(if home.history_pages.total > 0 {
-                    "No transactions match these filters."
+                    l10n::t("No transactions match these filters.")
                 } else {
-                    "No transactions found yet."
+                    l10n::t("No transactions yet.")
                 }))
             },
         )
@@ -583,9 +606,9 @@ pub(super) fn screen(home: &mut Home, window: &Window, cx: &mut Context<Home>) -
                                 div()
                                     .h(px(ROW_HEIGHT))
                                     .child(if this.history_pages.changed {
-                                        "Reload history to continue."
+                                        l10n::t("Reload history to continue.")
                                     } else {
-                                        "Loading transaction…"
+                                        l10n::t("Loading transaction…")
                                     })
                                     .into_any_element()
                             },
@@ -601,7 +624,7 @@ pub(super) fn screen(home: &mut Home, window: &Window, cx: &mut Context<Home>) -
         )
         .child(secondary_action_button(
             "history-export",
-            "Export all matching transactions (CSV)",
+            l10n::t("Export matching transactions (CSV)"),
             cx.listener(|this, _, _, cx| this.export_transfer_history(cx)),
         ))
         .into_any_element()
@@ -670,11 +693,32 @@ mod tests {
     }
 
     #[test]
-    fn utc_date_ranges_validate_calendar_dates() {
-        assert_eq!(date_seconds("1970-01-01", false).unwrap(), Some(0));
-        assert_eq!(date_seconds("1970-01-01", true).unwrap(), Some(86399));
+    fn local_date_ranges_validate_calendar_dates_and_end_at_next_local_midnight() {
+        let start = date_seconds("1970-01-01", false).unwrap().unwrap();
+        let end = date_seconds("1970-01-01", true).unwrap().unwrap();
+        let next_day = NaiveDate::from_ymd_opt(1970, 1, 2).unwrap();
+        let next_start = local_start_of_day(next_day).unwrap().max(0) as u64;
+        assert_eq!(end + 1, next_start);
+        let local_start = Local.timestamp_opt(start as i64, 0).single().unwrap();
+        assert_eq!(
+            local_start.date_naive(),
+            NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()
+        );
         assert!(date_seconds("2025-02-29", false).is_err());
         assert!(date_seconds("2024-02-29", false).is_ok());
         assert!(date_seconds("2025-13-01", false).is_err());
+        for (year, month, day) in [(2024, 3, 10), (2024, 11, 3)] {
+            let date = NaiveDate::from_ymd_opt(year, month, day).unwrap();
+            let next = date.succ_opt().unwrap();
+            let seconds = local_start_of_day(next).unwrap() - local_start_of_day(date).unwrap();
+            assert!(matches!(seconds, 82_800 | 86_400 | 90_000));
+            assert_eq!(
+                date_seconds(&date.format("%Y-%m-%d").to_string(), true)
+                    .unwrap()
+                    .unwrap() as i64
+                    + 1,
+                local_start_of_day(next).unwrap().max(0)
+            );
+        }
     }
 }

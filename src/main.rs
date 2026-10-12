@@ -450,6 +450,8 @@ struct Home {
     fiat_currency: String,
     fiat_rate: Option<fiat::Rate>,
     fiat_fetching: bool,
+    fiat_last_attempt_ms: u64,
+    fiat_last_attempt_currency: String,
     fiat_snapshots: fiat_snapshot::Store,
     network_policy: network::Policy,
     i2p_rpc: String,
@@ -607,6 +609,8 @@ impl Home {
             fiat_currency: paths::load_fiat_currency(),
             fiat_rate: paths::load_fiat_rate(),
             fiat_fetching: false,
+            fiat_last_attempt_ms: 0,
+            fiat_last_attempt_currency: String::new(),
             fiat_snapshots: fiat_snapshot::Store::load(),
             network_policy: paths::load_network_policy(),
             i2p_rpc: paths::load_i2p_rpc(),
@@ -1026,15 +1030,25 @@ impl Home {
                 .background_executor()
                 .spawn(async move {
                     let mut rows = Vec::new();
+                    let mut expected_revision: Option<String> = None;
                     loop {
                         let page =
                             api::query_transfers(WALLET_ID, &query).map_err(|e| e.to_string())?;
+                        if expected_revision
+                            .as_ref()
+                            .is_some_and(|revision| revision != &page.revision)
+                        {
+                            return Err(
+                                "History changed during export; reload and try again.".to_string(),
+                            );
+                        }
+                        expected_revision.get_or_insert_with(|| page.revision.clone());
                         rows.extend(page.transfers);
                         let Some(offset) = page.next_offset else {
                             break;
                         };
                         query.offset = offset;
-                        query.revision = Some(page.revision);
+                        query.revision = expected_revision.clone();
                     }
                     // Intentional full export, not the four-page UI cache. A history change aborts
                     // before writing, rather than producing a mixed-revision/truncated CSV.
@@ -3095,9 +3109,10 @@ impl Home {
         let _ = paths::save_fiat_enabled(self.fiat_enabled);
         if self.fiat_enabled {
             let _ = paths::ensure_fiat_opted_in_at();
+            self.fiat_last_attempt_ms = 0;
             self.maybe_refresh_fiat(cx);
             self.status = format!(
-                "Fiat estimates on · {}. Kraken / Frankfurter will see your IP.",
+                "Fiat estimates on · {}. Nexatrode will see your IP and selected currency.",
                 self.fiat_currency
             )
             .into();
@@ -3119,6 +3134,7 @@ impl Home {
         .to_string();
         let _ = paths::save_fiat_currency(&self.fiat_currency);
         self.fiat_rate = None;
+        self.fiat_last_attempt_ms = 0;
         if self.fiat_enabled {
             self.maybe_refresh_fiat(cx);
         }
@@ -3132,12 +3148,22 @@ impl Home {
         }
         let now = fiat::now_ms();
         if let Some(rate) = &self.fiat_rate {
-            if rate.currency == self.fiat_currency && fiat::is_fresh(rate.fetched_at_ms, now) {
+            if rate.source == "nexatrode"
+                && rate.currency == self.fiat_currency
+                && fiat::is_fresh(rate.fetched_at_ms, now)
+            {
                 if now.saturating_sub(rate.fetched_at_ms) < fiat::REFRESH_INTERVAL_MS {
                     return;
                 }
             }
         }
+        if self.fiat_last_attempt_currency == self.fiat_currency
+            && now.saturating_sub(self.fiat_last_attempt_ms) < fiat::REFRESH_INTERVAL_MS
+        {
+            return;
+        }
+        self.fiat_last_attempt_ms = now;
+        self.fiat_last_attempt_currency = self.fiat_currency.clone();
         self.fiat_fetching = true;
         let currency = self.fiat_currency.clone();
         cx.spawn(async move |this, cx| {
@@ -5280,7 +5306,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                             div()
                                 .text_xs()
                                 .text_color(rgb(theme_muted()))
-                                .child("Optional. Fetches XMR/USD from api.kraken.com and, if needed, FX from api.frankfurter.dev. Those servers see your IP. Amounts and addresses are not sent."),
+                                .child(l10n::t("Optional. When enabled, NexaWal requests an XMR rate for your selected currency from rates.nexatrode.com over HTTPS. This request uses clearnet even when the wallet node uses I2P. Nexatrode can see your IP address and selected currency; wallet amounts, addresses, seeds, and transaction history are not sent. Estimates only — XMR is what you send and hold.")),
                         )
                 }),
         ))
@@ -5548,6 +5574,7 @@ fn history_filter_button(
 
 fn transfer_detail(row: &Transfer, chain_height: u64, cx: &mut Context<Home>) -> impl IntoElement {
     let txid = row.txid.clone();
+    let explorer_url = format!("https://xmrchain.net/tx/{txid}");
     let amount = row.amount;
     let direction = match row.direction.as_str() {
         "in" => l10n::t("Received").to_string(),
@@ -5661,6 +5688,14 @@ fn transfer_detail(row: &Transfer, chain_height: u64, cx: &mut Context<Home>) ->
             cx.listener(move |this, _: &ClickEvent, _, cx| {
                 cx.write_to_clipboard(gpui::ClipboardItem::new_string(txid.clone()));
                 this.status = "Transaction ID copied.".into();
+            }),
+        ))
+        .child(action_button(
+            "copy-transfer-explorer-link",
+            l10n::t("Copy Explorer Link"),
+            cx.listener(move |this, _: &ClickEvent, _, cx| {
+                cx.write_to_clipboard(gpui::ClipboardItem::new_string(explorer_url.clone()));
+                this.status = l10n::t("Link copied").to_string().into();
             }),
         ))
         .child(action_button(

@@ -1,4 +1,4 @@
-//! Opt-in XMR fiat estimates. Same sources as iOS/Android: Kraken + Frankfurter.
+//! Opt-in XMR fiat estimates fetched from the NexaWal rates API over clearnet HTTPS.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -181,61 +181,56 @@ fn group_thousands(number: &str, places: usize) -> String {
     }
 }
 
-pub fn parse_kraken_last_trade(json: &str) -> Option<f64> {
-    let result_idx = json.find("\"result\"")?;
-    let c_idx = json[result_idx..].find("\"c\"")? + result_idx;
-    let bracket = json[c_idx..].find('[')? + c_idx;
-    let quote1 = json[bracket + 1..].find('"')? + bracket + 1;
-    let quote2 = json[quote1 + 1..].find('"')? + quote1 + 1;
-    json[quote1 + 1..quote2].parse().ok()
-}
-
-pub fn parse_frankfurter_rate(json: &str, symbol: &str) -> Option<f64> {
-    let code = symbol.to_ascii_uppercase();
-    if code == "USD" {
-        return Some(1.0);
-    }
-    let rates_idx = json.find("\"rates\"")?;
-    let key = format!("\"{code}\"");
-    let key_idx = json[rates_idx..].find(&key)? + rates_idx;
-    let colon = json[key_idx + key.len()..].find(':')? + key_idx + key.len();
-    let rest = json[colon + 1..].trim_start();
-    let end = rest
-        .find(|ch: char| ch == ',' || ch == '}' || ch.is_whitespace())
-        .unwrap_or(rest.len());
-    rest[..end].parse().ok()
-}
-
 pub fn fetch_rate(currency: &str) -> Result<Rate, String> {
     let code = currency.trim().to_ascii_uppercase();
     if !is_supported(&code) {
         return Err(format!("unsupported currency {code}"));
     }
-    let now = now_ms();
-    if code == "EUR" {
-        let last = fetch_kraken("XMREUR")?;
-        return Ok(Rate {
-            currency: code,
-            fiat_per_xmr: last,
-            fetched_at_ms: now,
-            source: "kraken".into(),
-        });
+    let json = http_get(&format!("https://rates.nexatrode.com/v1/rates/XMR/{code}"))?;
+    parse_nexatrode_rate(&json, &code, now_ms())
+}
+
+pub fn parse_nexatrode_rate(json: &str, currency: &str, now: u64) -> Result<Rate, String> {
+    let code = currency.trim().to_ascii_uppercase();
+    if !is_supported(&code) {
+        return Err(format!("unsupported currency {code}"));
     }
-    let usd = fetch_kraken("XMRUSD")?;
-    if code == "USD" {
-        return Ok(Rate {
-            currency: code,
-            fiat_per_xmr: usd,
-            fetched_at_ms: now,
-            source: "kraken".into(),
-        });
+    let value: serde_json::Value = serde_json::from_str(json).map_err(|err| err.to_string())?;
+    let base = value.get("base").and_then(serde_json::Value::as_str);
+    let quote = value.get("quote").and_then(serde_json::Value::as_str);
+    let price = value
+        .get("fiat_per_xmr")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|value| value.parse::<f64>().ok());
+    let checked_at = value
+        .get("checked_at_ms")
+        .and_then(serde_json::Value::as_u64);
+    let expires_at = value
+        .get("expires_at_ms")
+        .and_then(serde_json::Value::as_u64);
+
+    let (Some(price), Some(checked_at), Some(expires_at)) = (price, checked_at, expires_at) else {
+        return Err("rates response is missing required fields".into());
+    };
+    if base != Some("XMR") || quote != Some(code.as_str()) {
+        return Err("rates response currency does not match request".into());
     }
-    let fx = fetch_frankfurter(&code)?;
+    if !price.is_finite() || price <= 0.0 {
+        return Err("rates response contains an invalid price".into());
+    }
+    if checked_at > now
+        || expires_at <= now
+        || expires_at.saturating_sub(checked_at) > MAX_AGE_MS
+        || !is_fresh(checked_at, now)
+    {
+        return Err("rates response is expired or outside the accepted age".into());
+    }
+
     Ok(Rate {
         currency: code,
-        fiat_per_xmr: usd * fx,
-        fetched_at_ms: now,
-        source: "kraken+frankfurter".into(),
+        fiat_per_xmr: price,
+        fetched_at_ms: checked_at,
+        source: "nexatrode".into(),
     })
 }
 
@@ -243,19 +238,6 @@ fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
         .timeout(std::time::Duration::from_secs(8))
         .build()
-}
-
-fn fetch_kraken(pair: &str) -> Result<f64, String> {
-    let url = format!("https://api.kraken.com/0/public/Ticker?pair={pair}");
-    let json = http_get(&url)?;
-    parse_kraken_last_trade(&json).ok_or_else(|| "Kraken response missing last trade".into())
-}
-
-fn fetch_frankfurter(symbol: &str) -> Result<f64, String> {
-    let url = format!("https://api.frankfurter.dev/v1/latest?base=USD&symbols={symbol}");
-    let json = http_get(&url)?;
-    parse_frankfurter_rate(&json, symbol)
-        .ok_or_else(|| format!("Frankfurter response missing {symbol}"))
 }
 
 fn http_get(url: &str) -> Result<String, String> {
@@ -272,15 +254,41 @@ mod tests {
     use super::*;
 
     #[test]
-    fn kraken_parse() {
-        let json = r#"{"result":{"XXMRZUSD":{"c":["356.85","1"]}}}"#;
-        assert_eq!(parse_kraken_last_trade(json), Some(356.85));
+    fn nexatrode_response_is_validated_and_uses_server_timestamp() {
+        let now = 1_700_000_000_000;
+        let json = format!(
+            r#"{{"base":"XMR","quote":"USD","fiat_per_xmr":"547.38","checked_at_ms":{},"expires_at_ms":{}}}"#,
+            now - 10_000,
+            now + 1_790_000
+        );
+        let rate = parse_nexatrode_rate(&json, "USD", now).unwrap();
+        assert_eq!(rate.currency, "USD");
+        assert_eq!(rate.fiat_per_xmr, 547.38);
+        assert_eq!(rate.fetched_at_ms, now - 10_000);
+        assert_eq!(rate.source, "nexatrode");
     }
 
     #[test]
-    fn frankfurter_parse() {
-        let json = r#"{"rates":{"GBP":0.78}}"#;
-        assert_eq!(parse_frankfurter_rate(json, "GBP"), Some(0.78));
+    fn nexatrode_response_rejects_mismatch_expired_future_and_invalid_values() {
+        let now = 1_700_000_000_000;
+        let response = |quote: &str, price: &str, checked: u64, expires: u64| {
+            format!(
+                r#"{{"base":"XMR","quote":"{quote}","fiat_per_xmr":"{price}","checked_at_ms":{checked},"expires_at_ms":{expires}}}"#
+            )
+        };
+        assert!(parse_nexatrode_rate(&response("EUR", "2", now - 1, now + 1), "USD", now).is_err());
+        assert!(
+            parse_nexatrode_rate(
+                &response("USD", "2", now - MAX_AGE_MS - 1, now + 1),
+                "USD",
+                now
+            )
+            .is_err()
+        );
+        assert!(parse_nexatrode_rate(&response("USD", "2", now + 1, now + 2), "USD", now).is_err());
+        assert!(
+            parse_nexatrode_rate(&response("USD", "NaN", now - 1, now + 1), "USD", now).is_err()
+        );
     }
 
     #[test]

@@ -4032,6 +4032,7 @@ name = "nexawal-gpui"
 version = "0.1.0"
 dependencies = [
  "block2 0.6.2",
+ "chrono",
  "dirs 5.0.1",
  "gpui",
  "gpui_platform",
@@ -7160,8 +7161,8 @@ dependencies = [
 
 [[package]]
 name = "walletcore"
-version = "0.1.11"
-source = "git+https://github.com/cacaosteve/MoneroWalletCoreFFI.git?rev=7d0c40ff896e2a7dcc21c1573395e878a6c5e4c5#7d0c40ff896e2a7dcc21c1573395e878a6c5e4c5"
+version = "0.1.13"
+source = "git+https://github.com/cacaosteve/MoneroWalletCoreFFI.git?rev=85bf4956182389b6b4f96ef9dffa267000c72326#85bf4956182389b6b4f96ef9dffa267000c72326"
 dependencies = [
  "bincode",
  "bytes",
