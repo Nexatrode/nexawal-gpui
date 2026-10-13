@@ -566,7 +566,8 @@ impl Home {
             mnemonic: String::new(),
             address: "".into(),
             receive_address: "".into(),
-            receive_book: receive_book::load(),
+            // Loaded strictly before native open; this is only a closed-wallet placeholder.
+            receive_book: receive_book::Book::primary(),
             require_device_auth,
             total_piconero: 0,
             unlocked_piconero: 0,
@@ -2587,6 +2588,14 @@ impl Home {
         if self.blocked_by_locked_operation(cx) {
             return;
         }
+        let receive_book = match receive_book::load() {
+            Ok(book) => book,
+            Err(error) => {
+                self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
+                cx.notify();
+                return;
+            }
+        };
         if let Err(err) = api::open_from_mnemonic(WALLET_ID, mnemonic, restore_height, true) {
             self.status = l10n::interpolate("Open failed: {0}", &[format!("{}", err)]).into();
             cx.notify();
@@ -2639,7 +2648,7 @@ impl Home {
         self.scan_was_running = false;
         self.scan_rate.reset();
         self.apply_scan_proxy();
-        self.receive_book = receive_book::load();
+        self.receive_book = receive_book;
         if let Err(error) = api::set_gap_limit(WALLET_ID, self.receive_book.required_coverage().max(self.scan_gap_limit)) {
             self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
             let _ = api::close(WALLET_ID, 1_000);
@@ -2657,7 +2666,6 @@ impl Home {
         self.wrote_seed_down = false;
         self.challenge_indices.clear();
         self.challenge_answers = Default::default();
-        self.receive_book = receive_book::load();
         self.refresh_receive_address();
         let protection = self.require_device_auth ||
             (paths::load_device_auth_preference().is_none() && device_auth::is_available());

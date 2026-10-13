@@ -18,6 +18,11 @@ pub struct Book {
 impl Book {
     /// Publish edits only after the atomic file replacement succeeds.
     pub fn update_and_save<T>(&mut self, update: impl FnOnce(&mut Self) -> T) -> std::io::Result<T> {
+        // Do not overwrite an unreadable, corrupt, or externally changed book with the
+        // in-memory copy. In particular, absence is not interchangeable with corruption.
+        if load()? != *self {
+            return Err(std::io::Error::other("Receive address book changed; reopen the wallet before editing it."));
+        }
         self.update_with_writer(update, save)
     }
 
@@ -31,7 +36,8 @@ impl Book {
     }
 
     pub fn required_coverage(&self) -> u32 {
-        self.entries.iter().map(|entry| entry.index).max().unwrap_or(0).max(50)
+        self.entries.iter().map(|entry| entry.index).max().unwrap_or(0)
+            .max(self.next_index.saturating_sub(1)).max(50)
     }
 
     pub fn primary() -> Self {
@@ -134,20 +140,33 @@ impl Book {
     }
 }
 
-pub fn load() -> Book {
-    parse(&fs_read()).unwrap_or_else(Book::primary)
+pub fn load() -> std::io::Result<Book> {
+    load_from(&paths::receive_book_path())
 }
 
-pub fn save(book: &Book) -> std::io::Result<()> {
+fn load_from(path: &std::path::Path) -> std::io::Result<Book> {
+    match std::fs::read_to_string(path) {
+        Ok(raw) => parse(&raw).ok_or_else(|| std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Receive address book is invalid; restore its backup before reopening the wallet.",
+        )),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            // A dangling symlink is an existing damaged book, not a fresh installation.
+            match std::fs::symlink_metadata(path) {
+                Err(missing) if missing.kind() == std::io::ErrorKind::NotFound => Ok(Book::primary()),
+                _ => Err(error),
+            }
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn save(book: &Book) -> std::io::Result<()> {
     paths::write_bytes(paths::receive_book_path(), format_book(book).as_bytes())
 }
 
 pub fn clear() {
     let _ = std::fs::remove_file(paths::receive_book_path());
-}
-
-fn fs_read() -> String {
-    std::fs::read_to_string(paths::receive_book_path()).unwrap_or_default()
 }
 
 fn format_book(book: &Book) -> String {
@@ -175,27 +194,19 @@ fn parse(raw: &str) -> Option<Book> {
             label: label.trim().to_string(),
         });
     }
-    if !entries.iter().any(|e| e.index == 0) {
-        entries.insert(
-            0,
-            Entry {
-                index: 0,
-                label: "Primary".into(),
-            },
-        );
-    }
     entries.sort_by_key(|e| e.index);
-    entries.dedup_by_key(|e| e.index);
+    if !entries.iter().any(|e| e.index == 0)
+        || !entries.iter().any(|e| e.index == selected)
+        || entries.windows(2).any(|pair| pair[0].index == pair[1].index) {
+        return None;
+    }
     let max_index = entries.iter().map(|e| e.index).max().unwrap_or(0);
-    let mut book = Book {
-        next_index: next_index.max(max_index + 1),
+    if next_index < max_index.checked_add(1)? || next_index == u32::MAX { return None; }
+    Some(Book {
+        next_index,
         selected,
         entries,
-    };
-    if !book.entries.iter().any(|e| e.index == book.selected) {
-        book.selected = 0;
-    }
-    Some(book)
+    })
 }
 
 #[cfg(test)]
@@ -210,6 +221,32 @@ mod tests {
         assert_eq!(parsed.next_index, 2);
         assert_eq!(parsed.selected, 1);
         assert_eq!(parsed.entries[1].label, "Shop");
+    }
+
+    #[test]
+    fn missing_book_is_new_but_corruption_and_read_errors_are_not() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("book");
+        assert_eq!(load_from(&path).unwrap(), Book::primary());
+        for bytes in [b"".as_slice(), b"corrupt", b"2\n1\n0|Primary\nnot-an-index|Shop\n",
+            b"4294967295\n0\n4294967295|Overflow\n", b"2\n0\n", b"2\n1\n0|Primary\n",
+            b"2\n0\n0|Primary\n0|Duplicate\n", b"1\n1\n0|Primary\n1|Shop\n"] {
+            std::fs::write(&path, bytes).unwrap();
+            assert_eq!(load_from(&path).unwrap_err().kind(), std::io::ErrorKind::InvalidData);
+            assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        }
+        // A directory in place of the file is a read error, not a new book.
+        assert!(load_from(directory.path()).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dangling_symlink_is_not_an_absent_book() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("book");
+        std::os::unix::fs::symlink(directory.path().join("missing-target"), &path).unwrap();
+        assert!(load_from(&path).is_err());
+        assert!(std::fs::symlink_metadata(&path).unwrap().file_type().is_symlink());
     }
 
     #[test]

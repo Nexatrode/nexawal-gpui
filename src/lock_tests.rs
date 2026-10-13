@@ -4,6 +4,46 @@ use gpui::TestAppContext;
 static NATIVE_SESSION_FIXTURE: Mutex<()> = Mutex::new(());
 
 #[gpui::test]
+fn damaged_receive_book_blocks_open_and_all_edits_without_overwriting_it(cx: &mut TestAppContext) {
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        let damaged = "corrupt existing receive book";
+        fs::write(paths::receive_book_path(), damaged).unwrap();
+        let home = cx.new(Home::new);
+        home.update(cx, |home, cx| {
+            // Book failure must occur before mnemonic/native open; no RPC or secure store.
+            home.open_with_mnemonic("must not reach native open", 0, cx);
+            assert!(!home.opened);
+            assert!(home.status.contains("Address failed"));
+            let original = home.receive_book.clone();
+            home.recv_label = "must not overwrite".into();
+            home.persist_recv_label();
+            home.cycle_receive_address(true, cx);
+            assert_eq!(home.receive_book, original);
+            assert_eq!(fs::read_to_string(paths::receive_book_path()).unwrap(), damaged);
+        });
+    });
+}
+
+#[test]
+fn corrupt_or_changed_receive_book_cannot_issue_a_reused_index() {
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        let mut book = receive_book::Book::primary();
+        let damaged = "corrupt existing book";
+        fs::write(paths::receive_book_path(), damaged).unwrap();
+        assert!(book.update_and_save(|b| b.allocate_new("Shop")).is_err());
+        assert_eq!(book.next_index, 1);
+        assert_eq!(fs::read_to_string(paths::receive_book_path()).unwrap(), damaged);
+        fs::write(paths::receive_book_path(), "52\n51\n0|Primary\n51|Shop\n").unwrap();
+        assert!(book.update_and_save(|b| b.allocate_new("Shop")).is_err());
+        book = receive_book::load().unwrap();
+        assert_eq!(book.update_and_save(|b| b.allocate_new("Tips")).unwrap(), 52);
+        assert_eq!(receive_book::load().unwrap(), book);
+    });
+}
+
+#[gpui::test]
 fn failed_receive_book_write_does_not_publish_a_new_address(cx: &mut TestAppContext) {
     let _guard = NATIVE_SESSION_FIXTURE.lock().unwrap();
     let directory = tempfile::tempdir().unwrap();
