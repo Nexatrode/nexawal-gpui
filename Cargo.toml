@@ -46,7 +46,7 @@ gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "0ad5441b
     "runtime_shaders",
 ] }
 
-walletcore = { git = "https://github.com/cacaosteve/MoneroWalletCoreFFI.git", rev = "8b01cc3e321a5aa62a80797ef75d33052be583b2" }
+walletcore = { git = "https://github.com/cacaosteve/MoneroWalletCoreFFI.git", rev = "79c8ceb3ba8629bce72738c52e360c9c4fd8bed5" }
 dirs = "5"
 serde_json = "1"
 qrcode = { version = "0.14", default-features = false }

@@ -372,6 +372,7 @@ struct Home {
     edit_marked_range: Option<Range<usize>>,
     edit_last_layout: Option<text_field::FieldLayout>,
     edit_last_bounds: Option<Bounds<gpui::Pixels>>,
+    edit_pending_click: Option<(Field, gpui::Point<gpui::Pixels>, bool)>,
     edit_dragging: bool,
     main_scroll_handle: ScrollHandle,
     status: SharedString,
@@ -533,6 +534,7 @@ impl Home {
             edit_marked_range: None,
             edit_last_layout: None,
             edit_last_bounds: None,
+            edit_pending_click: None,
             edit_dragging: false,
             main_scroll_handle: ScrollHandle::new(),
             status: if should_auto_unlock {
@@ -668,8 +670,9 @@ impl Home {
     }
 
     fn persist_recv_label(&mut self) {
-        self.receive_book.set_selected_label(&self.recv_label);
-        receive_book::save(&self.receive_book);
+        if let Err(error) = self.receive_book.update_and_save(|book| book.set_selected_label(&self.recv_label)) {
+            self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
+        }
     }
 
     fn sync_recv_label_from_book(&mut self) {
@@ -1605,6 +1608,7 @@ impl Home {
             self.edit_marked_range = None;
             self.edit_last_layout = None;
             self.edit_last_bounds = None;
+            self.edit_pending_click = None;
         }
         self.active = field;
         match field {
@@ -1681,6 +1685,7 @@ impl Home {
         self.edit_marked_range = None;
         self.edit_last_layout = None;
         self.edit_last_bounds = None;
+        self.edit_pending_click = None;
     }
 
     fn place_edit_cursor(
@@ -1697,6 +1702,10 @@ impl Home {
             self.edit_last_bounds.as_ref(),
             self.edit_last_layout.as_ref(),
         ) else {
+            // The newly focused field has not painted yet. Resolve this click
+            // against its unscrolled geometry before scrolling to its caret.
+            self.edit_pending_click = Some((field, position, extend));
+            cx.notify();
             return;
         };
         let offset = line
@@ -1735,6 +1744,7 @@ impl Home {
     }
 
     fn move_edit_cursor(&mut self, offset: usize, cx: &mut Context<Self>) {
+        self.edit_pending_click = None;
         self.edit_selection = offset..offset;
         self.edit_selection_reversed = false;
         self.edit_marked_range = None;
@@ -1742,6 +1752,7 @@ impl Home {
     }
 
     fn select_edit_to(&mut self, offset: usize, cx: &mut Context<Self>) {
+        self.edit_pending_click = None;
         if self.edit_selection_reversed {
             self.edit_selection.start = offset;
         } else {
@@ -2647,7 +2658,6 @@ impl Home {
         self.challenge_indices.clear();
         self.challenge_answers = Default::default();
         self.receive_book = receive_book::load();
-        receive_book::save(&self.receive_book);
         self.refresh_receive_address();
         let protection = self.require_device_auth ||
             (paths::load_device_auth_preference().is_none() && device_auth::is_available());
@@ -3265,12 +3275,12 @@ impl Home {
     }
 
     fn cycle_receive_address(&mut self, next: bool, cx: &mut Context<Self>) {
-        if next {
-            self.receive_book.select_next();
-        } else {
-            self.receive_book.select_prev();
+        if let Err(error) = self.receive_book.update_and_save(|book| {
+            if next { book.select_next(); } else { book.select_prev(); }
+        }) {
+            self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
+            cx.notify(); return;
         }
-        receive_book::save(&self.receive_book);
         self.sync_recv_label_from_book();
         self.refresh_receive_address();
         self.ensure_qr();
@@ -3289,8 +3299,13 @@ impl Home {
             cx.notify();
             return;
         }
-        let index = self.receive_book.allocate_new("");
-        receive_book::save(&self.receive_book);
+        let index = match self.receive_book.update_and_save(|book| book.allocate_new("")) {
+            Ok(index) => index,
+            Err(error) => {
+                self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
+                cx.notify(); return;
+            }
+        };
         self.recv_label.clear();
         self.refresh_receive_address();
         self.ensure_qr();
@@ -4212,8 +4227,8 @@ fn field_input_for(
                 }
                 this.edit_dragging = true;
                 let extend = event.modifiers.shift;
-                this.place_edit_cursor(field, event.position, extend, cx);
                 this.focus_field(field, window, cx);
+                this.place_edit_cursor(field, event.position, extend, cx);
             }),
         )
         .on_mouse_up(

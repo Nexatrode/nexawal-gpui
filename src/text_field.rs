@@ -140,6 +140,15 @@ impl Element for FieldElement {
         let lines = window.text_system().shape_text(text, style.font_size.to_pixels(window.rem_size()), &runs,
             self.multiline.then_some(bounds.size.width.max(px(1.))), None).unwrap_or_default();
         let mut layout = FieldLayout { lines: lines.into_vec(), line_height: window.line_height(), scroll: point(px(0.), px(0.)) };
+        let pending = home.edit_pending_click.filter(|(field, _, _)| editing && *field == self.field);
+        if let Some((_, position, extend)) = pending {
+            let offset = layout.closest_index(position - bounds.origin).min(content.len());
+            self.input.update(cx, |home, cx| {
+                home.edit_pending_click = None;
+                if extend { home.select_edit_to(offset, cx); } else { home.move_edit_cursor(offset, cx); }
+            });
+        }
+        let home = self.input.read(cx);
         let index = if home.edit_selection_reversed { home.edit_selection.start } else { home.edit_selection.end };
         let caret = layout.position(index.min(content.len()));
         if editing {
@@ -196,6 +205,37 @@ fn caret_scroll(caret: Point<Pixels>, text: gpui::Size<Pixels>, viewport: gpui::
 #[cfg(test)]
 mod layout_tests {
     use super::*;
+
+    #[cfg(feature = "ui-tests")]
+    #[gpui::test]
+    fn first_click_into_new_field_places_caret_before_scrolling(cx: &mut gpui::TestAppContext) {
+        let directory = tempfile::tempdir().unwrap();
+        crate::paths::with_test_data_dir(directory.path().to_owned(), || {
+            let (home, cx) = cx.add_window_view(|_, cx| crate::Home::new(cx));
+            cx.update(|window, cx| {
+                let content = "αβγδεζηθικλμνξοπρστυφχψω";
+                let bounds = Bounds::new(point(px(20.), px(30.)), gpui::size(px(80.), px(25.)));
+                let style = window.text_style();
+                let lines = window.text_system().shape_text(content.into(), style.font_size.to_pixels(window.rem_size()),
+                    &[style.to_run(content.len())], None, None).unwrap();
+                let layout = FieldLayout { lines: lines.into_vec(), line_height: window.line_height(), scroll: point(px(0.), px(0.)) };
+                let click = bounds.origin + layout.position(4) + point(px(0.1), px(1.));
+                for field in [crate::Field::Node, crate::Field::Seed, crate::Field::Challenge] {
+                    home.update(cx, |home, cx| {
+                        home.set_field_text_raw(field, content.into());
+                        home.focus_field(field, window, cx);
+                        home.place_edit_cursor(field, click, false, cx);
+                        assert!(home.edit_pending_click.is_some());
+                    });
+                    let mut element = FieldElement::new(home.clone(), field, None, "", false);
+                    let state = element.prepaint(None, None, bounds, &mut (), window, cx);
+                    assert_eq!(home.read(cx).edit_selection, 4..4);
+                    assert!(home.read(cx).edit_pending_click.is_none());
+                    assert_eq!(state.layout.unwrap().scroll, point(px(0.), px(0.)));
+                }
+            });
+        });
+    }
 
     #[cfg(feature = "ui-tests")]
     #[gpui::test]

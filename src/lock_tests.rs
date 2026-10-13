@@ -4,6 +4,29 @@ use gpui::TestAppContext;
 static NATIVE_SESSION_FIXTURE: Mutex<()> = Mutex::new(());
 
 #[gpui::test]
+fn failed_receive_book_write_does_not_publish_a_new_address(cx: &mut TestAppContext) {
+    let _guard = NATIVE_SESSION_FIXTURE.lock().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        let seed = api::generate_mnemonic_english().unwrap();
+        api::open_from_mnemonic(WALLET_ID, &seed, 123, true).unwrap();
+        let home = cx.new(Home::new);
+        // An existing directory cannot be atomically replaced by the book file.
+        fs::create_dir(paths::receive_book_path()).unwrap();
+        home.update(cx, |home, cx| {
+            home.receive_book.next_index = 51;
+            home.receive_address = "unchanged address".into();
+            let original = home.receive_book.clone();
+            home.create_receive_subaddress(cx);
+            assert_eq!(home.receive_book, original);
+            assert_eq!(home.receive_address.as_ref(), "unchanged address");
+            assert!(home.status.contains("Address failed"));
+        });
+        api::close(WALLET_ID, 1_000).unwrap();
+    });
+}
+
+#[gpui::test]
 fn history_search_and_date_fields_accept_native_text(cx: &mut TestAppContext) {
     use gpui::EntityInputHandler;
     let directory = tempfile::tempdir().unwrap();

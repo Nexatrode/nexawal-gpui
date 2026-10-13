@@ -8,7 +8,7 @@ pub struct Entry {
     pub label: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Book {
     pub next_index: u32,
     pub selected: u32,
@@ -16,6 +16,20 @@ pub struct Book {
 }
 
 impl Book {
+    /// Publish edits only after the atomic file replacement succeeds.
+    pub fn update_and_save<T>(&mut self, update: impl FnOnce(&mut Self) -> T) -> std::io::Result<T> {
+        self.update_with_writer(update, save)
+    }
+
+    fn update_with_writer<T>(&mut self, update: impl FnOnce(&mut Self) -> T,
+        write: impl FnOnce(&Self) -> std::io::Result<()>) -> std::io::Result<T> {
+        let mut candidate = self.clone();
+        let result = update(&mut candidate);
+        write(&candidate)?;
+        *self = candidate;
+        Ok(result)
+    }
+
     pub fn required_coverage(&self) -> u32 {
         self.entries.iter().map(|entry| entry.index).max().unwrap_or(0).max(50)
     }
@@ -124,8 +138,8 @@ pub fn load() -> Book {
     parse(&fs_read()).unwrap_or_else(Book::primary)
 }
 
-pub fn save(book: &Book) {
-    let _ = paths::write_bytes(paths::receive_book_path(), format_book(book).as_bytes());
+pub fn save(book: &Book) -> std::io::Result<()> {
+    paths::write_bytes(paths::receive_book_path(), format_book(book).as_bytes())
 }
 
 pub fn clear() {
@@ -196,6 +210,25 @@ mod tests {
         assert_eq!(parsed.next_index, 2);
         assert_eq!(parsed.selected, 1);
         assert_eq!(parsed.entries[1].label, "Shop");
+    }
+
+    #[test]
+    fn failed_save_does_not_issue_address_or_advance_book() {
+        let mut book = Book::primary();
+        book.next_index = 51;
+        let original = book.clone();
+        let result = book.update_with_writer(|b| b.allocate_new("Shop"), |_| {
+            Err(std::io::Error::other("disk full"))
+        });
+        assert!(result.is_err());
+        assert_eq!(book, original);
+        let mut persisted = String::new();
+        let index = book.update_with_writer(|b| b.allocate_new("Shop"), |b| {
+            persisted = format_book(b); Ok(())
+        }).unwrap();
+        assert_eq!(index, 51);
+        assert_eq!(parse(&persisted).unwrap(), book);
+        assert_eq!(book.required_coverage(), 51);
     }
 
     #[test]

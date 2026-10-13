@@ -6,11 +6,13 @@ This is a **new client**, not a port of the SwiftUI or Compose apps. Scan, resto
 
 ### Session security
 
-Release security follow-up: all 96 tests and the Release build pass with WalletCore v0.1.16 through
+Release security follow-up: all 99 tests and the Release build pass with WalletCore v0.1.17 through
 the normal pinned Git dependency. Advisory checks pass. Synthetic fixtures
 cover idle/stale unlock, native teardown, clipboard expiry/new-copy preservation and safe migration
 failure ordering without reading a user's wallet or Keychain. Missing-item recovery preserves
 actual protection after an interrupted preference write; denied access never selects a fallback.
+Receive-book edits are published only after an atomic save succeeds, and first-click
+cursor placement is tested against shaped multibyte text before caret scrolling.
 
 The desktop session locks after five minutes without keyboard/mouse/scroll activity and on window
 deactivation. Lock hides history, wipes owned seed strings and cancels/joins native operations before
@@ -24,7 +26,7 @@ retired. Failure is reported, not silently downgraded. This path requires signed
 an unsigned development binary may be refused by Keychain. Linux/Windows retain their OS secure-store
 backends but do not currently implement a per-access biometric/device-auth gate. Auto-lock still applies.
 No hot-wallet implementation here promises complete erasure of UI/framework copies or protection from
-a compromised OS. Native changes are included in the pinned WalletCore v0.1.16 release.
+a compromised OS. Native changes are included in the pinned WalletCore v0.1.17 release.
 
 - Desktop app: this repository
 - iOS / Mac Catalyst app: [nexawal](https://github.com/Nexatrode/nexawal)
