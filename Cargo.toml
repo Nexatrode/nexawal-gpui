@@ -58,12 +58,14 @@ nokhwa = { version = "0.10", default-features = false, features = ["input-native
 unicode-segmentation = "1"
 tempfile = "3"
 zeroize = "1"
+sha2 = "0.10"
 
 [build-dependencies]
 winresource = "0.1.31"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
+security-framework = { version = "3.7", features = ["OSX_10_15"] }
 libc = "0.2"
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = [

@@ -36,6 +36,7 @@ mod scan_tuning;
 mod seed_backup;
 mod send_flow;
 mod session_lock;
+mod session_policy;
 mod sync_status;
 mod text_field;
 mod uri;
@@ -384,6 +385,7 @@ struct Home {
     show_restore_form: bool,
     unlocking: bool,
     unlock_started: bool,
+    session_policy: session_policy::SessionPolicy,
     mnemonic: String,
     address: SharedString,
     receive_address: SharedString,
@@ -459,6 +461,15 @@ struct Home {
     network_policy: network::Policy,
     i2p_rpc: String,
     i2p_proxy: String,
+}
+
+impl Drop for Home {
+    fn drop(&mut self) {
+        use zeroize::Zeroize;
+        self.seed.zeroize();
+        self.mnemonic.zeroize();
+        self.challenge_answers.zeroize();
+    }
 }
 
 impl Home {
@@ -547,6 +558,7 @@ impl Home {
             show_restore_form,
             unlocking: should_auto_unlock,
             unlock_started: false,
+            session_policy: session_policy::SessionPolicy::default(),
             mnemonic: String::new(),
             address: "".into(),
             receive_address: "".into(),
@@ -851,9 +863,25 @@ impl Home {
             cx.notify();
             return;
         }
-        cx.write_to_clipboard(gpui::ClipboardItem::new_string(self.seed.clone()));
+        self.copy_secret(self.seed.clone(), cx);
         self.status = l10n::t("Seed copied. Store it offline, then clear the clipboard.").into();
         cx.notify();
+    }
+
+    fn copy_secret(&mut self, text: String, cx: &mut Context<Self>) {
+        use sha2::{Digest, Sha256};
+        let text = zeroize::Zeroizing::new(text);
+        let fingerprint = Sha256::digest(text.as_bytes());
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string(text.to_string()));
+        cx.spawn(async move |_, cx| {
+            cx.background_executor().timer(session_policy::CLIPBOARD_TIMEOUT).await;
+            let _ = cx.update(|cx| {
+                let current = cx.read_from_clipboard().and_then(|item| item.text()).map(zeroize::Zeroizing::new);
+                if current.as_ref().is_some_and(|value| Sha256::digest(value.as_bytes()) == fingerprint) {
+                    cx.write_to_clipboard(gpui::ClipboardItem::new_string(String::new()));
+                }
+            });
+        }).detach();
     }
 
     fn scan_node_url(&self) -> String {
@@ -1779,6 +1807,7 @@ impl Home {
     }
 
     fn replace_edit_selection(&mut self, text: &str, cx: &mut Context<Self>) {
+        self.session_policy.touch(Instant::now());
         let field = self.active;
         let current = self.field_text(field);
         let start = self.edit_selection.start.min(current.len());
@@ -1997,7 +2026,11 @@ impl Home {
             self.copy_address(cx);
             return;
         }
-        cx.write_to_clipboard(gpui::ClipboardItem::new_string(text));
+        if self.active == Field::Seed || self.active == Field::Challenge {
+            self.copy_secret(text, cx);
+        } else {
+            cx.write_to_clipboard(gpui::ClipboardItem::new_string(text));
+        }
         cx.notify();
     }
 
@@ -2593,11 +2626,14 @@ impl Home {
         self.receive_book = receive_book::load();
         receive_book::save(&self.receive_book);
         self.refresh_receive_address();
-        let store_error = match wallet_store::save(mnemonic, restore_height) {
+        let protection = self.require_device_auth ||
+            (paths::load_device_auth_preference().is_none() && device_auth::is_available());
+        let store_error = match wallet_store::save(mnemonic, restore_height, protection) {
             Ok(()) => {
                 self.has_stored = true;
                 self.show_restore_form = false;
-                self.seed.clear();
+                zeroize::Zeroize::zeroize(&mut self.seed);
+                self.require_device_auth = protection;
                 if paths::load_device_auth_preference().is_none() && device_auth::is_available() {
                     self.require_device_auth = true;
                     let _ = paths::save_device_auth(true);
@@ -2964,6 +3000,7 @@ impl Home {
     }
 
     fn forget(&mut self, cx: &mut Context<Self>) {
+        self.session_policy.invalidate();
         let cleanup_now = self.send_operation.lock();
         // Hide and invalidate presentation immediately, even when a fee RPC is stalled.
         self.opened = false;
@@ -3097,6 +3134,7 @@ impl Home {
         }
 
         let require_device_auth = self.require_device_auth;
+        let attempt = self.session_policy.token();
         self.unlocking = true;
         self.unlock_started = true;
         self.status = if require_device_auth {
@@ -3110,22 +3148,28 @@ impl Home {
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    if require_device_auth {
-                        let reason = l10n::t("Authenticate to unlock nexawal");
-                        device_auth::authenticate(&reason)?;
-                    }
-                    wallet_store::load()
+                    wallet_store::load(require_device_auth)
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
+                if !this.session_policy.accepts(attempt) { return; }
                 this.unlocking = false;
                 this.unlock_started = false;
                 match result {
-                    Ok((mnemonic, height)) => {
+                    Ok((mnemonic, height, protected)) => {
                         this.restore_height_text = height.to_string();
                         this.show_restore_form = false;
+                        if cx.active_window().is_none() { this.forget(cx); return; }
+                        this.require_device_auth = protected;
+                        // The actual Keychain item wins if a preference write was interrupted.
+                        let preference_error = paths::save_device_auth(protected).err();
+                        this.session_policy.touch(Instant::now());
                         this.open_with_mnemonic(&mnemonic, height, cx);
-                        this.seed.clear();
+                        if let Some(error) = preference_error {
+                            this.status = format!("Could not save device-auth preference: {error}").into();
+                            cx.notify();
+                        }
+                        zeroize::Zeroize::zeroize(&mut this.seed);
                     }
                     Err(err) => {
                         this.has_stored = true;
@@ -3230,13 +3274,20 @@ impl Home {
     }
 
     fn toggle_device_auth(&mut self, cx: &mut Context<Self>) {
+        if !self.opened || self.mnemonic.is_empty() { return; }
         if self.require_device_auth {
             if !self.authenticate_if_required("Authenticate to turn off device authentication", cx)
             {
                 return;
             }
+            if let Err(error) = wallet_store::set_protection(&self.mnemonic, false) {
+                self.status = error.into(); cx.notify(); return;
+            }
             self.require_device_auth = false;
-            let _ = paths::save_device_auth(false);
+            if let Err(error) = paths::save_device_auth(false) {
+                self.status = format!("Could not save device-auth preference: {error}").into();
+                cx.notify(); return;
+            }
             self.status = l10n::t("Device authentication off.").into();
         } else {
             if !device_auth::is_available() {
@@ -3253,8 +3304,14 @@ impl Home {
                 cx.notify();
                 return;
             }
+            if let Err(error) = wallet_store::set_protection(&self.mnemonic, true) {
+                self.status = error.into(); cx.notify(); return;
+            }
             self.require_device_auth = true;
-            let _ = paths::save_device_auth(true);
+            if let Err(error) = paths::save_device_auth(true) {
+                self.status = format!("Could not save device-auth preference: {error}").into();
+                cx.notify(); return;
+            }
             self.status = l10n::t("Device authentication on · required to unlock and send.").into();
         }
         cx.notify();
@@ -3396,6 +3453,22 @@ impl Home {
             }
         })
         .detach();
+    }
+
+    fn security_tick(&mut self, now: Instant, cx: &mut Context<Self>) {
+        if (self.opened || self.unlocking || !self.seed.is_empty()) && self.session_policy.expired(now) {
+            self.forget(cx);
+        }
+    }
+
+    fn start_security_watch(&mut self, cx: &mut Context<Self>) {
+        self.session_policy.touch(Instant::now());
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor().timer(Duration::from_secs(1)).await;
+                if this.update(cx, |this, cx| this.security_tick(Instant::now(), cx)).is_err() { break; }
+            }
+        }).detach();
     }
 
     fn poll_core(&mut self, cx: &mut Context<Self>) {
@@ -3654,6 +3727,9 @@ impl Render for Home {
             .gap_4()
             .key_context("nexawal")
             .track_focus(&self.ui_focus)
+            .capture_any_mouse_down(cx.listener(|this, _, _, _| this.session_policy.touch(Instant::now())))
+            .capture_key_down(cx.listener(|this, _, _, _| this.session_policy.touch(Instant::now())))
+            .on_scroll_wheel(cx.listener(|this, _, _, _| this.session_policy.touch(Instant::now())))
             .on_action(cx.listener(Self::paste_field))
             .on_action(cx.listener(Self::copy_field))
             .on_action(cx.listener(Self::cut_field))
@@ -3677,6 +3753,7 @@ impl Render for Home {
             .on_action(cx.listener(Self::show_wallet))
             .on_action(cx.listener(Self::show_settings))
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+                this.session_policy.touch(Instant::now());
                 if event.keystroke.key == "escape" && this.history_pages.selected.is_some() {
                     this.history_pages.selected = None;
                     cx.notify();
@@ -6536,6 +6613,12 @@ fn main() {
                 let should_unlock = should_auto_unlock_stored();
                 let placement_observer = placement_in_window.clone();
                 let home = cx.new(|cx| {
+                    cx.observe_window_activation(window, |this: &mut Home, window, cx| {
+                        if !window.is_window_active() && !this.unlocking &&
+                            (this.opened || !this.seed.is_empty()) {
+                            this.forget(cx);
+                        }
+                    }).detach();
                     cx.observe_window_bounds(window, move |_, window, _| {
                         let window_bounds = window.window_bounds();
                         let maximized = matches!(window_bounds, WindowBounds::Maximized(_));
@@ -6552,6 +6635,7 @@ fn main() {
                     })
                     .detach();
                     let mut home = Home::new(cx);
+                    home.start_security_watch(cx);
                     if !should_unlock {
                         home.seed_focus.focus(window, cx);
                     }

@@ -4,6 +4,28 @@ Desktop [nexawal](https://github.com/Nexatrode/nexawal) for **macOS, Windows, an
 
 This is a **new client**, not a port of the SwiftUI or Compose apps. Scan, restore, history, and send stay in the shared Rust wallet core.
 
+### Session security
+
+Local security follow-up: all 88 tests pass against the modified WalletCore through a temporary
+path override; the normal remote Cargo pin is unchanged. Advisory checks pass. Synthetic fixtures
+cover idle/stale unlock, native teardown, clipboard expiry/new-copy preservation and safe migration
+failure ordering without reading a user's wallet or Keychain. Missing-item recovery preserves
+actual protection after an interrupted preference write; denied access never selects a fallback.
+
+The desktop session locks after five minutes without keyboard/mouse/scroll activity and on window
+deactivation. Lock hides history, wipes owned seed strings and cancels/joins native operations before
+removing spend/view authority. An already-approved operation may finish before teardown; a busy native
+cleanup is retried and is not treated as completed. Copied seed/challenge text expires after 60 seconds
+only if the clipboard still contains that copy. Clipboard history managers may retain earlier copies.
+
+On macOS, device-auth protection uses a user-presence, device-only Data Protection Keychain item.
+Legacy entries migrate after authentication: the replacement is committed before the legacy entry is
+retired. Failure is reported, not silently downgraded. This path requires signed-build/device QA;
+an unsigned development binary may be refused by Keychain. Linux/Windows retain their OS secure-store
+backends but do not currently implement a per-access biometric/device-auth gate. Auto-lock still applies.
+No hot-wallet implementation here promises complete erasure of UI/framework copies or protection from
+a compromised OS. Native changes must be released and consumer pins advanced before they ship.
+
 - Desktop app: this repository
 - iOS / Mac Catalyst app: [nexawal](https://github.com/Nexatrode/nexawal)
 - Android app: [nexawal-android](https://github.com/Nexatrode/nexawal-android)

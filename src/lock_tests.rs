@@ -4,6 +4,46 @@ use gpui::TestAppContext;
 static NATIVE_SESSION_FIXTURE: Mutex<()> = Mutex::new(());
 
 #[gpui::test]
+fn automatic_idle_boundary_hides_keys_and_invalidates_unlock(cx: &mut TestAppContext) {
+    let _guard = NATIVE_SESSION_FIXTURE.lock().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        let home = cx.new(Home::new);
+        home.update(cx, |home, cx| {
+            let now = Instant::now();
+            home.session_policy.touch(now);
+            let attempt = home.session_policy.token();
+            home.seed = "synthetic secret".into();
+            home.unlocking = true;
+            home.security_tick(now + session_policy::IDLE_TIMEOUT, cx);
+            assert!(home.seed.is_empty() && !home.opened && !home.unlocking);
+            assert!(!home.session_policy.accepts(attempt));
+        });
+        cx.run_until_parked();
+    });
+}
+
+#[gpui::test]
+fn secret_clipboard_expires_without_erasing_a_new_copy(cx: &mut TestAppContext) {
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        let home = cx.new(Home::new);
+        home.update(cx, |home, cx| home.copy_secret("synthetic clipboard secret".into(), cx));
+        cx.run_until_parked();
+        assert_eq!(cx.read_from_clipboard().and_then(|item| item.text()).as_deref(), Some("synthetic clipboard secret"));
+        cx.executor().advance_clock(session_policy::CLIPBOARD_TIMEOUT);
+        cx.run_until_parked();
+        assert!(cx.read_from_clipboard().and_then(|item| item.text()).is_none_or(|text| text.is_empty()));
+        home.update(cx, |home, cx| home.copy_secret("another synthetic secret".into(), cx));
+        cx.run_until_parked();
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("a later ordinary copy".into()));
+        cx.executor().advance_clock(session_policy::CLIPBOARD_TIMEOUT);
+        cx.run_until_parked();
+        assert_eq!(cx.read_from_clipboard().and_then(|item| item.text()).as_deref(), Some("a later ordinary copy"));
+    });
+}
+
+#[gpui::test]
 fn idle_lock_closes_native_keys_before_a_new_session_can_open(cx: &mut TestAppContext) {
     let _guard = NATIVE_SESSION_FIXTURE.lock().unwrap();
     let directory = tempfile::tempdir().unwrap();
