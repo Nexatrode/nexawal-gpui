@@ -366,16 +366,17 @@ fn row(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> gpui::Stateful<gp
                     "{} · {}",
                     format_timestamp(row.timestamp),
                     if row.is_pending {
-                        "Pending".into()
+                        l10n::t("Pending").to_string()
                     } else {
-                        format!(
-                            "{} confirmations",
+                        l10n::interpolate(
+                            "{0} confirmations",
+                            &[format!("{}",
                             confirmations(
                                 row.height,
                                 row.is_pending,
                                 home.sync.as_ref().map_or(0, |s| s.chain_height),
                                 row.confirmations
-                            )
+                            ))]
                         )
                     }
                 )),
@@ -398,12 +399,12 @@ fn row(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> gpui::Stateful<gp
                     .text_xs()
                     .text_color(rgb(theme_muted()))
                     .child(format!(
-                        "Fee {}{}",
-                        format_xmr(fee),
+                        "{}{}",
+                        l10n::interpolate("Fee {0}", &[format_xmr(fee)]),
                         if row.direction == "in" {
-                            " · paid by sender"
+                            format!(" · {}", l10n::t("Paid by the sender. Not deducted from the amount received."))
                         } else {
-                            ""
+                            String::new()
                         }
                     )),
             )

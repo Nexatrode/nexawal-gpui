@@ -32,12 +32,12 @@ impl Policy {
         }
     }
 
-    pub fn label(self) -> &'static str {
-        match self {
+    pub fn label(self) -> gpui::SharedString {
+        crate::l10n::t(match self {
             Self::Clearnet => "Clearnet only",
             Self::I2p => "I2P only",
             Self::Hybrid => "Scan clearnet, broadcast I2P",
-        }
+        })
     }
 }
 

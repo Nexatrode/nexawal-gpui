@@ -16,6 +16,10 @@ pub struct Book {
 }
 
 impl Book {
+    pub fn required_coverage(&self) -> u32 {
+        self.entries.iter().map(|entry| entry.index).max().unwrap_or(0).max(50)
+    }
+
     pub fn primary() -> Self {
         Self {
             next_index: 1,
@@ -45,8 +49,10 @@ impl Book {
             .find(|e| e.index == index)
             .unwrap_or(&self.entries[0]);
         let label = entry.label.trim();
-        if label.is_empty() {
-            format!("Subaddress {}", entry.index)
+        if entry.index == 0 && (label.is_empty() || label == "Primary") {
+            crate::l10n::t("Primary").to_string()
+        } else if label.is_empty() {
+            crate::l10n::interpolate("Subaddress {0}", &[entry.index.to_string()])
         } else {
             label.to_string()
         }

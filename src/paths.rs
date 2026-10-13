@@ -407,6 +407,19 @@ pub fn save_restore_height(height: u64) -> std::io::Result<()> {
     write_bytes(restore_height_path(), height.to_string().as_bytes())
 }
 
+pub fn load_scan_gap_limit() -> u32 {
+    fs::read_to_string(data_dir().join("scan_gap_limit.txt")).ok()
+        .and_then(|s| s.trim().parse::<u32>().ok())
+        .filter(|n| (50..=100_000).contains(n)).unwrap_or(50)
+}
+
+pub fn save_scan_gap_limit(limit: u32) -> std::io::Result<()> {
+    if !(50..=100_000).contains(&limit) {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid scan lookahead"));
+    }
+    write_bytes(data_dir().join("scan_gap_limit.txt"), limit.to_string().as_bytes())
+}
+
 pub fn clear_wallet_slot() {
     let _ = fs::remove_file(wallet_slot_path());
     let _ = fs::remove_file(restore_height_path());
@@ -616,6 +629,22 @@ mod tests {
 
     use std::fs;
     use std::io::{Error, ErrorKind, Write};
+
+    #[cfg(feature = "ui-tests")]
+    #[test]
+    fn recovery_lookahead_round_trips_and_rejects_unbounded_values() {
+        use super::{data_dir, load_scan_gap_limit, save_scan_gap_limit, with_test_data_dir};
+        let directory = tempfile::tempdir().unwrap();
+        with_test_data_dir(directory.path().to_owned(), || {
+            assert_eq!(load_scan_gap_limit(), 50);
+            save_scan_gap_limit(1_000).unwrap();
+            assert_eq!(load_scan_gap_limit(), 1_000);
+            assert!(save_scan_gap_limit(100_001).is_err());
+            assert_eq!(load_scan_gap_limit(), 1_000);
+            fs::write(data_dir().join("scan_gap_limit.txt"), "4294967295").unwrap();
+            assert_eq!(load_scan_gap_limit(), 50);
+        });
+    }
 
     use super::{
         WindowPlacement, load_pending_send_at, parse_bool_preference, quarantine_rejected_file_at,

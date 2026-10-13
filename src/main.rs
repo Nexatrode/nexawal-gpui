@@ -122,10 +122,10 @@ impl Theme {
         }
     }
 
-    fn label(self) -> &'static str {
+    fn label(self) -> SharedString {
         match self {
-            Self::Classic => "Classic",
-            Self::Neon => "Neon / Techno",
+            Self::Classic => l10n::t("Disabled Techno Theme").into(),
+            Self::Neon => l10n::t("Enabled Techno Theme").into(),
         }
     }
 
@@ -351,6 +351,7 @@ struct Home {
     seed: String,
     restore_height_text: String,
     rescan_height_text: String,
+    scan_gap_limit: u32,
     active: Field,
     ui_focus: FocusHandle,
     seed_focus: FocusHandle,
@@ -369,7 +370,7 @@ struct Home {
     edit_selection: Range<usize>,
     edit_selection_reversed: bool,
     edit_marked_range: Option<Range<usize>>,
-    edit_last_layout: Option<gpui::ShapedLine>,
+    edit_last_layout: Option<text_field::FieldLayout>,
     edit_last_bounds: Option<Bounds<gpui::Pixels>>,
     edit_dragging: bool,
     main_scroll_handle: ScrollHandle,
@@ -510,6 +511,7 @@ impl Home {
                 }
             },
             rescan_height_text: paths::load_restore_height().to_string(),
+            scan_gap_limit: paths::load_scan_gap_limit(),
             active: Field::Seed,
             ui_focus: cx.focus_handle(),
             seed_focus: cx.focus_handle(),
@@ -1057,7 +1059,11 @@ impl Home {
             let result =
                 cx.background_executor()
                     .spawn(async move {
-                        let mut rows = Vec::new();
+                        use std::io::Write;
+                        let mut spool = tempfile::NamedTempFile::new().map_err(|e| e.to_string())?;
+                        let mut writer = std::io::BufWriter::new(spool.as_file_mut());
+                        let mut count = 0;
+                        let mut first = true;
                         let mut expected_revision: Option<String> = None;
                         loop {
                             let page = api::query_transfers(WALLET_ID, &query)
@@ -1070,16 +1076,20 @@ impl Home {
                                     .to_string());
                             }
                             expected_revision.get_or_insert_with(|| page.revision.clone());
-                            rows.extend(page.transfers);
+                            let csv = transfer_history_csv(&page.transfers);
+                            let body = if first { csv.as_str() } else { csv.split_once('\n').map_or("", |(_, body)| body) };
+                            writer.write_all(body.as_bytes()).map_err(|e| e.to_string())?;
+                            first = false;
+                            count += page.transfers.len();
                             let Some(offset) = page.next_offset else {
                                 break;
                             };
                             query.offset = offset;
                             query.revision = expected_revision.clone();
                         }
-                        // Intentional full export, not the four-page UI cache. A history change aborts
-                        // before writing, rather than producing a mixed-revision/truncated CSV.
-                        Ok::<_, String>((rows.len(), transfer_history_csv(&rows)))
+                        writer.flush().map_err(|e| e.to_string())?;
+                        drop(writer);
+                        Ok::<_, String>((count, spool))
                     })
                     .await;
             let valid = this
@@ -1095,8 +1105,13 @@ impl Home {
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    let (count, csv) = result?;
-                    fs::write(&path, csv).map_err(|e| e.to_string())?;
+                    let (count, mut spool) = result?;
+                    use std::io::Seek;
+                    spool.as_file_mut().rewind().map_err(|e| e.to_string())?;
+                    let mut destination = tempfile::NamedTempFile::new_in(path.parent().ok_or("missing export directory")?).map_err(|e| e.to_string())?;
+                    std::io::copy(spool.as_file_mut(), destination.as_file_mut()).map_err(|e| e.to_string())?;
+                    destination.as_file_mut().sync_all().map_err(|e| e.to_string())?;
+                    destination.persist_noclobber(&path).map_err(|e| e.to_string())?;
                     Ok::<_, String>((count, path))
                 })
                 .await;
@@ -1685,7 +1700,7 @@ impl Home {
             return;
         };
         let offset = line
-            .closest_index_for_x(position.x - bounds.left())
+            .closest_index(position - bounds.origin)
             .min(self.field_text(field).len());
         if extend {
             self.select_edit_to(offset, cx);
@@ -2413,6 +2428,7 @@ impl Home {
                         let _ = this.start_fast_scan();
                     }
                     Err(err) => {
+                        this.clear_send_preview();
                         this.status =
                             l10n::interpolate("Send failed: {0}", &[format!("{}", err)]).into();
                     }
@@ -2612,6 +2628,13 @@ impl Home {
         self.scan_was_running = false;
         self.scan_rate.reset();
         self.apply_scan_proxy();
+        self.receive_book = receive_book::load();
+        if let Err(error) = api::set_gap_limit(WALLET_ID, self.receive_book.required_coverage().max(self.scan_gap_limit)) {
+            self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
+            let _ = api::close(WALLET_ID, 1_000);
+            cx.notify();
+            return;
+        }
         let scan_error = self.start_fast_scan().err().map(|err| err.to_string());
 
         self.opened = true;
@@ -3260,6 +3283,12 @@ impl Home {
     }
 
     fn create_receive_subaddress(&mut self, cx: &mut Context<Self>) {
+        let requested = self.receive_book.next_index.max(self.scan_gap_limit);
+        if let Err(error) = api::set_gap_limit(WALLET_ID, requested) {
+            self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
+            cx.notify();
+            return;
+        }
         let index = self.receive_book.allocate_new("");
         receive_book::save(&self.receive_book);
         self.recv_label.clear();
@@ -3270,6 +3299,29 @@ impl Home {
             &[format!("{}", index)],
         )
         .into();
+        cx.notify();
+    }
+
+    fn increase_scan_lookahead(&mut self, cx: &mut Context<Self>) {
+        let current = self.scan_gap_limit.max(self.receive_book.required_coverage());
+        let Some(next) = [50, 100, 500, 1_000, 5_000, 10_000, 100_000].into_iter().find(|n| *n > current) else { return; };
+        // Growth rewinds the native cursor while retaining verified history. Refuse
+        // changes during an active scan instead of racing its scanner snapshot.
+        if self.opened && let Err(error) = api::set_gap_limit(WALLET_ID, next) {
+            self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
+            cx.notify(); return;
+        }
+        if let Err(error) = paths::save_scan_gap_limit(next) {
+            self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
+            cx.notify(); return;
+        }
+        self.scan_gap_limit = next;
+        if self.opened {
+            self.persist_scan_cache();
+            if let Err(error) = self.start_fast_scan() {
+                self.status = l10n::interpolate("Rescan prepared, but refresh failed: {0}", &[error.to_string()]).into();
+            }
+        }
         cx.notify();
     }
 
@@ -4186,6 +4238,7 @@ fn field_input_for(
             field,
             challenge_slot,
             placeholder,
+            multiline,
         ))
 }
 
@@ -4325,7 +4378,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         cx,
                         Field::Seed,
                         "seed-field",
-                        "Paste or type your 25-word recovery phrase",
+                        l10n::t("Paste 25-word mnemonic…"),
                         true,
                         false,
                     ),
@@ -4869,7 +4922,7 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                     cx,
                     Field::RecvAmount,
                     "recv-amount",
-                    "Optional amount",
+                    l10n::t("Amount"),
                     false,
                     false,
                 ))
@@ -4904,7 +4957,7 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                     cx,
                     Field::RecvDesc,
                     "recv-desc",
-                    "Optional description",
+                    l10n::t("Description (optional)"),
                     false,
                     false,
                 )),
@@ -4917,7 +4970,7 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                 .gap_2()
                 .child(wide_primary_action_button(
                     "receive-copy-uri",
-                    l10n::t("Share Payment Link"),
+                    l10n::t("Copy Payment URI"),
                     cx.listener(|this, _: &ClickEvent, _, cx| this.copy_receive_uri(cx)),
                 ))
                 .child(wide_secondary_action_button(
@@ -4990,7 +5043,7 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                     cx,
                     Field::RecvLabel,
                     "recv-label",
-                    "Label (optional)",
+                    l10n::t("Optional label"),
                     false,
                     false,
                 ))
@@ -5089,7 +5142,7 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
                     cx,
                     Field::Dest,
                     "send-dest",
-                    "Paste a Monero address or monero: URI",
+                    l10n::t("Monero address"),
                     true,
                     false,
                 ))
@@ -5610,6 +5663,14 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 .flex()
                 .flex_col()
                 .gap_3()
+                .child(wide_secondary_action_button(
+                    "settings-scan-lookahead",
+                    format!("{}: {}", l10n::t("Gap limit (subaddresses per account)"), home.scan_gap_limit.max(home.receive_book.required_coverage())),
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.increase_scan_lookahead(cx)),
+                ))
+                .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t(
+                    "Only change scan lookahead if an import appears incomplete after using the right restore height.",
+                )))
                 .child(
                     div()
                         .text_xs()

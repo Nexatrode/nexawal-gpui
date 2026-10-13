@@ -71,7 +71,6 @@ fn with_approved_fee<T>(
 pub struct RecoveredSend {
     pub txid: String,
     pub amount: u64,
-    pub fee: u64,
 }
 
 pub fn recover_pending(node_url: &str) -> api::Result<Option<RecoveredSend>> {
@@ -85,7 +84,6 @@ pub fn recover_pending(node_url: &str) -> api::Result<Option<RecoveredSend>> {
             Ok(Some(RecoveredSend {
                 txid: relay.txid,
                 amount: prepared.amount,
-                fee: prepared.fee,
             }))
         }
         Err(err) => Err(err),
@@ -99,9 +97,7 @@ pub fn send_exact(
     from_subaddress: Option<u32>,
     approved_max_fee: u64,
 ) -> api::Result<(String, u64, u64)> {
-    if let Some(recovered) = recover_pending(node_url)? {
-        return Ok((recovered.txid, recovered.amount, recovered.fee));
-    }
+    require_new_payment(recover_pending(node_url)?)?;
     let json =
         api::prepare_send_filtered(WALLET_ID, node_url, to_address, amount, from_subaddress)?;
     let prepared = api::parse_prepared(&json)?;
@@ -117,15 +113,21 @@ pub fn send_max(
     from_subaddress: Option<u32>,
     approved_max_fee: u64,
 ) -> api::Result<(String, u64, u64)> {
-    if let Some(recovered) = recover_pending(node_url)? {
-        return Ok((recovered.txid, recovered.amount, recovered.fee));
-    }
+    require_new_payment(recover_pending(node_url)?)?;
     let json = api::prepare_sweep_filtered(WALLET_ID, node_url, to_address, from_subaddress)?;
     let prepared = api::parse_prepared(&json)?;
     let sent = with_approved_fee(prepared.fee, approved_max_fee, || {
         persist_and_relay(node_url, &json, prepared.fee)
     })?;
     Ok((sent.txid, prepared.amount, sent.fee))
+}
+
+fn recovered_payment_error(txid: &str) -> api::Error {
+    api::Error { code: -18, message: format!("{}\nTXID: {}", crate::l10n::t("Previous payment recovered. The new payment was not sent. Preview it again."), txid) }
+}
+
+fn require_new_payment(recovered: Option<RecoveredSend>) -> api::Result<()> {
+    match recovered { Some(payment) => Err(recovered_payment_error(&payment.txid)), None => Ok(()) }
 }
 
 fn persist_and_relay(node_url: &str, json: &str, fee: u64) -> api::Result<SendResult> {
@@ -161,7 +163,20 @@ fn pending_journal_error(error: io::Error) -> api::Error {
 mod tests {
     use std::{cell::Cell, io};
 
-    use super::persist_before_relay;
+    use super::{api, persist_before_relay};
+
+    #[test]
+    fn recovery_stops_a_new_exact_or_max_payment() {
+        let calls = Cell::new(0);
+        let action = || -> api::Result<()> {
+            super::require_new_payment(Some(super::RecoveredSend { txid: "previous-txid".into(), amount: 10 }))?;
+            calls.set(calls.get() + 1);
+            Ok(())
+        };
+        assert_eq!(action().unwrap_err().code, -18);
+        assert_eq!(calls.get(), 0);
+        assert!(super::require_new_payment(None).is_ok());
+    }
 
     #[test]
     fn lock_during_preview_send_or_recovery_defers_cleanup_not_privacy() {

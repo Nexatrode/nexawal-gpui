@@ -646,7 +646,13 @@
     "Unlocking…": "جارٍ فتح القفل…",
     "Wallet debit (amount + fee)": "المحفظة",
     "Seed word": "كلمة عبارة الاسترداد",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "برنامج مرخص من معهد ماساتشوستس للتكنولوجيا وغير مدقق. أنت مسؤول عن عبارة الاسترداد والأموال الخاصة بك. يمكن للعقدة البعيدة الافتراضية رؤية استعلامات IP ومزامنة المحفظة الخاصة بك - قم بتشغيل العقدة الخاصة بك للحصول على خصوصية أقوى. التقديرات الورقية الاختيارية، إذا تم تمكينها، اتصل بـ rates.nexatrode.com لمعرفة الأسعار."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "برنامج مرخص من معهد ماساتشوستس للتكنولوجيا وغير مدقق. أنت مسؤول عن عبارة الاسترداد والأموال الخاصة بك. يمكن للعقدة البعيدة الافتراضية رؤية استعلامات IP ومزامنة المحفظة الخاصة بك - قم بتشغيل العقدة الخاصة بك للحصول على خصوصية أقوى. التقديرات الورقية الاختيارية، إذا تم تمكينها، اتصل بـ rates.nexatrode.com لمعرفة الأسعار.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "تم استرداد الدفعة السابقة. لم تُرسل الدفعة الجديدة. عاينها مجددًا.",
+    "{0} confirmations": "{0} تأكيدات",
+    "Fee {0}": "الرسوم {0}",
+    "Subaddress {0}": "العنوان الفرعي {0}",
+    "Could not load this part of history. You can retry.": "تعذّر تحميل هذا الجزء من السجل. يمكنك إعادة المحاولة.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "زادت رسوم الشبكة. لم تُبث أي معاملة. راجع الرسوم وأكّد مرة أخرى."
   },
   "az": {
     "\nAmount %@": "\nMəbləğ %@",
@@ -1295,7 +1301,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Pulqabı",
     "Seed word": "Bərpa söz sözü",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-lisenziyalı, yoxlanılmamış proqram təminatı. Bərpa ifadəniz və vəsaitlərinizə görə məsuliyyət daşıyırsınız. Defolt uzaq qovşaq IP və pul kisəsi sinxronizasiya sorğularınızı görə bilər – daha güclü məxfilik üçün öz nodeunuzu idarə edin. Könüllü fiat təxminləri, əgər aktivdirsə, tariflər üçün rates.nexatrode.com ilə əlaqə saxlayın."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-lisenziyalı, yoxlanılmamış proqram təminatı. Bərpa ifadəniz və vəsaitlərinizə görə məsuliyyət daşıyırsınız. Defolt uzaq qovşaq IP və pul kisəsi sinxronizasiya sorğularınızı görə bilər – daha güclü məxfilik üçün öz nodeunuzu idarə edin. Könüllü fiat təxminləri, əgər aktivdirsə, tariflər üçün rates.nexatrode.com ilə əlaqə saxlayın.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Əvvəlki ödəniş bərpa edildi. Yeni ödəniş göndərilmədi. Yenidən önizləyin.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Komissiya {0}",
+    "Subaddress {0}": "Alt ünvan {0}",
+    "Could not load this part of history. You can retry.": "Tarixçənin bu hissəsini yükləmək olmadı. Yenidən cəhd edin.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Şəbəkə komissiyası artdı. Heç nə yayımlanmadı. Komissiyanı yoxlayıb yenidən təsdiqləyin."
   },
   "bg": {
     "\nAmount %@": "\nСума %@",
@@ -1944,7 +1956,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Портфейл",
     "Seed word": "Дума с фраза за възстановяване",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Лицензиран от MIT, неодитиран софтуер. Вие носите отговорност за вашата фраза за възстановяване и средства. Отдалеченият възел по подразбиране може да вижда вашите заявки за синхронизиране на IP и портфейл — стартирайте свой собствен възел за по-голяма поверителност. Незадължителни фиатни оценки, ако са активирани, свържете се с rates.nexatrode.com за цени."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Лицензиран от MIT, неодитиран софтуер. Вие носите отговорност за вашата фраза за възстановяване и средства. Отдалеченият възел по подразбиране може да вижда вашите заявки за синхронизиране на IP и портфейл — стартирайте свой собствен възел за по-голяма поверителност. Незадължителни фиатни оценки, ако са активирани, свържете се с rates.nexatrode.com за цени.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Предишното плащане е възстановено. Новото плащане не е изпратено. Прегледайте го отново.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Такса {0}",
+    "Subaddress {0}": "Подадрес {0}",
+    "Could not load this part of history. You can retry.": "Тази част от историята не можа да се зареди. Опитайте отново.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Таксата на мрежата се увеличи. Нищо не е излъчено. Проверете таксата и потвърдете отново."
   },
   "bn": {
     "\nAmount %@": "\nপরিমাণ %@",
@@ -2593,7 +2611,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "ওয়ালেট",
     "Seed word": "রিকভারি শব্দগুচ্ছ শব্দ",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT- লাইসেন্সপ্রাপ্ত, অনিরীক্ষিত সফ্টওয়্যার। আপনি আপনার পুনরুদ্ধার শব্দগুচ্ছ এবং তহবিল জন্য দায়ী. ডিফল্ট রিমোট নোড আপনার আইপি এবং ওয়ালেট সিঙ্ক প্রশ্নগুলি দেখতে পারে — শক্তিশালী গোপনীয়তার জন্য আপনার নিজস্ব নোড চালান৷ ঐচ্ছিক ফিয়াট অনুমান, যদি সক্ষম করা থাকে, তাহলে হারের জন্য rates.nexatrode.com-এর সাথে যোগাযোগ করুন।"
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT- লাইসেন্সপ্রাপ্ত, অনিরীক্ষিত সফ্টওয়্যার। আপনি আপনার পুনরুদ্ধার শব্দগুচ্ছ এবং তহবিল জন্য দায়ী. ডিফল্ট রিমোট নোড আপনার আইপি এবং ওয়ালেট সিঙ্ক প্রশ্নগুলি দেখতে পারে — শক্তিশালী গোপনীয়তার জন্য আপনার নিজস্ব নোড চালান৷ ঐচ্ছিক ফিয়াট অনুমান, যদি সক্ষম করা থাকে, তাহলে হারের জন্য rates.nexatrode.com-এর সাথে যোগাযোগ করুন।",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "আগের পেমেন্ট পুনরুদ্ধার হয়েছে। নতুন পেমেন্ট পাঠানো হয়নি। আবার পূর্বরূপ দেখুন।",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "ফি {0}",
+    "Subaddress {0}": "উপ-ঠিকানা {0}",
+    "Could not load this part of history. You can retry.": "ইতিহাসের এই অংশ লোড করা যায়নি। আবার চেষ্টা করুন।",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "নেটওয়ার্ক ফি বেড়েছে। কিছুই সম্প্রচার করা হয়নি। ফি পর্যালোচনা করে আবার নিশ্চিত করুন।"
   },
   "ca": {
     "\nAmount %@": "\nImport %@",
@@ -3242,7 +3266,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Cartera",
     "Seed word": "paraula de frase de recuperació",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "programari no auditat amb llicència MIT. Sou responsable de la vostra frase de recuperació i dels vostres fons. El node remot predeterminat pot veure les consultes de sincronització d'IP i cartera: executeu el vostre propi node per obtenir una privadesa més forta. Estimacions de fiat opcionals, si estan habilitades, poseu-vos en contacte amb rates.nexatrode.com per obtenir les tarifes."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "programari no auditat amb llicència MIT. Sou responsable de la vostra frase de recuperació i dels vostres fons. El node remot predeterminat pot veure les consultes de sincronització d'IP i cartera: executeu el vostre propi node per obtenir una privadesa més forta. Estimacions de fiat opcionals, si estan habilitades, poseu-vos en contacte amb rates.nexatrode.com per obtenir les tarifes.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "S'ha recuperat el pagament anterior. El nou pagament no s'ha enviat. Torneu a previsualitzar-lo.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Comissió {0}",
+    "Subaddress {0}": "Subadreça {0}",
+    "Could not load this part of history. You can retry.": "No s’ha pogut carregar aquesta part de l’historial. Torna-ho a provar.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "La tarifa de la xarxa ha augmentat. No s’ha enviat res. Revisa-la i torna a confirmar."
   },
   "cs": {
     "\nAmount %@": "\nČástka %@",
@@ -3891,7 +3921,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Peněženka",
     "Seed word": "Slovo fráze obnovení",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Neauditovaný software s licencí MIT. Jste odpovědní za svou frázi pro obnovení a finanční prostředky. Výchozí vzdálený uzel vidí vaši IP adresu a dotazy na synchronizaci peněženky – spusťte svůj vlastní uzel pro větší soukromí. Volitelné odhady fiat, pokud jsou povoleny, kontaktujte rates.nexatrode.com pro sazby."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Neauditovaný software s licencí MIT. Jste odpovědní za svou frázi pro obnovení a finanční prostředky. Výchozí vzdálený uzel vidí vaši IP adresu a dotazy na synchronizaci peněženky – spusťte svůj vlastní uzel pro větší soukromí. Volitelné odhady fiat, pokud jsou povoleny, kontaktujte rates.nexatrode.com pro sazby.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Předchozí platba byla obnovena. Nová platba nebyla odeslána. Znovu zobrazte náhled.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Poplatek {0}",
+    "Subaddress {0}": "Podadresa {0}",
+    "Could not load this part of history. You can retry.": "Tuto část historie se nepodařilo načíst. Zkuste to znovu.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Síťový poplatek se zvýšil. Nic nebylo odesláno. Zkontrolujte poplatek a znovu potvrďte."
   },
   "da": {
     "\nAmount %@": "\nBeløb %@",
@@ -4540,7 +4576,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Tegnebog",
     "Seed word": "Gendannelsessætningsord",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-licenseret, ikke-revideret software. Du er ansvarlig for din genopretningssætning og midler. Standard-fjernknuden kan se dine IP- og tegnebogssynkroniseringsforespørgsler - kør din egen node for stærkere privatliv. Valgfri fiat-estimat, hvis aktiveret, kontakt rates.nexatrode.com for priser."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-licenseret, ikke-revideret software. Du er ansvarlig for din genopretningssætning og midler. Standard-fjernknuden kan se dine IP- og tegnebogssynkroniseringsforespørgsler - kør din egen node for stærkere privatliv. Valgfri fiat-estimat, hvis aktiveret, kontakt rates.nexatrode.com for priser.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Den tidligere betaling er gendannet. Den nye betaling blev ikke sendt. Se forhåndsvisningen igen.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Gebyr {0}",
+    "Subaddress {0}": "Underadresse {0}",
+    "Could not load this part of history. You can retry.": "Denne del af historikken kunne ikke indlæses. Prøv igen.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Netværksgebyret steg. Intet blev udsendt. Gennemgå gebyret, og bekræft igen."
   },
   "de": {
     "\nAmount %@": "\nBetrag %@",
@@ -5189,7 +5231,13 @@
     "Unlocking…": "Wird entsperrt…",
     "Wallet debit (amount + fee)": "Wallet",
     "Seed word": "Wiederherstellungsphrasenwort",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-lizenzierte, ungeprüfte Software. Sie sind für Ihren Wiederherstellungssatz und Ihre Mittel verantwortlich. Der standardmäßige Remote-Knoten kann Ihre IP- und Wallet-Synchronisierungsanfragen sehen – führen Sie Ihren eigenen Knoten aus, um den Datenschutz zu verbessern. Optionale Fiat-Schätzungen, falls aktiviert, kontaktieren Sie rates.nexatrode.com für Preise."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-lizenzierte, ungeprüfte Software. Sie sind für Ihren Wiederherstellungssatz und Ihre Mittel verantwortlich. Der standardmäßige Remote-Knoten kann Ihre IP- und Wallet-Synchronisierungsanfragen sehen – führen Sie Ihren eigenen Knoten aus, um den Datenschutz zu verbessern. Optionale Fiat-Schätzungen, falls aktiviert, kontaktieren Sie rates.nexatrode.com für Preise.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Die vorherige Zahlung wurde wiederhergestellt. Die neue Zahlung wurde nicht gesendet. Öffne die Vorschau erneut.",
+    "{0} confirmations": "{0} Bestätigungen",
+    "Fee {0}": "Gebühr {0}",
+    "Subaddress {0}": "Unteradresse {0}",
+    "Could not load this part of history. You can retry.": "Dieser Teil des Verlaufs konnte nicht geladen werden. Bitte erneut versuchen.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Die Netzwerkgebühr ist gestiegen. Es wurde nichts übertragen. Prüfe die Gebühr und bestätige erneut."
   },
   "el": {
     "\nAmount %@": "\nΠοσό %@",
@@ -5838,7 +5886,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Πορτοφόλι",
     "Seed word": "Λέξη φράσης ανάκτησης",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Λογισμικό με άδεια MIT, μη ελεγμένο. Είστε υπεύθυνοι για τη φράση και τα χρήματά σας ανάκτησης. Ο προεπιλεγμένος απομακρυσμένος κόμβος μπορεί να δει τα ερωτήματα συγχρονισμού IP και πορτοφολιού — εκτελέστε τον δικό σας κόμβο για ισχυρότερο απόρρητο. Προαιρετικές εκτιμήσεις fiat, εάν είναι ενεργοποιημένες, επικοινωνήστε με το rates.nexatrode.com για τιμές."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Λογισμικό με άδεια MIT, μη ελεγμένο. Είστε υπεύθυνοι για τη φράση και τα χρήματά σας ανάκτησης. Ο προεπιλεγμένος απομακρυσμένος κόμβος μπορεί να δει τα ερωτήματα συγχρονισμού IP και πορτοφολιού — εκτελέστε τον δικό σας κόμβο για ισχυρότερο απόρρητο. Προαιρετικές εκτιμήσεις fiat, εάν είναι ενεργοποιημένες, επικοινωνήστε με το rates.nexatrode.com για τιμές.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Η προηγούμενη πληρωμή ανακτήθηκε. Η νέα πληρωμή δεν στάλθηκε. Δείτε ξανά την προεπισκόπηση.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Προμήθεια {0}",
+    "Subaddress {0}": "Υποδιεύθυνση {0}",
+    "Could not load this part of history. You can retry.": "Δεν ήταν δυνατή η φόρτωση αυτού του τμήματος του ιστορικού. Δοκιμάστε ξανά.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Η χρέωση δικτύου αυξήθηκε. Δεν μεταδόθηκε τίποτα. Ελέγξτε τη χρέωση και επιβεβαιώστε ξανά."
   },
   "en": {
     "Copy Explorer Link": "Copy Explorer Link",
@@ -6487,7 +6541,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Wallet debit (amount + fee)",
     "Seed word": "Seed word",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Previous payment recovered. The new payment was not sent. Preview it again.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Fee {0}",
+    "Subaddress {0}": "Subaddress {0}",
+    "Could not load this part of history. You can retry.": "Could not load this part of history. You can retry.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "The network fee increased. Nothing was broadcast. Preview the fee and confirm again."
   },
   "eo": {
     "\nAmount %@": "\nSumo %@",
@@ -7136,7 +7196,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Monujo",
     "Seed word": "Reakira frazvorto",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-licencita, nekontrolita programaro. Vi respondecas pri via reakira frazo kaj financoj. La defaŭlta fora nodo povas vidi viajn IP- kaj monujo-sinkronigajn demandojn — rulu vian propran nodon por pli forta privateco. Laŭvolaj fiattaksoj, se ebligitaj, kontaktu rates.nexatrode.com por tarifoj."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-licencita, nekontrolita programaro. Vi respondecas pri via reakira frazo kaj financoj. La defaŭlta fora nodo povas vidi viajn IP- kaj monujo-sinkronigajn demandojn — rulu vian propran nodon por pli forta privateco. Laŭvolaj fiattaksoj, se ebligitaj, kontaktu rates.nexatrode.com por tarifoj.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "La antaŭa pago estis reakirita. La nova pago ne estis sendita. Antaŭrigardu ĝin denove.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Krompago {0}",
+    "Subaddress {0}": "Subadreso {0}",
+    "Could not load this part of history. You can retry.": "Ne eblis ŝargi ĉi tiun parton de la historio. Provu denove.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "La reta kotizo plialtiĝis. Nenio estis elsendita. Kontrolu la kotizon kaj konfirmu denove."
   },
   "es": {
     "\nAmount %@": "\nCantidad %@",
@@ -7785,7 +7851,13 @@
     "Unlocking…": "Desbloqueando…",
     "Wallet debit (amount + fee)": "Cartera",
     "Seed word": "Palabra de frase de recuperación",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "software no auditado con licencia del MIT. Usted es responsable de su frase de recuperación y de sus fondos. El nodo remoto predeterminado puede ver sus consultas de sincronización de IP y billetera; ejecute su propio nodo para mayor privacidad. Estimaciones fiduciarias opcionales, si están habilitadas, comuníquese con rates.nexatrode.com para conocer las tarifas."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "software no auditado con licencia del MIT. Usted es responsable de su frase de recuperación y de sus fondos. El nodo remoto predeterminado puede ver sus consultas de sincronización de IP y billetera; ejecute su propio nodo para mayor privacidad. Estimaciones fiduciarias opcionales, si están habilitadas, comuníquese con rates.nexatrode.com para conocer las tarifas.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Se recuperó el pago anterior. El nuevo pago no se envió. Vuelve a previsualizarlo.",
+    "{0} confirmations": "{0} confirmaciones",
+    "Fee {0}": "Comisión {0}",
+    "Subaddress {0}": "Subdirección {0}",
+    "Could not load this part of history. You can retry.": "No se pudo cargar esta parte del historial. Puedes volver a intentarlo.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "La comisión de red aumentó. No se envió nada. Revisa la comisión y vuelve a confirmar."
   },
   "et": {
     "\nAmount %@": "\nSumma %@",
@@ -8434,7 +8506,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Rahakott",
     "Seed word": "taastefraasisõna",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-litsentsiga, auditeerimata tarkvara. Vastutate oma taastamisfraasi ja raha eest. Vaikimisi kaugsõlm näeb teie IP ja rahakoti sünkroonimise päringuid – tugevama privaatsuse tagamiseks käivitage oma sõlm. Valikulised fiati hinnangud, kui see on lubatud, võtke hindade saamiseks ühendust rates.nexatrode.com-ga."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-litsentsiga, auditeerimata tarkvara. Vastutate oma taastamisfraasi ja raha eest. Vaikimisi kaugsõlm näeb teie IP ja rahakoti sünkroonimise päringuid – tugevama privaatsuse tagamiseks käivitage oma sõlm. Valikulised fiati hinnangud, kui see on lubatud, võtke hindade saamiseks ühendust rates.nexatrode.com-ga.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Eelmine makse taastati. Uut makset ei saadetud. Vaadake eelvaadet uuesti.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Tasu {0}",
+    "Subaddress {0}": "Alamaadress {0}",
+    "Could not load this part of history. You can retry.": "Selle ajaloo osa laadimine ebaõnnestus. Proovi uuesti.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Võrgutasu suurenes. Midagi ei edastatud. Vaata tasu üle ja kinnita uuesti."
   },
   "eu": {
     "\nAmount %@": "\nKopurua %@",
@@ -9083,7 +9161,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Zorroa",
     "Seed word": "Berreskuratzeko esaldi-hitza",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT lizentziadun, ikuskatu gabeko softwarea. Zure berreskurapen esaldiaren eta funtsen arduraduna zara. Urruneko nodo lehenetsiak zure IP eta zorroaren sinkronizazio-kontsultak ikus ditzake; exekutatu zure nodoa pribatutasun sendoagoa izateko. Aukerako fiat estimazioak, gaituta badago, jarri harremanetan rates.nexatrode.com tarifak lortzeko."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT lizentziadun, ikuskatu gabeko softwarea. Zure berreskurapen esaldiaren eta funtsen arduraduna zara. Urruneko nodo lehenetsiak zure IP eta zorroaren sinkronizazio-kontsultak ikus ditzake; exekutatu zure nodoa pribatutasun sendoagoa izateko. Aukerako fiat estimazioak, gaituta badago, jarri harremanetan rates.nexatrode.com tarifak lortzeko.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Aurreko ordainketa berreskuratu da. Ordainketa berria ez da bidali. Ikusi aurrebista berriro.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Komisioa {0}",
+    "Subaddress {0}": "Azpihelbidea {0}",
+    "Could not load this part of history. You can retry.": "Ezin izan da historiaren zati hau kargatu. Saiatu berriro.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Sareko komisioa igo da. Ez da ezer bidali. Berrikusi komisioa eta berretsi berriro."
   },
   "fa": {
     "\nAmount %@": "\nمقدار %@",
@@ -9732,7 +9816,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "کیف پول",
     "Seed word": "کلمه عبارت بازیابی",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "نرم افزار دارای مجوز MIT و حسابرسی نشده. شما مسئول عبارت و وجوه بازیابی خود هستید. گره راه دور پیش‌فرض می‌تواند جستارهای همگام‌سازی IP و کیف پول شما را ببیند - برای حفظ حریم خصوصی قوی‌تر، گره خود را اجرا کنید. تخمین‌های فیات اختیاری، در صورت فعال بودن، برای اطلاع از نرخ‌ها با rates.nexatrode.com تماس بگیرید."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "نرم افزار دارای مجوز MIT و حسابرسی نشده. شما مسئول عبارت و وجوه بازیابی خود هستید. گره راه دور پیش‌فرض می‌تواند جستارهای همگام‌سازی IP و کیف پول شما را ببیند - برای حفظ حریم خصوصی قوی‌تر، گره خود را اجرا کنید. تخمین‌های فیات اختیاری، در صورت فعال بودن، برای اطلاع از نرخ‌ها با rates.nexatrode.com تماس بگیرید.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "پرداخت قبلی بازیابی شد. پرداخت جدید ارسال نشد. دوباره پیش‌نمایش را ببینید.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "کارمزد {0}",
+    "Subaddress {0}": "زیرآدرس {0}",
+    "Could not load this part of history. You can retry.": "بارگیری این بخش از تاریخچه ممکن نشد. دوباره تلاش کنید.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "کارمزد شبکه افزایش یافت. چیزی پخش نشد. کارمزد را بررسی و دوباره تأیید کنید."
   },
   "fi": {
     "\nAmount %@": "\nMäärä %@",
@@ -10381,7 +10471,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Lompakko",
     "Seed word": "Palautuslauseke",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-lisensoitu, auditoimaton ohjelmisto. Olet vastuussa palautuslausekkeestasi ja varoistasi. Oletusetäsolmu voi nähdä IP- ja lompakkosynkronointikyselysi – käytä omaa solmuasi parantaaksesi yksityisyyttä. Valinnaiset fiat-arviot, jos ne ovat käytössä, ota yhteyttä rates.nexatrode.com:iin saadaksesi hinnat."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-lisensoitu, auditoimaton ohjelmisto. Olet vastuussa palautuslausekkeestasi ja varoistasi. Oletusetäsolmu voi nähdä IP- ja lompakkosynkronointikyselysi – käytä omaa solmuasi parantaaksesi yksityisyyttä. Valinnaiset fiat-arviot, jos ne ovat käytössä, ota yhteyttä rates.nexatrode.com:iin saadaksesi hinnat.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Aiempi maksu palautettiin. Uutta maksua ei lähetetty. Avaa esikatselu uudelleen.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Maksu {0}",
+    "Subaddress {0}": "Aliosoite {0}",
+    "Could not load this part of history. You can retry.": "Tämän historiaosan lataaminen epäonnistui. Yritä uudelleen.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Verkkomaksu nousi. Mitään ei lähetetty. Tarkista maksu ja vahvista uudelleen."
   },
   "fil": {
     "\nAmount %@": "\nHalaga %@",
@@ -11030,7 +11126,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Wallet",
     "Seed word": "Salita ng parirala sa pagbawi",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Lisensyado ng MIT, hindi na-audited na software. Responsable ka para sa iyong parirala sa pagbawi at mga pondo. Makikita ng default na remote node ang iyong mga query sa pag-sync ng IP at wallet — patakbuhin ang sarili mong node para sa mas malakas na privacy. Mga opsyonal na pagtatantya ng fiat, kung naka-enable, makipag-ugnayan sa rates.nexatrode.com para sa mga rate."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Lisensyado ng MIT, hindi na-audited na software. Responsable ka para sa iyong parirala sa pagbawi at mga pondo. Makikita ng default na remote node ang iyong mga query sa pag-sync ng IP at wallet — patakbuhin ang sarili mong node para sa mas malakas na privacy. Mga opsyonal na pagtatantya ng fiat, kung naka-enable, makipag-ugnayan sa rates.nexatrode.com para sa mga rate.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Na-recover ang nakaraang bayad. Hindi naipadala ang bagong bayad. I-preview itong muli.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Bayad {0}",
+    "Subaddress {0}": "Subaddress {0}",
+    "Could not load this part of history. You can retry.": "Hindi ma-load ang bahaging ito ng history. Subukang muli.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Tumaas ang network fee. Walang na-broadcast. Suriin ang fee at kumpirmahin muli."
   },
   "fr": {
     "\nAmount %@": "\nMontant %@",
@@ -11679,7 +11781,13 @@
     "Unlocking…": "Déverrouillage…",
     "Wallet debit (amount + fee)": "Portefeuille",
     "Seed word": "Mot de phrase de récupération",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "logiciel non audité sous licence MIT. Vous êtes responsable de votre phrase de récupération et de vos fonds. Le nœud distant par défaut peut voir vos requêtes de synchronisation IP et de portefeuille – exécutez votre propre nœud pour une meilleure confidentialité. Estimations fiat facultatives, si activées, contactez rates.nexatrode.com pour connaître les tarifs."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "logiciel non audité sous licence MIT. Vous êtes responsable de votre phrase de récupération et de vos fonds. Le nœud distant par défaut peut voir vos requêtes de synchronisation IP et de portefeuille – exécutez votre propre nœud pour une meilleure confidentialité. Estimations fiat facultatives, si activées, contactez rates.nexatrode.com pour connaître les tarifs.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Le paiement précédent a été récupéré. Le nouveau paiement n'a pas été envoyé. Affichez à nouveau l'aperçu.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Frais {0}",
+    "Subaddress {0}": "Sous-adresse {0}",
+    "Could not load this part of history. You can retry.": "Impossible de charger cette partie de l’historique. Réessayez.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Les frais réseau ont augmenté. Rien n’a été diffusé. Vérifiez les frais et confirmez à nouveau."
   },
   "ga": {
     "\nAmount %@": "\nMéid %@",
@@ -12328,7 +12436,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Sparán",
     "Seed word": "Aisghabháil focal frása",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Bogearraí MIT-cheadúnaithe, neamhiniúchta. Tá tú freagrach as do frása athshlánaithe agus cistí. Is féidir leis an gciannód réamhshocraithe do cheisteanna maidir le sioncrónú IP agus sparán a fheiceáil - do nód féin a rith le haghaidh príobháideachta níos láidre. Meastacháin fiat roghnach, má tá sé cumasaithe, téigh i dteagmháil le rates.nexatrode.com le haghaidh rátaí."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Bogearraí MIT-cheadúnaithe, neamhiniúchta. Tá tú freagrach as do frása athshlánaithe agus cistí. Is féidir leis an gciannód réamhshocraithe do cheisteanna maidir le sioncrónú IP agus sparán a fheiceáil - do nód féin a rith le haghaidh príobháideachta níos láidre. Meastacháin fiat roghnach, má tá sé cumasaithe, téigh i dteagmháil le rates.nexatrode.com le haghaidh rátaí.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Aisghabhadh an íocaíocht roimhe seo. Níor seoladh an íocaíocht nua. Réamhamharc uirthi arís.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Táille {0}",
+    "Subaddress {0}": "Fo-sheoladh {0}",
+    "Could not load this part of history. You can retry.": "Níorbh fhéidir an chuid seo den stair a luchtú. Bain triail eile as.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Tháinig méadú ar tháille an líonra. Níor craoladh aon rud. Seiceáil an táille agus deimhnigh arís."
   },
   "gl": {
     "\nAmount %@": "\nCantidade %@",
@@ -12977,7 +13091,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Carteira",
     "Seed word": "palabra de frase de recuperación",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "software con licenza MIT non auditado. Vostede é o responsable da súa frase de recuperación e dos fondos. O nodo remoto predeterminado pode ver as túas consultas de sincronización de IP e carteira: executa o teu propio nodo para aumentar a privacidade. Estimacións fiat opcionais, se están habilitadas, póñase en contacto con rates.nexatrode.com para obter tarifas."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "software con licenza MIT non auditado. Vostede é o responsable da súa frase de recuperación e dos fondos. O nodo remoto predeterminado pode ver as túas consultas de sincronización de IP e carteira: executa o teu propio nodo para aumentar a privacidade. Estimacións fiat opcionais, se están habilitadas, póñase en contacto con rates.nexatrode.com para obter tarifas.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Recuperouse o pagamento anterior. O novo pagamento non se enviou. Previsualízao de novo.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Comisión {0}",
+    "Subaddress {0}": "Subenderezo {0}",
+    "Could not load this part of history. You can retry.": "Non se puido cargar esta parte do historial. Téntao de novo.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "A comisión da rede aumentou. Non se emitiu nada. Revisa a comisión e confirma de novo."
   },
   "gn": {
     "\nAmount %@": "\nCantidad %@",
@@ -13626,7 +13746,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Ñongatuha",
     "Seed word": "Ñe’ẽjoaju jegueru jey rehegua",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Software oguerekóva licencia MIT-pe, ndojejapóiva auditada. Nde ha’e responsable nde frase de recuperación ha fondo-kuéra rehe. Pe nodo mombyrygua ñepyrũrã ikatu ohecha ne IP ha billetera ñemboheko porandu — emongu’e nde nodo tee ñeñangareko imbaretevévape g̃uarã. Umi estimación fiat opcional, oñembohapéramo, eñe’ẽ rates.nexatrode.com ndive umi tasa rehegua."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Software oguerekóva licencia MIT-pe, ndojejapóiva auditada. Nde ha’e responsable nde frase de recuperación ha fondo-kuéra rehe. Pe nodo mombyrygua ñepyrũrã ikatu ohecha ne IP ha billetera ñemboheko porandu — emongu’e nde nodo tee ñeñangareko imbaretevévape g̃uarã. Umi estimación fiat opcional, oñembohapéramo, eñe’ẽ rates.nexatrode.com ndive umi tasa rehegua.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Ojerekupera pe jehepyme’ẽ ymaguare. Ndoñemondói pe jehepyme’ẽ pyahu. Ehecha jey henonderã.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Comisión {0}",
+    "Subaddress {0}": "Subdirección {0}",
+    "Could not load this part of history. You can retry.": "Ndaikatúi oñemyanyhẽ ko ñemuhakue pehẽ. Eha'ã jey.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Oñembohetave pe tarifa red rehegua. Ndojekuaaukái mba'eve. Ehecha jey tarifa ha emoneĩ jey."
   },
   "ha": {
     "\nAmount %@": "\nAdadi %@",
@@ -14275,7 +14401,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Walat",
     "Seed word": "Kalmomin jumlar maidowa",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-lasisi, software mara tantancewa. Kuna da alhakin dawo da kalmar ku da kuɗi. Kullin nesa na tsoho yana iya ganin tambayoyin daidaitawa na IP da walat ɗinku - gudanar da kumburin ku don ƙarin sirrin sirri. Ƙididdiga na fiat na zaɓi, idan an kunna, tuntuɓi rates.nexatrode.com don ƙimar kuɗi."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-lasisi, software mara tantancewa. Kuna da alhakin dawo da kalmar ku da kuɗi. Kullin nesa na tsoho yana iya ganin tambayoyin daidaitawa na IP da walat ɗinku - gudanar da kumburin ku don ƙarin sirrin sirri. Ƙididdiga na fiat na zaɓi, idan an kunna, tuntuɓi rates.nexatrode.com don ƙimar kuɗi.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "An dawo da biyan kuɗin da ya gabata. Ba a aika sabon biyan kuɗin ba. Duba samfoti kuma.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Kuɗin Caji {0}",
+    "Subaddress {0}": "Sab-adireshi {0}",
+    "Could not load this part of history. You can retry.": "Ba a iya loda wannan ɓangaren tarihin ba. Gwada kuma.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Kudin cibiyar sadarwa ya ƙaru. Ba a aika komai ba. Duba kuɗin sannan ka sake tabbatarwa."
   },
   "he": {
     "\nAmount %@": "\nסכום %@",
@@ -14924,7 +15056,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "ארנק",
     "Seed word": "מילת ביטוי שחזור",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "תוכנה לא מבוקרה ברישיון MIT. אתה אחראי על ביטוי השחזור והכספים שלך. צומת ברירת המחדל יכול לראות את שאילתות סנכרון ה-IP והארנק שלך - הפעל צומת משלך לפרטיות חזקה יותר. הערכות פיאט אופציונליות, אם מופעלות, צור קשר עם rates.nexatrode.com לקבלת תעריפים."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "תוכנה לא מבוקרה ברישיון MIT. אתה אחראי על ביטוי השחזור והכספים שלך. צומת ברירת המחדל יכול לראות את שאילתות סנכרון ה-IP והארנק שלך - הפעל צומת משלך לפרטיות חזקה יותר. הערכות פיאט אופציונליות, אם מופעלות, צור קשר עם rates.nexatrode.com לקבלת תעריפים.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "התשלום הקודם שוחזר. התשלום החדש לא נשלח. הצג שוב תצוגה מקדימה.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "עמלה {0}",
+    "Subaddress {0}": "כתובת משנה {0}",
+    "Could not load this part of history. You can retry.": "לא ניתן לטעון את החלק הזה של ההיסטוריה. אפשר לנסות שוב.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "עמלת הרשת עלתה. שום דבר לא שודר. יש לבדוק את העמלה ולאשר שוב."
   },
   "hi": {
     "\nAmount %@": "\nराशि %@",
@@ -15573,7 +15711,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "वॉलेट",
     "Seed word": "पुनर्प्राप्ति वाक्यांश शब्द",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "एमआईटी-लाइसेंस प्राप्त, अनऑडिटेड सॉफ़्टवेयर। आप अपने पुनर्प्राप्ति वाक्यांश और धन के लिए जिम्मेदार हैं। डिफ़ॉल्ट रिमोट नोड आपके आईपी और वॉलेट सिंक क्वेरी को देख सकता है - मजबूत गोपनीयता के लिए अपना स्वयं का नोड चलाएं। वैकल्पिक फिएट अनुमान, यदि सक्षम है, तो दरों के लिए rates.nexatrode.com से संपर्क करें।"
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "एमआईटी-लाइसेंस प्राप्त, अनऑडिटेड सॉफ़्टवेयर। आप अपने पुनर्प्राप्ति वाक्यांश और धन के लिए जिम्मेदार हैं। डिफ़ॉल्ट रिमोट नोड आपके आईपी और वॉलेट सिंक क्वेरी को देख सकता है - मजबूत गोपनीयता के लिए अपना स्वयं का नोड चलाएं। वैकल्पिक फिएट अनुमान, यदि सक्षम है, तो दरों के लिए rates.nexatrode.com से संपर्क करें।",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "पिछला भुगतान पुनर्प्राप्त हो गया। नया भुगतान नहीं भेजा गया। उसका पूर्वावलोकन फिर देखें।",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "फ़ीस {0}",
+    "Subaddress {0}": "सब-एड्रेस {0}",
+    "Could not load this part of history. You can retry.": "इतिहास का यह हिस्सा लोड नहीं हो सका। फिर से कोशिश करें।",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "नेटवर्क शुल्क बढ़ गया। कुछ भी प्रसारित नहीं हुआ। शुल्क देखें और फिर से पुष्टि करें।"
   },
   "hr": {
     "\nAmount %@": "\nIznos %@",
@@ -16222,7 +16366,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Novčanik",
     "Seed word": "Riječ izraza za oporavak",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT licencirani, nerevidirani softver. Vi ste odgovorni za svoju frazu i sredstva za oporavak. Zadani udaljeni čvor može vidjeti vaše IP i upite za sinkronizaciju novčanika — pokrenite vlastiti čvor za veću privatnost. Neobavezne procjene fiat-a, ako je omogućeno, kontaktirajte rates.nexatrode.com za cijene."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT licencirani, nerevidirani softver. Vi ste odgovorni za svoju frazu i sredstva za oporavak. Zadani udaljeni čvor može vidjeti vaše IP i upite za sinkronizaciju novčanika — pokrenite vlastiti čvor za veću privatnost. Neobavezne procjene fiat-a, ako je omogućeno, kontaktirajte rates.nexatrode.com za cijene.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Prethodno plaćanje je obnovljeno. Novo plaćanje nije poslano. Ponovno pogledajte pretpregled.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Naknada {0}",
+    "Subaddress {0}": "Podadresa {0}",
+    "Could not load this part of history. You can retry.": "Ovaj dio povijesti nije moguće učitati. Pokušajte ponovno.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Mrežna naknada se povećala. Ništa nije emitirano. Pregledajte naknadu i ponovno potvrdite."
   },
   "hu": {
     "\nAmount %@": "\nÖsszeg %@",
@@ -16871,7 +17021,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Pénztárca",
     "Seed word": "Helyreállítási kifejezés szó",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-licenc, nem auditált szoftver. Ön felelős a helyreállítási kifejezésért és az alapokért. Az alapértelmezett távoli csomópont láthatja az Ön IP-címét és a pénztárca szinkronizálási lekérdezéseit – futtassa saját csomópontját az erősebb adatvédelem érdekében. Opcionális fiat becslések, ha engedélyezve van, forduljon a rates.nexatrode.com-hez az árakért."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-licenc, nem auditált szoftver. Ön felelős a helyreállítási kifejezésért és az alapokért. Az alapértelmezett távoli csomópont láthatja az Ön IP-címét és a pénztárca szinkronizálási lekérdezéseit – futtassa saját csomópontját az erősebb adatvédelem érdekében. Opcionális fiat becslések, ha engedélyezve van, forduljon a rates.nexatrode.com-hez az árakért.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "A korábbi fizetés helyreállt. Az új fizetés nem lett elküldve. Tekintsd meg újra az előnézetet.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Díj {0}",
+    "Subaddress {0}": "{0}. alcím",
+    "Could not load this part of history. You can retry.": "Az előzmények ezen része nem tölthető be. Próbálja újra.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "A hálózati díj megemelkedett. Nem történt közvetítés. Ellenőrizze a díjat, majd erősítse meg újra."
   },
   "hy": {
     "\nAmount %@": "\nԳումար՝ %@",
@@ -17520,7 +17676,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Դրամապանակ",
     "Seed word": "Վերականգնող բառակապակցություն",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT լիցենզավորված, չաուդիտի ենթարկված ծրագրակազմ: Դուք պատասխանատու եք ձեր վերականգնման արտահայտության և միջոցների համար: Կանխադրված հեռավոր հանգույցը կարող է տեսնել ձեր IP-ի և դրամապանակի համաժամացման հարցումները. գործարկել ձեր սեփական հանգույցը՝ ավելի ուժեղ գաղտնիության համար: Ֆիատի կամընտիր գնահատականները, եթե միացված են, կապվեք rates.nexatrode.com համարով գների համար:"
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT լիցենզավորված, չաուդիտի ենթարկված ծրագրակազմ: Դուք պատասխանատու եք ձեր վերականգնման արտահայտության և միջոցների համար: Կանխադրված հեռավոր հանգույցը կարող է տեսնել ձեր IP-ի և դրամապանակի համաժամացման հարցումները. գործարկել ձեր սեփական հանգույցը՝ ավելի ուժեղ գաղտնիության համար: Ֆիատի կամընտիր գնահատականները, եթե միացված են, կապվեք rates.nexatrode.com համարով գների համար:",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Նախորդ վճարումը վերականգնվել է։ Նոր վճարումը չի ուղարկվել։ Կրկին դիտեք նախադիտումը։",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Միջնորդավճար {0}",
+    "Subaddress {0}": "Ենթահասցե {0}",
+    "Could not load this part of history. You can retry.": "Չհաջողվեց բեռնել պատմության այս մասը։ Կրկին փորձեք։",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Ցանցի վճարը բարձրացել է։ Ոչինչ չի հեռարձակվել։ Ստուգեք վճարը և կրկին հաստատեք։"
   },
   "id": {
     "\nAmount %@": "\nJumlah %@",
@@ -18169,7 +18331,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Dompet",
     "Seed word": "Kata frase pemulihan",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Perangkat lunak berlisensi MIT dan tidak diaudit. Anda bertanggung jawab atas frase dan dana pemulihan Anda. Node jarak jauh default dapat melihat permintaan sinkronisasi IP dan dompet Anda — jalankan node Anda sendiri untuk privasi yang lebih kuat. Perkiraan fiat opsional, jika diaktifkan, hubungi rates.nexatrode.com untuk mengetahui tarif."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Perangkat lunak berlisensi MIT dan tidak diaudit. Anda bertanggung jawab atas frase dan dana pemulihan Anda. Node jarak jauh default dapat melihat permintaan sinkronisasi IP dan dompet Anda — jalankan node Anda sendiri untuk privasi yang lebih kuat. Perkiraan fiat opsional, jika diaktifkan, hubungi rates.nexatrode.com untuk mengetahui tarif.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Pembayaran sebelumnya dipulihkan. Pembayaran baru tidak dikirim. Lihat pratinjaunya lagi.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Biaya {0}",
+    "Subaddress {0}": "Subalamat {0}",
+    "Could not load this part of history. You can retry.": "Bagian riwayat ini tidak dapat dimuat. Coba lagi.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Biaya jaringan meningkat. Tidak ada transaksi yang disiarkan. Tinjau biaya lalu konfirmasi lagi."
   },
   "it": {
     "\nAmount %@": "\nImporto %@",
@@ -18818,7 +18986,13 @@
     "Unlocking…": "Sblocco…",
     "Wallet debit (amount + fee)": "Wallet",
     "Seed word": "parola della frase di recupero",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "software non certificato con licenza MIT. Sei responsabile della tua frase di recupero e dei tuoi fondi. Il nodo remoto predefinito può vedere il tuo IP e le query di sincronizzazione del portafoglio: esegui il tuo nodo per una maggiore privacy. Stime fiat opzionali, se abilitate, contattare rates.nexatrode.com per le tariffe."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "software non certificato con licenza MIT. Sei responsabile della tua frase di recupero e dei tuoi fondi. Il nodo remoto predefinito può vedere il tuo IP e le query di sincronizzazione del portafoglio: esegui il tuo nodo per una maggiore privacy. Stime fiat opzionali, se abilitate, contattare rates.nexatrode.com per le tariffe.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Il pagamento precedente è stato recuperato. Il nuovo pagamento non è stato inviato. Visualizza di nuovo l'anteprima.",
+    "{0} confirmations": "{0} conferme",
+    "Fee {0}": "Commissione {0}",
+    "Subaddress {0}": "Sottoindirizzo {0}",
+    "Could not load this part of history. You can retry.": "Impossibile caricare questa parte della cronologia. Riprova.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "La commissione di rete è aumentata. Non è stato trasmesso nulla. Controlla la commissione e conferma di nuovo."
   },
   "ja": {
     "\nAmount %@": "\n金額 %@",
@@ -19467,7 +19641,13 @@
     "Unlocking…": "ロック解除中…",
     "Wallet debit (amount + fee)": "ウォレット",
     "Seed word": "リカバリフレーズワード",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT ライセンスの未監査ソフトウェア。回復フレーズと資金についてはあなたが責任を負います。デフォルトのリモート ノードは、IP とウォレットの同期クエリを参照できます。プライバシーを強化するために独自のノードを実行します。オプションの法定通貨見積りが有効になっている場合、料金については rates.nexatrode.com にお問い合わせください。"
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT ライセンスの未監査ソフトウェア。回復フレーズと資金についてはあなたが責任を負います。デフォルトのリモート ノードは、IP とウォレットの同期クエリを参照できます。プライバシーを強化するために独自のノードを実行します。オプションの法定通貨見積りが有効になっている場合、料金については rates.nexatrode.com にお問い合わせください。",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "前の支払いを復旧しました。新しい支払いは送信されていません。もう一度プレビューしてください。",
+    "{0} confirmations": "{0} 確認",
+    "Fee {0}": "手数料 {0}",
+    "Subaddress {0}": "サブアドレス {0}",
+    "Could not load this part of history. You can retry.": "履歴のこの部分を読み込めませんでした。再試行できます。",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "ネットワーク手数料が増加しました。送信は行われていません。手数料を確認してもう一度承認してください。"
   },
   "ko": {
     "\nAmount %@": "\n금액 %@",
@@ -20116,7 +20296,13 @@
     "Unlocking…": "잠금 해제 중…",
     "Wallet debit (amount + fee)": "지갑",
     "Seed word": "복구 문구 단어",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT 라이선스, 감사되지 않은 소프트웨어. 복구 문구와 자금에 대한 책임은 귀하에게 있습니다. 기본 원격 노드는 귀하의 IP 및 지갑 동기화 쿼리를 볼 수 있습니다. 더 강력한 개인정보 보호를 위해 자체 노드를 실행하세요. 선택적 법정화폐 추정이 활성화된 경우 요율은 rates.nexatrode.com에 문의하세요."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT 라이선스, 감사되지 않은 소프트웨어. 복구 문구와 자금에 대한 책임은 귀하에게 있습니다. 기본 원격 노드는 귀하의 IP 및 지갑 동기화 쿼리를 볼 수 있습니다. 더 강력한 개인정보 보호를 위해 자체 노드를 실행하세요. 선택적 법정화폐 추정이 활성화된 경우 요율은 rates.nexatrode.com에 문의하세요.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "이전 결제가 복구되었습니다. 새 결제는 전송되지 않았습니다. 다시 미리 보기를 확인하세요.",
+    "{0} confirmations": "{0}회 확인",
+    "Fee {0}": "수수료 {0}",
+    "Subaddress {0}": "서브주소 {0}",
+    "Could not load this part of history. You can retry.": "내역의 이 부분을 불러오지 못했습니다. 다시 시도할 수 있습니다.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "네트워크 수수료가 증가했습니다. 전송된 내용이 없습니다. 수수료를 확인하고 다시 승인하세요."
   },
   "ky": {
     "\nAmount %@": "\nСумма: %@",
@@ -20765,7 +20951,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Капчык",
     "Seed word": "Калыбына келтирүү фразасы",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT лицензиясы бар, текшерилбеген программалык камсыздоо. Сиз калыбына келтирүү фразасы жана каражаттарыңыз үчүн жооптуусуз. Демейки алыскы түйүн сиздин IP жана капчыкты синхрондоштуруу сурамдарын көрө алат — купуялуулукту бекемдөө үчүн өз түйүнүңүздү иштетиңиз. Кошумча fiat баалоолору, эгер иштетилген болсо, тарифтер үчүн rates.nexatrode.com менен байланышыңыз."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT лицензиясы бар, текшерилбеген программалык камсыздоо. Сиз калыбына келтирүү фразасы жана каражаттарыңыз үчүн жооптуусуз. Демейки алыскы түйүн сиздин IP жана капчыкты синхрондоштуруу сурамдарын көрө алат — купуялуулукту бекемдөө үчүн өз түйүнүңүздү иштетиңиз. Кошумча fiat баалоолору, эгер иштетилген болсо, тарифтер үчүн rates.nexatrode.com менен байланышыңыз.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Мурунку төлөм калыбына келтирилди. Жаңы төлөм жөнөтүлгөн жок. Алдын ала көрүнүшүн кайра текшериңиз.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Комиссия {0}",
+    "Subaddress {0}": "Кошумча дарек {0}",
+    "Could not load this part of history. You can retry.": "Тарыхтын бул бөлүгүн жүктөө мүмкүн болгон жок. Кайра аракет кылыңыз.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Тармак акысы көбөйдү. Эч нерсе таратылган жок. Акыны карап чыгып, кайра ырастаңыз."
   },
   "lt": {
     "\nAmount %@": "\nSuma %@",
@@ -21414,7 +21606,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Piniginė",
     "Seed word": "atkūrimo frazės žodis",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT licencijuota, neaudituota programinė įranga. Jūs esate atsakingi už atkūrimo frazę ir lėšas. Numatytasis nuotolinis mazgas gali matyti jūsų IP ir piniginės sinchronizavimo užklausas – paleiskite savo mazgą, kad užtikrintumėte didesnį privatumą. Pasirenkami „fiat“ įvertinimai, jei įjungta, dėl tarifų susisiekite su rates.nexatrode.com."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT licencijuota, neaudituota programinė įranga. Jūs esate atsakingi už atkūrimo frazę ir lėšas. Numatytasis nuotolinis mazgas gali matyti jūsų IP ir piniginės sinchronizavimo užklausas – paleiskite savo mazgą, kad užtikrintumėte didesnį privatumą. Pasirenkami „fiat“ įvertinimai, jei įjungta, dėl tarifų susisiekite su rates.nexatrode.com.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Ankstesnis mokėjimas atkurtas. Naujas mokėjimas neišsiųstas. Dar kartą peržiūrėkite jį.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Mokestis {0}",
+    "Subaddress {0}": "Subadresas {0}",
+    "Could not load this part of history. You can retry.": "Nepavyko įkelti šios istorijos dalies. Bandykite dar kartą.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Tinklo mokestis padidėjo. Nieko neišsiųsta. Peržiūrėkite mokestį ir patvirtinkite dar kartą."
   },
   "lv": {
     "\nAmount %@": "\nSumma %@",
@@ -22063,7 +22261,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Maks",
     "Seed word": "atkopšanas frāzes vārds",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT licencēta, neauditēta programmatūra. Jūs esat atbildīgs par savu atgūšanas frāzi un līdzekļiem. Noklusējuma attālais mezgls var redzēt jūsu IP un maka sinhronizācijas vaicājumus — palaidiet savu mezglu, lai nodrošinātu lielāku privātumu. Izvēles fiat aprēķini, ja tie ir iespējoti, sazinieties ar rates.nexatrode.com, lai uzzinātu cenas."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT licencēta, neauditēta programmatūra. Jūs esat atbildīgs par savu atgūšanas frāzi un līdzekļiem. Noklusējuma attālais mezgls var redzēt jūsu IP un maka sinhronizācijas vaicājumus — palaidiet savu mezglu, lai nodrošinātu lielāku privātumu. Izvēles fiat aprēķini, ja tie ir iespējoti, sazinieties ar rates.nexatrode.com, lai uzzinātu cenas.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Iepriekšējais maksājums atjaunots. Jaunais maksājums netika nosūtīts. Apskatiet priekšskatījumu vēlreiz.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Maksa {0}",
+    "Subaddress {0}": "Subadrese {0}",
+    "Could not load this part of history. You can retry.": "Neizdevās ielādēt šo vēstures daļu. Mēģiniet vēlreiz.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Tīkla maksa palielinājās. Nekas netika pārraidīts. Pārskatiet maksu un apstipriniet vēlreiz."
   },
   "ms": {
     "\nAmount %@": "\nJumlah %@",
@@ -22712,7 +22916,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Dompet",
     "Seed word": "Perkataan frasa pemulihan",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Berlesen MIT, perisian tidak diaudit. Anda bertanggungjawab untuk frasa pemulihan dan dana anda. Nod jauh lalai boleh melihat pertanyaan penyegerakan IP dan dompet anda — jalankan nod anda sendiri untuk privasi yang lebih kukuh. Anggaran fiat pilihan, jika didayakan, hubungi rates.nexatrode.com untuk mendapatkan kadar."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Berlesen MIT, perisian tidak diaudit. Anda bertanggungjawab untuk frasa pemulihan dan dana anda. Nod jauh lalai boleh melihat pertanyaan penyegerakan IP dan dompet anda — jalankan nod anda sendiri untuk privasi yang lebih kukuh. Anggaran fiat pilihan, jika didayakan, hubungi rates.nexatrode.com untuk mendapatkan kadar.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Pembayaran terdahulu dipulihkan. Pembayaran baharu tidak dihantar. Lihat pratonton sekali lagi.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Yuran {0}",
+    "Subaddress {0}": "Sub-alamat {0}",
+    "Could not load this part of history. You can retry.": "Bahagian sejarah ini tidak dapat dimuatkan. Cuba lagi.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Yuran rangkaian meningkat. Tiada apa-apa disiarkan. Semak yuran dan sahkan sekali lagi."
   },
   "my": {
     "\nAmount %@": "\nပမာဏ %@",
@@ -23361,7 +23571,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "ပိုက်ဆံအိတ်",
     "Seed word": "- ပြန်လည်ရယူရေး စကားစု စကားလုံး",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "- MIT လိုင်စင်ရ၊ စစ်ဆေးမထားသော ဆော့ဖ်ဝဲ။ သင်၏ ပြန်လည်ရယူရေး စကားစုနှင့် ရန်ပုံငွေများအတွက် သင်သည် တာဝန်ရှိပါသည်။ မူရင်းအဝေးမှ node သည် သင်၏ IP နှင့် wallet sync queries များကို မြင်နိုင်သည် — ပိုမိုခိုင်မာသောကိုယ်ရေးကိုယ်တာအတွက် သင့်ကိုယ်ပိုင် node ကိုဖွင့်ပါ။ ရွေးချယ်နိုင်သော fiat ခန့်မှန်းချက်များကို ဖွင့်ထားပါက နှုန်းထားများအတွက် rates.nexatrode.com သို့ ဆက်သွယ်ပါ။"
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "- MIT လိုင်စင်ရ၊ စစ်ဆေးမထားသော ဆော့ဖ်ဝဲ။ သင်၏ ပြန်လည်ရယူရေး စကားစုနှင့် ရန်ပုံငွေများအတွက် သင်သည် တာဝန်ရှိပါသည်။ မူရင်းအဝေးမှ node သည် သင်၏ IP နှင့် wallet sync queries များကို မြင်နိုင်သည် — ပိုမိုခိုင်မာသောကိုယ်ရေးကိုယ်တာအတွက် သင့်ကိုယ်ပိုင် node ကိုဖွင့်ပါ။ ရွေးချယ်နိုင်သော fiat ခန့်မှန်းချက်များကို ဖွင့်ထားပါက နှုန်းထားများအတွက် rates.nexatrode.com သို့ ဆက်သွယ်ပါ။",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "ယခင်ငွေပေးချေမှုကို ပြန်လည်ရယူပြီးပါပြီ။ ငွေပေးချေမှုအသစ်ကို မပို့ရသေးပါ။ အကြိုကြည့်ရှုမှုကို ထပ်ကြည့်ပါ။",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "အခကြေးငွေ {0}",
+    "Subaddress {0}": "Subaddress {0}",
+    "Could not load this part of history. You can retry.": "မှတ်တမ်း၏ ဤအပိုင်းကို ဖွင့်၍မရပါ။ ထပ်ကြိုးစားပါ။",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "ကွန်ရက်ကြေး တိုးလာသည်။ မည်သည့်အရာမျှ ထုတ်လွှင့်ခြင်း မရှိပါ။ ကြေးကိုစစ်ဆေးပြီး ထပ်မံအတည်ပြုပါ။"
   },
   "nb": {
     "\nAmount %@": "\nBeløp %@",
@@ -24010,7 +24226,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Lommebok",
     "Seed word": "Gjenopprettingsfraseord",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-lisensiert, urevidert programvare. Du er ansvarlig for gjenopprettingsfrasen og midler. Standard ekstern node kan se IP- og lommeboksynkroniseringsspørsmålene dine - kjør din egen node for sterkere personvern. Valgfrie fiat-anslag, hvis aktivert, kontakt rates.nexatrode.com for priser."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-lisensiert, urevidert programvare. Du er ansvarlig for gjenopprettingsfrasen og midler. Standard ekstern node kan se IP- og lommeboksynkroniseringsspørsmålene dine - kjør din egen node for sterkere personvern. Valgfrie fiat-anslag, hvis aktivert, kontakt rates.nexatrode.com for priser.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Den tidligere betalingen er gjenopprettet. Den nye betalingen ble ikke sendt. Se forhåndsvisningen igjen.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Avgift {0}",
+    "Subaddress {0}": "Underadresse {0}",
+    "Could not load this part of history. You can retry.": "Denne delen av historikken kunne ikke lastes inn. Prøv igjen.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Nettverksgebyret økte. Ingenting ble kringkastet. Se over gebyret og bekreft på nytt."
   },
   "nl": {
     "\nAmount %@": "\nBedrag %@",
@@ -24659,7 +24881,13 @@
     "Unlocking…": "Ontgrendelen…",
     "Wallet debit (amount + fee)": "Portemonnee",
     "Seed word": "Herstelzinwoord",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-gelicentieerde, niet-gecontroleerde software. U bent verantwoordelijk voor uw herstelzin en fondsen. Het standaard externe knooppunt kan uw IP- en portemonneesynchronisatieverzoeken zien. Voer uw eigen knooppunt uit voor een betere privacy. Optionele fiatschattingen, indien ingeschakeld, neem contact op met rates.nexatrode.com voor tarieven."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-gelicentieerde, niet-gecontroleerde software. U bent verantwoordelijk voor uw herstelzin en fondsen. Het standaard externe knooppunt kan uw IP- en portemonneesynchronisatieverzoeken zien. Voer uw eigen knooppunt uit voor een betere privacy. Optionele fiatschattingen, indien ingeschakeld, neem contact op met rates.nexatrode.com voor tarieven.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "De vorige betaling is hersteld. De nieuwe betaling is niet verzonden. Bekijk het voorbeeld opnieuw.",
+    "{0} confirmations": "{0} bevestigingen",
+    "Fee {0}": "Vergoeding {0}",
+    "Subaddress {0}": "Subadres {0}",
+    "Could not load this part of history. You can retry.": "Dit deel van de geschiedenis kon niet worden geladen. Probeer het opnieuw.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "De netwerkkosten zijn gestegen. Er is niets uitgezonden. Controleer de kosten en bevestig opnieuw."
   },
   "pl": {
     "\nAmount %@": "\nKwota %@",
@@ -25308,7 +25536,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Portfel",
     "Seed word": "Słowo frazy odzyskiwania",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Niesprawdzone oprogramowanie na licencji MIT. Jesteś odpowiedzialny za zwrot środków i środki. Domyślny węzeł zdalny może zobaczyć Twoje zapytania dotyczące synchronizacji adresu IP i portfela — uruchom własny węzeł, aby zapewnić większą prywatność. Opcjonalne szacunki fiat, jeśli są włączone, skontaktuj się z rates.nexatrode.com w celu uzyskania stawek."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Niesprawdzone oprogramowanie na licencji MIT. Jesteś odpowiedzialny za zwrot środków i środki. Domyślny węzeł zdalny może zobaczyć Twoje zapytania dotyczące synchronizacji adresu IP i portfela — uruchom własny węzeł, aby zapewnić większą prywatność. Opcjonalne szacunki fiat, jeśli są włączone, skontaktuj się z rates.nexatrode.com w celu uzyskania stawek.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Poprzednia płatność została odzyskana. Nowa płatność nie została wysłana. Ponownie wyświetl podgląd.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Opłata {0}",
+    "Subaddress {0}": "Podadres {0}",
+    "Could not load this part of history. You can retry.": "Nie udało się wczytać tej części historii. Spróbuj ponownie.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Opłata sieciowa wzrosła. Nic nie zostało wysłane. Sprawdź opłatę i potwierdź ponownie."
   },
   "pt-BR": {
     "\nAmount %@": "\nValor %@",
@@ -25957,7 +26191,13 @@
     "Unlocking…": "Desbloqueando…",
     "Wallet debit (amount + fee)": "Carteira",
     "Seed word": "Palavra da frase de recuperação",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Software não auditado e licenciado pelo MIT. Você é responsável por seu período de recuperação e fundos. O nó remoto padrão pode ver suas consultas de sincronização de IP e carteira – execute seu próprio nó para maior privacidade. Estimativas fiduciárias opcionais, se habilitadas, entre em contato com rates.nexatrode.com para obter taxas."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Software não auditado e licenciado pelo MIT. Você é responsável por seu período de recuperação e fundos. O nó remoto padrão pode ver suas consultas de sincronização de IP e carteira – execute seu próprio nó para maior privacidade. Estimativas fiduciárias opcionais, se habilitadas, entre em contato com rates.nexatrode.com para obter taxas.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "O pagamento anterior foi recuperado. O novo pagamento não foi enviado. Veja a prévia novamente.",
+    "{0} confirmations": "{0} confirmações",
+    "Fee {0}": "Taxa {0}",
+    "Subaddress {0}": "Subendereço {0}",
+    "Could not load this part of history. You can retry.": "Não foi possível carregar esta parte do histórico. Tente novamente.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "A taxa da rede aumentou. Nada foi transmitido. Confira a taxa e confirme novamente."
   },
   "ro": {
     "\nAmount %@": "\nSumă %@",
@@ -26606,7 +26846,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Portofel",
     "Seed word": "Cuvânt expresie de recuperare",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "software cu licență MIT, neauditat. Sunteți responsabil pentru fraza și fondurile dvs. de recuperare. Nodul la distanță implicit poate vedea interogările dvs. de sincronizare IP și portofel - rulați propriul nod pentru o confidențialitate mai puternică. Estimări fiat opționale, dacă sunt activate, contactați rates.nexatrode.com pentru tarife."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "software cu licență MIT, neauditat. Sunteți responsabil pentru fraza și fondurile dvs. de recuperare. Nodul la distanță implicit poate vedea interogările dvs. de sincronizare IP și portofel - rulați propriul nod pentru o confidențialitate mai puternică. Estimări fiat opționale, dacă sunt activate, contactați rates.nexatrode.com pentru tarife.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Plata anterioară a fost recuperată. Noua plată nu a fost trimisă. Previzualizați-o din nou.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Comision {0}",
+    "Subaddress {0}": "Subadresa {0}",
+    "Could not load this part of history. You can retry.": "Această parte a istoricului nu a putut fi încărcată. Încearcă din nou.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Comisionul rețelei a crescut. Nu s-a transmis nimic. Verifică comisionul și confirmă din nou."
   },
   "ru": {
     "\nAmount %@": "\nСумма %@",
@@ -27255,7 +27501,13 @@
     "Unlocking…": "Разблокировка…",
     "Wallet debit (amount + fee)": "Кошелёк",
     "Seed word": "Слово фразы восстановления.",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "непроверенное программное обеспечение, лицензированное MIT. Вы несете ответственность за свою фразу восстановления и средства. Удаленный узел по умолчанию может видеть ваш IP-адрес и запросы синхронизации кошелька — запустите собственный узел для большей конфиденциальности. Дополнительные оценки, если они включены, позвоните по номеру rates.nexatrode.com, чтобы узнать тарифы."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "непроверенное программное обеспечение, лицензированное MIT. Вы несете ответственность за свою фразу восстановления и средства. Удаленный узел по умолчанию может видеть ваш IP-адрес и запросы синхронизации кошелька — запустите собственный узел для большей конфиденциальности. Дополнительные оценки, если они включены, позвоните по номеру rates.nexatrode.com, чтобы узнать тарифы.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Предыдущий платёж восстановлен. Новый платёж не отправлен. Повторите предварительный просмотр.",
+    "{0} confirmations": "{0} подтверждений",
+    "Fee {0}": "Комиссия {0}",
+    "Subaddress {0}": "Подадрес {0}",
+    "Could not load this part of history. You can retry.": "Не удалось загрузить эту часть истории. Попробуйте ещё раз.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Сетевая комиссия выросла. Ничего не отправлено. Проверьте комиссию и подтвердите снова."
   },
   "sk": {
     "\nAmount %@": "\nSuma %@",
@@ -27904,7 +28156,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Peňaženka",
     "Seed word": "Obnovovacie frázové slovo",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Neauditovaný softvér s licenciou MIT. Zodpovedáte za svoju frázu na obnovenie a finančné prostriedky. Predvolený vzdialený uzol môže vidieť vaše dotazy na synchronizáciu IP a peňaženky – spustite svoj vlastný uzol pre väčšie súkromie. Voliteľné odhady fiat, ak sú aktivované, kontaktujte rates.nexatrode.com pre sadzby."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Neauditovaný softvér s licenciou MIT. Zodpovedáte za svoju frázu na obnovenie a finančné prostriedky. Predvolený vzdialený uzol môže vidieť vaše dotazy na synchronizáciu IP a peňaženky – spustite svoj vlastný uzol pre väčšie súkromie. Voliteľné odhady fiat, ak sú aktivované, kontaktujte rates.nexatrode.com pre sadzby.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Predchádzajúca platba bola obnovená. Nová platba nebola odoslaná. Znovu zobrazte náhľad.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Poplatok {0}",
+    "Subaddress {0}": "Podadresa {0}",
+    "Could not load this part of history. You can retry.": "Túto časť histórie sa nepodarilo načítať. Skúste to znova.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Sieťový poplatok sa zvýšil. Nič sa nevyslalo. Skontrolujte poplatok a znova potvrďte."
   },
   "sl": {
     "\nAmount %@": "\nZnesek %@",
@@ -28553,7 +28811,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Denarnica",
     "Seed word": "Beseda fraze za obnovitev",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "nerevidirana programska oprema z licenco MIT. Odgovorni ste za vašo frazo za obnovitev in sredstva. Privzeto oddaljeno vozlišče lahko vidi vaše poizvedbe za sinhronizacijo IP in denarnice – za večjo zasebnost zaženite svoje vozlišče. Izbirne ocene fiat, če so omogočene, se za cene obrnite na rates.nexatrode.com."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "nerevidirana programska oprema z licenco MIT. Odgovorni ste za vašo frazo za obnovitev in sredstva. Privzeto oddaljeno vozlišče lahko vidi vaše poizvedbe za sinhronizacijo IP in denarnice – za večjo zasebnost zaženite svoje vozlišče. Izbirne ocene fiat, če so omogočene, se za cene obrnite na rates.nexatrode.com.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Prejšnje plačilo je obnovljeno. Novo plačilo ni bilo poslano. Ponovno si oglejte predogled.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Provizija {0}",
+    "Subaddress {0}": "Podnaslov {0}",
+    "Could not load this part of history. You can retry.": "Tega dela zgodovine ni bilo mogoče naložiti. Poskusite znova.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Omrežna provizija se je zvišala. Nič ni bilo oddano. Preverite provizijo in znova potrdite."
   },
   "sq": {
     "\nAmount %@": "\nShuma %@",
@@ -29202,7 +29466,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Portofoli",
     "Seed word": "Fjala e frazës rikuperuese",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Softuer i paaudituar i licencuar nga MIT. Ju jeni përgjegjës për frazën dhe fondet tuaja të rikuperimit. Nyja e largët e parazgjedhur mund të shohë pyetjet tuaja të sinkronizimit të IP-së dhe portofolit - drejtoni nyjen tuaj për privatësi më të fortë. Vlerësimet opsionale të fiat-it, nëse janë të aktivizuara, kontaktoni rates.nexatrode.com për tarifat."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Softuer i paaudituar i licencuar nga MIT. Ju jeni përgjegjës për frazën dhe fondet tuaja të rikuperimit. Nyja e largët e parazgjedhur mund të shohë pyetjet tuaja të sinkronizimit të IP-së dhe portofolit - drejtoni nyjen tuaj për privatësi më të fortë. Vlerësimet opsionale të fiat-it, nëse janë të aktivizuara, kontaktoni rates.nexatrode.com për tarifat.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Pagesa e mëparshme u rikuperua. Pagesa e re nuk u dërgua. Shikojeni paraprakisht përsëri.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Tarifa {0}",
+    "Subaddress {0}": "Nën-adresa {0}",
+    "Could not load this part of history. You can retry.": "Nuk mund të ngarkohej kjo pjesë e historikut. Provo përsëri.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Tarifa e rrjetit u rrit. Nuk u transmetua asgjë. Kontrolloni tarifën dhe konfirmoni përsëri."
   },
   "sv": {
     "\nAmount %@": "\nBelopp %@",
@@ -29851,7 +30121,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Plånbok",
     "Seed word": "Återställningsfrasord",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-licensierad, oreviderad programvara. Du är ansvarig för din återställningsfras och pengar. Standardfjärrnoden kan se dina IP- och plånbokssynkroniseringsfrågor – kör din egen nod för bättre integritet. Valfria fiat-uppskattningar, om de är aktiverade, kontakta rates.nexatrode.com för priser."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT-licensierad, oreviderad programvara. Du är ansvarig för din återställningsfras och pengar. Standardfjärrnoden kan se dina IP- och plånbokssynkroniseringsfrågor – kör din egen nod för bättre integritet. Valfria fiat-uppskattningar, om de är aktiverade, kontakta rates.nexatrode.com för priser.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Den tidigare betalningen återställdes. Den nya betalningen skickades inte. Förhandsgranska den igen.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Avgift {0}",
+    "Subaddress {0}": "Underadress {0}",
+    "Could not load this part of history. You can retry.": "Den här delen av historiken kunde inte läsas in. Försök igen.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Nätverksavgiften ökade. Inget skickades. Granska avgiften och bekräfta igen."
   },
   "th": {
     "\nAmount %@": "\nจำนวน %@",
@@ -30500,7 +30776,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "กระเป๋าเงิน",
     "Seed word": "คำวลีการกู้คืน",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "ซอฟต์แวร์ที่ได้รับอนุญาตจาก MIT และยังไม่ได้รับการตรวจสอบ คุณต้องรับผิดชอบต่อวลีกู้คืนและเงินทุนของคุณ โหนดระยะไกลเริ่มต้นสามารถดู IP และคำขอซิงค์กระเป๋าเงินของคุณ — เรียกใช้โหนดของคุณเองเพื่อความเป็นส่วนตัวที่แข็งแกร่งยิ่งขึ้น การประมาณการคำสั่งเพิ่มเติม หากเปิดใช้งาน โปรดติดต่อ rates.nexatrode.com เพื่อสอบถามอัตรา"
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "ซอฟต์แวร์ที่ได้รับอนุญาตจาก MIT และยังไม่ได้รับการตรวจสอบ คุณต้องรับผิดชอบต่อวลีกู้คืนและเงินทุนของคุณ โหนดระยะไกลเริ่มต้นสามารถดู IP และคำขอซิงค์กระเป๋าเงินของคุณ — เรียกใช้โหนดของคุณเองเพื่อความเป็นส่วนตัวที่แข็งแกร่งยิ่งขึ้น การประมาณการคำสั่งเพิ่มเติม หากเปิดใช้งาน โปรดติดต่อ rates.nexatrode.com เพื่อสอบถามอัตรา",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "กู้คืนการชำระเงินก่อนหน้าแล้ว ยังไม่ได้ส่งการชำระเงินใหม่ โปรดดูตัวอย่างอีกครั้ง",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "ค่าธรรมเนียม {0}",
+    "Subaddress {0}": "ที่อยู่ย่อย {0}",
+    "Could not load this part of history. You can retry.": "โหลดประวัติส่วนนี้ไม่ได้ ลองอีกครั้ง",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "ค่าธรรมเนียมเครือข่ายเพิ่มขึ้น ไม่มีการเผยแพร่ธุรกรรม ตรวจสอบค่าธรรมเนียมและยืนยันอีกครั้ง"
   },
   "tr": {
     "\nAmount %@": "\nMiktar %@",
@@ -31149,7 +31431,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Cüzdan",
     "Seed word": "Kurtarma ifade sözcüğü",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT lisanslı, denetlenmemiş yazılım. Kurtarma ifadenizden ve fonlarınızdan siz sorumlusunuz. Varsayılan uzak düğüm, IP ve cüzdan senkronizasyonu sorgularınızı görebilir; daha güçlü gizlilik için kendi düğümünüzü çalıştırın. İsteğe bağlı fiat tahminleri, eğer etkinleştirilirse, oranlar için rates.nexatrode.com ile iletişime geçin."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT lisanslı, denetlenmemiş yazılım. Kurtarma ifadenizden ve fonlarınızdan siz sorumlusunuz. Varsayılan uzak düğüm, IP ve cüzdan senkronizasyonu sorgularınızı görebilir; daha güçlü gizlilik için kendi düğümünüzü çalıştırın. İsteğe bağlı fiat tahminleri, eğer etkinleştirilirse, oranlar için rates.nexatrode.com ile iletişime geçin.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Önceki ödeme kurtarıldı. Yeni ödeme gönderilmedi. Yeniden önizleyin.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Ücret {0}",
+    "Subaddress {0}": "Alt adres {0}",
+    "Could not load this part of history. You can retry.": "Geçmişin bu bölümü yüklenemedi. Yeniden deneyebilirsiniz.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Ağ ücreti arttı. Hiçbir şey yayınlanmadı. Ücreti inceleyip yeniden onaylayın."
   },
   "uk": {
     "\nAmount %@": "\nСума %@",
@@ -31798,7 +32086,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Гаманець",
     "Seed word": "Слово фрази відновлення",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "програмне забезпечення, що не перевірялося, ліцензоване MIT. Ви несете відповідальність за свою фразу відновлення та кошти. Віддалений вузол за замовчуванням може бачити вашу IP-адресу та запити синхронізації гаманця — запустіть власний вузол для кращої конфіденційності. Необов’язкова оцінка фіат, якщо ввімкнено, зв’яжіться з rates.nexatrode.com, щоб дізнатися ціни."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "програмне забезпечення, що не перевірялося, ліцензоване MIT. Ви несете відповідальність за свою фразу відновлення та кошти. Віддалений вузол за замовчуванням може бачити вашу IP-адресу та запити синхронізації гаманця — запустіть власний вузол для кращої конфіденційності. Необов’язкова оцінка фіат, якщо ввімкнено, зв’яжіться з rates.nexatrode.com, щоб дізнатися ціни.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Попередній платіж відновлено. Новий платіж не надіслано. Повторіть попередній перегляд.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Комісія {0}",
+    "Subaddress {0}": "Підадреса {0}",
+    "Could not load this part of history. You can retry.": "Не вдалося завантажити цю частину історії. Спробуйте ще раз.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Мережева комісія зросла. Нічого не передано. Перевірте комісію та підтвердьте ще раз."
   },
   "ur": {
     "\nAmount %@": "\nرقم %@",
@@ -32447,7 +32741,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "والٹ",
     "Seed word": "بازیابی کا جملہ لفظ",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT لائسنس یافتہ، غیر آڈیٹ سافٹ ویئر۔ آپ اپنے ریکوری کے جملے اور فنڈز کے ذمہ دار ہیں۔ ڈیفالٹ ریموٹ نوڈ آپ کے IP اور والیٹ کی مطابقت پذیری کے سوالات دیکھ سکتا ہے — مضبوط رازداری کے لیے اپنا نوڈ چلائیں۔ اختیاری تخمینہ جات، اگر فعال ہو، تو قیمتوں کے لیے rates.nexatrode.com سے رابطہ کریں۔"
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "MIT لائسنس یافتہ، غیر آڈیٹ سافٹ ویئر۔ آپ اپنے ریکوری کے جملے اور فنڈز کے ذمہ دار ہیں۔ ڈیفالٹ ریموٹ نوڈ آپ کے IP اور والیٹ کی مطابقت پذیری کے سوالات دیکھ سکتا ہے — مضبوط رازداری کے لیے اپنا نوڈ چلائیں۔ اختیاری تخمینہ جات، اگر فعال ہو، تو قیمتوں کے لیے rates.nexatrode.com سے رابطہ کریں۔",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "پچھلی ادائیگی بازیافت ہو گئی۔ نئی ادائیگی نہیں بھیجی گئی۔ دوبارہ پیش منظر دیکھیں۔",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "فیس {0}",
+    "Subaddress {0}": "سب ایڈریس {0}",
+    "Could not load this part of history. You can retry.": "تاریخچے کا یہ حصہ لوڈ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "نیٹ ورک فیس بڑھ گئی۔ کچھ بھی نشر نہیں ہوا۔ فیس کا جائزہ لے کر دوبارہ تصدیق کریں۔"
   },
   "vi": {
     "\nAmount %@": "\nSố tiền %@",
@@ -33096,7 +33396,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Ví",
     "Seed word": "Khôi phục cụm từ",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Phần mềm chưa được kiểm tra, được MIT cấp phép. Bạn chịu trách nhiệm về thời hạn khôi phục và số tiền của mình. Nút từ xa mặc định có thể xem các truy vấn đồng bộ hóa IP và ví của bạn — hãy chạy nút của riêng bạn để có được sự bảo mật mạnh mẽ hơn. Ước tính tiền pháp định tùy chọn, nếu được bật, hãy liên hệ với rates.nexatrode.com để biết mức giá."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Phần mềm chưa được kiểm tra, được MIT cấp phép. Bạn chịu trách nhiệm về thời hạn khôi phục và số tiền của mình. Nút từ xa mặc định có thể xem các truy vấn đồng bộ hóa IP và ví của bạn — hãy chạy nút của riêng bạn để có được sự bảo mật mạnh mẽ hơn. Ước tính tiền pháp định tùy chọn, nếu được bật, hãy liên hệ với rates.nexatrode.com để biết mức giá.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "Đã khôi phục khoản thanh toán trước. Khoản thanh toán mới chưa được gửi. Hãy xem trước lại.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Phí {0}",
+    "Subaddress {0}": "Địa chỉ phụ {0}",
+    "Could not load this part of history. You can retry.": "Không thể tải phần lịch sử này. Hãy thử lại.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Phí mạng đã tăng. Chưa có giao dịch nào được phát đi. Kiểm tra phí và xác nhận lại."
   },
   "yo": {
     "\nAmount %@": "\nIye %@",
@@ -33745,7 +34051,13 @@
     "Unlocking…": "Unlocking…",
     "Wallet debit (amount + fee)": "Àpamọ́wọ́",
     "Seed word": "Ọrọ igbapada",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Iwe-aṣẹ MIT, sọfitiwia ti a ko ṣe ayẹwo. O ni iduro fun gbolohun imularada rẹ ati awọn owo. Node isakoṣo latọna jijin le rii IP rẹ ati awọn ibeere amuṣiṣẹpọ apamọwọ - ṣiṣe ipade tirẹ fun ikọkọ ti o lagbara. Awọn iṣiro fiat iyan, ti o ba ṣiṣẹ, kan si rates.nexatrode.com fun awọn oṣuwọn."
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "Iwe-aṣẹ MIT, sọfitiwia ti a ko ṣe ayẹwo. O ni iduro fun gbolohun imularada rẹ ati awọn owo. Node isakoṣo latọna jijin le rii IP rẹ ati awọn ibeere amuṣiṣẹpọ apamọwọ - ṣiṣe ipade tirẹ fun ikọkọ ti o lagbara. Awọn iṣiro fiat iyan, ti o ba ṣiṣẹ, kan si rates.nexatrode.com fun awọn oṣuwọn.",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "A ti mú ìsanwó iṣaaju padà. A kò fi ìsanwó tuntun ránṣẹ́. Wo àwòkọ rẹ̀ lẹ́ẹ̀kan sí i.",
+    "{0} confirmations": "{0} confirmations",
+    "Fee {0}": "Ọya {0}",
+    "Subaddress {0}": "Sub-àdírẹ́sì {0}",
+    "Could not load this part of history. You can retry.": "A kò lè gbé apá ìtàn yìí wọlé. Gbìyànjú lẹ́ẹ̀kansi.",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "Owó iṣẹ́ nẹ́tíwọ́ọ̀kì ti pọ̀ sí i. A kò tan ohunkóhun ká. Ṣàyẹ̀wò owó náà kí o sì fọwọ́ sí i lẹ́ẹ̀kansi."
   },
   "zh-Hans": {
     "\nAmount %@": "\n金额 %@",
@@ -34394,7 +34706,13 @@
     "Unlocking…": "正在解锁…",
     "Wallet debit (amount + fee)": "钱包",
     "Seed word": "恢复短语单词",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "麻省理工学院许可、未经审核的软件。您应对您的恢复短语和资金负责。默认远程节点可以查看您的 IP 和钱包同步查询 - 运行您自己的节点以获得更强的隐私。可选的法定估算（如果启用）请联系 rates.nexatrode.com 了解费率。"
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "麻省理工学院许可、未经审核的软件。您应对您的恢复短语和资金负责。默认远程节点可以查看您的 IP 和钱包同步查询 - 运行您自己的节点以获得更强的隐私。可选的法定估算（如果启用）请联系 rates.nexatrode.com 了解费率。",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "已恢复上一笔付款。新的付款尚未发送。请重新预览。",
+    "{0} confirmations": "{0} 次确认",
+    "Fee {0}": "手续费 {0}",
+    "Subaddress {0}": "子地址 {0}",
+    "Could not load this part of history. You can retry.": "无法加载这部分历史记录。请重试。",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "网络手续费已增加。没有广播任何交易。请检查手续费并再次确认。"
   },
   "zh-Hant": {
     "\nAmount %@": "\n金額 %@",
@@ -35043,6 +35361,12 @@
     "Unlocking…": "正在解鎖…",
     "Wallet debit (amount + fee)": "錢包",
     "Seed word": "恢復短語單字",
-    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "麻省理工學院許可、未經審核的軟體。您應對您的恢復短語和資金負責。預設遠端節點可以查看您的 IP 和錢包同步查詢 - 運行您自己的節點以獲得更強的隱私。可選的法定估算（如果啟用）請聯絡 rates.nexatrode.com 以了解費率。"
+    "MIT-licensed, unaudited software. You are responsible for your seed and funds. The default remote node can see your IP and wallet sync queries — run your own node for stronger privacy. Optional fiat estimates, if enabled, contact rates.nexatrode.com for rates.": "麻省理工學院許可、未經審核的軟體。您應對您的恢復短語和資金負責。預設遠端節點可以查看您的 IP 和錢包同步查詢 - 運行您自己的節點以獲得更強的隱私。可選的法定估算（如果啟用）請聯絡 rates.nexatrode.com 以了解費率。",
+    "Previous payment recovered. The new payment was not sent. Preview it again.": "已恢復上一筆付款。新的付款尚未傳送。請重新預覽。",
+    "{0} confirmations": "{0} 次確認",
+    "Fee {0}": "手續費 {0}",
+    "Subaddress {0}": "子地址 {0}",
+    "Could not load this part of history. You can retry.": "無法載入這部分歷史記錄。請重試。",
+    "The network fee increased. Nothing was broadcast. Preview the fee and confirm again.": "網路手續費已增加。沒有廣播任何交易。請檢查手續費並再次確認。"
   }
 }

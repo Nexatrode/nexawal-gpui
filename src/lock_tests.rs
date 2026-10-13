@@ -4,6 +4,27 @@ use gpui::TestAppContext;
 static NATIVE_SESSION_FIXTURE: Mutex<()> = Mutex::new(());
 
 #[gpui::test]
+fn history_search_and_date_fields_accept_native_text(cx: &mut TestAppContext) {
+    use gpui::EntityInputHandler;
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        let (home, cx) = cx.add_window_view(|_, cx| Home::new(cx));
+        cx.update(|window, cx| {
+            home.update(cx, |home, cx| {
+                home.opened = true;
+                home.screen = Screen::Transactions;
+                for field in [Field::TransferSearch, Field::HistoryFrom, Field::HistoryTo] {
+                    home.active = field;
+                    assert!(home.accepts_text_input(window, cx));
+                }
+                home.screen = Screen::Legal;
+                assert!(!home.accepts_text_input(window, cx));
+            });
+        });
+    });
+}
+
+#[gpui::test]
 fn automatic_idle_boundary_hides_keys_and_invalidates_unlock(cx: &mut TestAppContext) {
     let _guard = NATIVE_SESSION_FIXTURE.lock().unwrap();
     let directory = tempfile::tempdir().unwrap();

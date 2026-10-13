@@ -3,7 +3,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const MAX_AGE_MS: u64 = 30 * 60 * 1000;
-pub const REFRESH_INTERVAL_MS: u64 = 15 * 60 * 1000;
+pub const REFRESH_INTERVAL_MS: u64 = 5 * 60 * 1000;
 
 pub const SUPPORTED: [&str; 30] = [
     "USD", "EUR", "GBP", "JPY", "CNY", "AUD", "CAD", "CHF", "HKD", "SGD", "NZD", "SEK", "NOK",
@@ -202,6 +202,7 @@ pub fn parse_nexatrode_rate(json: &str, currency: &str, now: u64) -> Result<Rate
     let price = value
         .get("fiat_per_xmr")
         .and_then(serde_json::Value::as_str)
+        .filter(|value| valid_rate_decimal(value))
         .and_then(|value| value.parse::<f64>().ok());
     let checked_at = value
         .get("checked_at_ms")
@@ -244,17 +245,51 @@ fn agent() -> ureq::Agent {
 }
 
 fn http_get(url: &str) -> Result<String, String> {
-    agent()
+    let response = agent()
         .get(url)
         .call()
-        .map_err(|err| err.to_string())?
-        .into_string()
-        .map_err(|err| err.to_string())
+        .map_err(|err| err.to_string())?;
+    bounded_rate_body(response.into_reader())
+}
+
+fn bounded_rate_body(reader: impl std::io::Read) -> Result<String, String> {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    reader.take(16_385).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+    if bytes.len() > 16_384 { return Err("rates response too large".into()); }
+    String::from_utf8(bytes).map_err(|e| e.to_string())
+}
+
+fn valid_rate_decimal(value: &str) -> bool {
+    let mut parts = value.split('.');
+    let whole = parts.next().unwrap_or("");
+    let fraction = parts.next();
+    !whole.is_empty() && whole.len() <= 12 && whole.bytes().all(|b| b.is_ascii_digit()) &&
+        fraction.is_none_or(|f| !f.is_empty() && f.len() <= 24 && f.bytes().all(|b| b.is_ascii_digit())) && parts.next().is_none()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rate_body_limit_bounds_even_an_endless_response() {
+        assert_eq!(bounded_rate_body(&b"{}"[..]).unwrap(), "{}");
+        assert!(bounded_rate_body(std::io::repeat(b'x')).is_err());
+        assert!(bounded_rate_body(&[0xff][..]).is_err());
+        assert_eq!(bounded_rate_body(&vec![b'x'; 16_384][..]).unwrap().len(), 16_384);
+    }
+
+    #[test]
+    fn server_rate_precision_and_exponents_are_bounded() {
+        assert!(valid_rate_decimal("547.380000000000"));
+        for value in ["1e1000000000", "1e-1000000000", "NaN", "-1", "1.2.3"] {
+            assert!(!valid_rate_decimal(value));
+        }
+        assert!(!valid_rate_decimal(&"9".repeat(1000)));
+        assert!(!valid_rate_decimal(&format!("1.{}", "1".repeat(1000))));
+        assert_eq!(REFRESH_INTERVAL_MS, 300_000);
+    }
 
     #[test]
     fn nexatrode_response_is_validated_and_uses_server_timestamp() {
