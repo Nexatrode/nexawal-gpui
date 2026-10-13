@@ -683,16 +683,11 @@ impl Home {
                         if this.created_seed || this.restore_height() == 0 {
                             this.restore_height_text = height.to_string();
                         }
-                        this.status = format!(
-                            "Starting height (fast): {}.",
-                            this.restore_height()
-                        )
+                        this.status = l10n::interpolate("Starting height (fast): {0}.", &[format!("{}", this.restore_height())])
                         .into();
                     }
                     Err(err) => {
-                        this.status = format!(
-                            "Couldn't fetch a fast restore height ({err}). Leaving restore height as 0."
-                        )
+                        this.status = l10n::interpolate("Couldn't fetch a fast restore height ({0}). Leaving restore height as 0.", &[format!("{}", err)])
                         .into();
                     }
                 }
@@ -1031,35 +1026,34 @@ impl Home {
             if !valid {
                 return;
             }
-            let result = cx
-                .background_executor()
-                .spawn(async move {
-                    let mut rows = Vec::new();
-                    let mut expected_revision: Option<String> = None;
-                    loop {
-                        let page =
-                            api::query_transfers(WALLET_ID, &query).map_err(|e| e.to_string())?;
-                        if expected_revision
-                            .as_ref()
-                            .is_some_and(|revision| revision != &page.revision)
-                        {
-                            return Err(
-                                "History changed during export; reload and try again.".to_string(),
-                            );
+            let result =
+                cx.background_executor()
+                    .spawn(async move {
+                        let mut rows = Vec::new();
+                        let mut expected_revision: Option<String> = None;
+                        loop {
+                            let page = api::query_transfers(WALLET_ID, &query)
+                                .map_err(|e| e.to_string())?;
+                            if expected_revision
+                                .as_ref()
+                                .is_some_and(|revision| revision != &page.revision)
+                            {
+                                return Err("History changed during export; reload and try again."
+                                    .to_string());
+                            }
+                            expected_revision.get_or_insert_with(|| page.revision.clone());
+                            rows.extend(page.transfers);
+                            let Some(offset) = page.next_offset else {
+                                break;
+                            };
+                            query.offset = offset;
+                            query.revision = expected_revision.clone();
                         }
-                        expected_revision.get_or_insert_with(|| page.revision.clone());
-                        rows.extend(page.transfers);
-                        let Some(offset) = page.next_offset else {
-                            break;
-                        };
-                        query.offset = offset;
-                        query.revision = expected_revision.clone();
-                    }
-                    // Intentional full export, not the four-page UI cache. A history change aborts
-                    // before writing, rather than producing a mixed-revision/truncated CSV.
-                    Ok::<_, String>((rows.len(), transfer_history_csv(&rows)))
-                })
-                .await;
+                        // Intentional full export, not the four-page UI cache. A history change aborts
+                        // before writing, rather than producing a mixed-revision/truncated CSV.
+                        Ok::<_, String>((rows.len(), transfer_history_csv(&rows)))
+                    })
+                    .await;
             let valid = this
                 .update(cx, |this, _| {
                     this.opened
@@ -1080,14 +1074,16 @@ impl Home {
                 .await;
             let _ = this.update(cx, |this, cx| {
                 this.status = match result {
-                    Ok((count, path)) => format!(
-                        "Exported {count} matching transactions to {}.",
-                        path.display()
+                    Ok((count, path)) => l10n::interpolate(
+                        "Exported {0} matching transactions to {1}.",
+                        &[format!("{}", count), format!("{}", path.display())],
                     )
                     .into(),
-                    Err(error) => {
-                        format!("Export failed: {error}. Retry when history is stable.").into()
-                    }
+                    Err(error) => l10n::interpolate(
+                        "Export failed: {0}. Retry when history is stable.",
+                        &[format!("{}", error)],
+                    )
+                    .into(),
                 };
                 cx.notify();
             });
@@ -1108,21 +1104,34 @@ impl Home {
         self.refresh_send_source_balance();
         self.status = if self.send_from_subaddress {
             match self.send_unlocked() {
-                Some(unlocked) if !self.send_source_balance_stale => format!(
-                    "Spend from {} · unlocked {}.",
-                    self.receive_book.display_label_for(self.send_source_index),
-                    amount::format_xmr(unlocked)
+                Some(unlocked) if !self.send_source_balance_stale => l10n::interpolate(
+                    "Spend from {0} · unlocked {1}.",
+                    &[
+                        format!(
+                            "{}",
+                            self.receive_book.display_label_for(self.send_source_index)
+                        ),
+                        format!("{}", amount::format_xmr(unlocked)),
+                    ],
                 )
                 .into(),
-                Some(unlocked) => format!(
-                    "Spend from {} · unlocked {} (stale).",
-                    self.receive_book.display_label_for(self.send_source_index),
-                    amount::format_xmr(unlocked)
+                Some(unlocked) => l10n::interpolate(
+                    "Spend from {0} · unlocked {1} (stale).",
+                    &[
+                        format!(
+                            "{}",
+                            self.receive_book.display_label_for(self.send_source_index)
+                        ),
+                        format!("{}", amount::format_xmr(unlocked)),
+                    ],
                 )
                 .into(),
-                None => format!(
-                    "Spend from {} · unlocked unavailable.",
-                    self.receive_book.display_label_for(self.send_source_index)
+                None => l10n::interpolate(
+                    "Spend from {0} · unlocked unavailable.",
+                    &[format!(
+                        "{}",
+                        self.receive_book.display_label_for(self.send_source_index)
+                    )],
                 )
                 .into(),
             }
@@ -1141,21 +1150,34 @@ impl Home {
         self.clear_send_preview();
         self.refresh_send_source_balance();
         self.status = match self.send_unlocked() {
-            Some(unlocked) if !self.send_source_balance_stale => format!(
-                "Spend from {} · unlocked {}.",
-                self.receive_book.display_label_for(self.send_source_index),
-                amount::format_xmr(unlocked)
+            Some(unlocked) if !self.send_source_balance_stale => l10n::interpolate(
+                "Spend from {0} · unlocked {1}.",
+                &[
+                    format!(
+                        "{}",
+                        self.receive_book.display_label_for(self.send_source_index)
+                    ),
+                    format!("{}", amount::format_xmr(unlocked)),
+                ],
             )
             .into(),
-            Some(unlocked) => format!(
-                "Spend from {} · unlocked {} (stale).",
-                self.receive_book.display_label_for(self.send_source_index),
-                amount::format_xmr(unlocked)
+            Some(unlocked) => l10n::interpolate(
+                "Spend from {0} · unlocked {1} (stale).",
+                &[
+                    format!(
+                        "{}",
+                        self.receive_book.display_label_for(self.send_source_index)
+                    ),
+                    format!("{}", amount::format_xmr(unlocked)),
+                ],
             )
             .into(),
-            None => format!(
-                "Spend from {} · unlocked unavailable.",
-                self.receive_book.display_label_for(self.send_source_index)
+            None => l10n::interpolate(
+                "Spend from {0} · unlocked unavailable.",
+                &[format!(
+                    "{}",
+                    self.receive_book.display_label_for(self.send_source_index)
+                )],
             )
             .into(),
         };
@@ -1236,9 +1258,9 @@ impl Home {
     fn cycle_network_policy(&mut self, cx: &mut Context<Self>) {
         self.network_policy = self.network_policy.next();
         let _ = paths::save_network_policy(self.network_policy);
-        self.status = format!(
-            "Connection mode: {}. Choose Use this node to apply it.",
-            self.network_policy.label()
+        self.status = l10n::interpolate(
+            "Connection mode: {0}. Choose Use this node to apply it.",
+            &[format!("{}", self.network_policy.label())],
         )
         .into();
         cx.notify();
@@ -1250,11 +1272,13 @@ impl Home {
         let _ = paths::save_i2p_rpc(&self.i2p_rpc);
         let _ = paths::save_i2p_proxy(&self.i2p_proxy);
         self.apply_scan_proxy();
-        self.status = format!(
-            "{} · scan {} · broadcast {}",
-            self.network_policy.label(),
-            self.scan_node_url(),
-            self.broadcast_node_url()
+        self.status = l10n::interpolate(
+            "{0} · scan {1} · broadcast {2}",
+            &[
+                format!("{}", self.network_policy.label()),
+                format!("{}", self.scan_node_url()),
+                format!("{}", self.broadcast_node_url()),
+            ],
         )
         .into();
         if self.opened {
@@ -1268,7 +1292,11 @@ impl Home {
         let generation = self.scan_restart_generation;
         if !matches!(api::refresh_job(WALLET_ID), RefreshJob::Running) {
             if let Err(err) = self.start_fast_scan() {
-                self.status = format!("Saved network, but rescan failed: {err}").into();
+                self.status = l10n::interpolate(
+                    "Saved network, but rescan failed: {0}",
+                    &[format!("{}", err)],
+                )
+                .into();
                 self.scan_needs_retry = true;
             }
             return;
@@ -1300,11 +1328,18 @@ impl Home {
                     .into();
                 } else if let Err(err) = this.start_fast_scan() {
                     this.scan_needs_retry = true;
-                    this.status = format!("Saved network, but rescan failed: {err}").into();
+                    this.status = l10n::interpolate(
+                        "Saved network, but rescan failed: {0}",
+                        &[format!("{}", err)],
+                    )
+                    .into();
                 } else {
                     this.scan_needs_retry = false;
-                    this.status =
-                        format!("Saved network. Syncing with {}…", this.scan_node_url()).into();
+                    this.status = l10n::interpolate(
+                        "Saved network. Syncing with {0}…",
+                        &[format!("{}", this.scan_node_url())],
+                    )
+                    .into();
                     this.start_poll(cx);
                 }
                 cx.notify();
@@ -1333,9 +1368,9 @@ impl Home {
         let height = self.rescan_height();
         if let Ok(sync) = api::sync_status(WALLET_ID) {
             if sync.chain_height > 0 && height > sync.chain_height {
-                self.status = format!(
-                    "Rescan height {} is above the observed chain height {}.",
-                    height, sync.chain_height
+                self.status = l10n::interpolate(
+                    "Rescan height {0} is above the observed chain height {1}.",
+                    &[format!("{}", height), format!("{}", sync.chain_height)],
                 )
                 .into();
                 cx.notify();
@@ -1343,7 +1378,11 @@ impl Home {
             }
         }
         self.maintenance_confirmation = Some(MaintenanceAction::Rescan);
-        self.status = format!("Confirm rescanning from block {} below.", height).into();
+        self.status = l10n::interpolate(
+            "Confirm rescanning from block {0} below.",
+            &[format!("{}", height)],
+        )
+        .into();
         cx.notify();
     }
 
@@ -1471,7 +1510,8 @@ impl Home {
 
     fn finish_rescan_from_height(&mut self, height: u64, cx: &mut Context<Self>) {
         if let Err(err) = api::force_rescan_from_height(WALLET_ID, height) {
-            self.status = format!("Could not prepare rescan: {err}").into();
+            self.status =
+                l10n::interpolate("Could not prepare rescan: {0}", &[format!("{}", err)]).into();
             cx.notify();
             return;
         }
@@ -1500,9 +1540,14 @@ impl Home {
         if let Err(err) = self.start_fast_scan() {
             self.scan_needs_retry = true;
             self.last_scan_error = Some(err.to_string());
-            self.status = format!("Rescan prepared, but refresh failed: {err}").into();
+            self.status = l10n::interpolate(
+                "Rescan prepared, but refresh failed: {0}",
+                &[format!("{}", err)],
+            )
+            .into();
         } else {
-            self.status = format!("Rescanning from block {}…", height).into();
+            self.status =
+                l10n::interpolate("Rescanning from block {0}…", &[format!("{}", height)]).into();
             self.start_poll(cx);
         }
         cx.notify();
@@ -1897,9 +1942,9 @@ impl Home {
         self.seed = normalize_seed(&text);
         self.mark_imported_seed();
         self.reset_edit_cursor(Field::Seed);
-        self.status = format!(
-            "Seed field has {} words. Set restore height, then Open & sync.",
-            self.word_count()
+        self.status = l10n::interpolate(
+            "Seed field has {0} words. Set restore height, then Open & sync.",
+            &[format!("{}", self.word_count())],
         )
         .into();
         cx.notify();
@@ -1942,7 +1987,13 @@ impl Home {
                 Field::I2pProxy => self.i2p_proxy.clone(),
             }
         };
-        if text.is_empty() && self.opened && !matches!(self.active, Field::TransferSearch | Field::HistoryFrom | Field::HistoryTo) {
+        if text.is_empty()
+            && self.opened
+            && !matches!(
+                self.active,
+                Field::TransferSearch | Field::HistoryFrom | Field::HistoryTo
+            )
+        {
             self.copy_address(cx);
             return;
         }
@@ -2071,7 +2122,7 @@ impl Home {
         let _ = paths::save_theme(self.theme.stored());
         self.qr_uri.clear();
         self.qr_image = None;
-        self.status = format!("Theme: {}.", self.theme.label()).into();
+        self.status = l10n::interpolate("Theme: {0}.", &[format!("{}", self.theme.label())]).into();
         cx.notify();
     }
 
@@ -2082,7 +2133,11 @@ impl Home {
             return;
         }
         if let Err(err) = paths::accept_terms() {
-            self.status = format!("Could not save terms acceptance: {err}").into();
+            self.status = l10n::interpolate(
+                "Could not save terms acceptance: {0}",
+                &[format!("{}", err)],
+            )
+            .into();
             cx.notify();
             return;
         }
@@ -2185,10 +2240,15 @@ impl Home {
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                if !this.finish_send_operation(cx) { return; }
-                if !this.opened || !this.send_preview_epoch.accepts(preview_token)
-                    || this.broadcast_node_url() != preview_node || this.send_from_minor() != from
-                    || (!is_max && this.send_piconero() != amount) {
+                if !this.finish_send_operation(cx) {
+                    return;
+                }
+                if !this.opened
+                    || !this.send_preview_epoch.accepts(preview_token)
+                    || this.broadcast_node_url() != preview_node
+                    || this.send_from_minor() != from
+                    || (!is_max && this.send_piconero() != amount)
+                {
                     this.status = l10n::t("Send details changed. Preview the fee again.").into();
                     cx.notify();
                     return;
@@ -2202,16 +2262,20 @@ impl Home {
                             this.send_amount_mode = AmountMode::Xmr;
                             this.send_amount = amount::format_for_input(amt);
                         }
-                        this.status = format!(
-                            "Fee {} · amount {}. Press Send to broadcast.",
-                            amount::format_xmr(fee),
-                            amount::format_xmr(amt)
+                        this.status = l10n::interpolate(
+                            "Fee {0} · amount {1}. Press Send to broadcast.",
+                            &[
+                                format!("{}", amount::format_xmr(fee)),
+                                format!("{}", amount::format_xmr(amt)),
+                            ],
                         )
                         .into();
                     }
                     Err(err) => {
                         this.clear_send_preview();
-                        this.status = format!("Fee preview failed: {err}").into();
+                        this.status =
+                            l10n::interpolate("Fee preview failed: {0}", &[format!("{}", err)])
+                                .into();
                     }
                 }
                 cx.notify();
@@ -2292,7 +2356,9 @@ impl Home {
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                if !this.finish_send_operation(cx) { return; }
+                if !this.finish_send_operation(cx) {
+                    return;
+                }
                 match result {
                     Ok((txid, amt, fee)) => {
                         this.clear_send_preview();
@@ -2301,18 +2367,21 @@ impl Home {
                         this.screen = Screen::Wallet;
                         let rate = this.live_rate().cloned();
                         this.fiat_snapshots.record_send(&txid, rate.as_ref());
-                        this.status = format!(
-                            "Sent {} (fee {}) · {}",
-                            amount::format_xmr(amt),
-                            amount::format_xmr(fee),
-                            txid.chars().take(12).collect::<String>()
+                        this.status = l10n::interpolate(
+                            "Sent {0} (fee {1}) · {2}",
+                            &[
+                                format!("{}", amount::format_xmr(amt)),
+                                format!("{}", amount::format_xmr(fee)),
+                                format!("{}", txid.chars().take(12).collect::<String>()),
+                            ],
                         )
                         .into();
                         this.apply_scan_proxy();
                         let _ = this.start_fast_scan();
                     }
                     Err(err) => {
-                        this.status = format!("Send failed: {err}").into();
+                        this.status =
+                            l10n::interpolate("Send failed: {0}", &[format!("{}", err)]).into();
                     }
                 }
                 this.poll_core(cx);
@@ -2393,7 +2462,9 @@ impl Home {
     }
 
     fn create_seed(&mut self, cx: &mut Context<Self>) {
-        if self.blocked_by_locked_operation(cx) { return; }
+        if self.blocked_by_locked_operation(cx) {
+            return;
+        }
         match api::generate_mnemonic_english() {
             Ok(mnemonic) => {
                 self.seed = normalize_seed(&mnemonic);
@@ -2408,7 +2479,10 @@ impl Home {
                 )
                 .into();
             }
-            Err(err) => self.status = format!("Could not generate seed: {err}").into(),
+            Err(err) => {
+                self.status =
+                    l10n::interpolate("Could not generate seed: {0}", &[format!("{}", err)]).into()
+            }
         }
         cx.notify();
     }
@@ -2422,7 +2496,9 @@ impl Home {
     }
 
     fn open_from_form(&mut self, cx: &mut Context<Self>) {
-        if self.blocked_by_locked_operation(cx) { return; }
+        if self.blocked_by_locked_operation(cx) {
+            return;
+        }
         if self.blocked_by_terms() {
             self.screen = Screen::Terms;
             self.status = l10n::t("Accept the Terms of Use first.").into();
@@ -2448,9 +2524,11 @@ impl Home {
     }
 
     fn open_with_mnemonic(&mut self, mnemonic: &str, restore_height: u64, cx: &mut Context<Self>) {
-        if self.blocked_by_locked_operation(cx) { return; }
+        if self.blocked_by_locked_operation(cx) {
+            return;
+        }
         if let Err(err) = api::open_from_mnemonic(WALLET_ID, mnemonic, restore_height, true) {
-            self.status = format!("Open failed: {err}").into();
+            self.status = l10n::interpolate("Open failed: {0}", &[format!("{}", err)]).into();
             cx.notify();
             return;
         }
@@ -2459,7 +2537,8 @@ impl Home {
         match api::primary_address_from_mnemonic(mnemonic, true) {
             Ok(address) => self.address = address.into(),
             Err(err) => {
-                self.status = format!("Address failed: {err}").into();
+                self.status =
+                    l10n::interpolate("Address failed: {0}", &[format!("{}", err)]).into();
                 cx.notify();
                 return;
             }
@@ -2469,39 +2548,25 @@ impl Home {
             Ok(Some(cache)) => match api::import_cache(WALLET_ID, &cache) {
                 Ok(()) => l10n::t("Opened with local cache. Syncing…").into(),
                 Err(error) => match paths::quarantine_rejected_cache() {
-                    Ok(Some(path)) => format!(
-                        "Cache rejected ({error}) and moved to {}. Syncing from restore height…",
-                        path.file_name()
+                    Ok(Some(path)) => l10n::interpolate("Cache rejected ({0}) and moved to {1}. Syncing from restore height…", &[format!("{}", error), format!("{}", path.file_name()
                             .and_then(|name| name.to_str())
-                            .unwrap_or("a rejected-cache file")
-                    )
+                            .unwrap_or("a rejected-cache file"))])
                     .into(),
-                    Ok(None) => format!(
-                        "Cache rejected ({error}). Syncing from restore height…"
-                    )
+                    Ok(None) => l10n::interpolate("Cache rejected ({0}). Syncing from restore height…", &[format!("{}", error)])
                     .into(),
-                    Err(quarantine_error) => format!(
-                        "Cache rejected ({error}); it could not be moved aside ({quarantine_error}). Syncing from restore height…"
-                    )
+                    Err(quarantine_error) => l10n::interpolate("Cache rejected ({0}); it could not be moved aside ({1}). Syncing from restore height…", &[format!("{}", error), format!("{}", quarantine_error)])
                     .into(),
                 },
             },
             Ok(None) => l10n::t("Opened. Syncing…").into(),
             Err(error) => match paths::quarantine_rejected_cache() {
-                Ok(Some(path)) => format!(
-                    "Cache could not be read ({error}) and was moved to {}. Syncing from restore height…",
-                    path.file_name()
+                Ok(Some(path)) => l10n::interpolate("Cache could not be read ({0}) and was moved to {1}. Syncing from restore height…", &[format!("{}", error), format!("{}", path.file_name()
                         .and_then(|name| name.to_str())
-                        .unwrap_or("a rejected-cache file")
-                )
+                        .unwrap_or("a rejected-cache file"))])
                 .into(),
-                Ok(None) => format!(
-                    "Cache could not be read ({error}). Syncing from restore height…"
-                )
+                Ok(None) => l10n::interpolate("Cache could not be read ({0}). Syncing from restore height…", &[format!("{}", error)])
                 .into(),
-                Err(quarantine_error) => format!(
-                    "Cache could not be read ({error}) or moved aside ({quarantine_error}). Syncing from restore height…"
-                )
+                Err(quarantine_error) => l10n::interpolate("Cache could not be read ({0}) or moved aside ({1}). Syncing from restore height…", &[format!("{}", error), format!("{}", quarantine_error)])
                 .into(),
             },
         };
@@ -2542,12 +2607,18 @@ impl Home {
             Err(err) => Some(err),
         };
         if let Some(err) = scan_error {
-            self.status =
-                format!("Wallet opened, but refresh failed: {err}. Use Wallet → Retry sync.")
-                    .into();
+            self.status = l10n::interpolate(
+                "Wallet opened, but refresh failed: {0}. Use Wallet → Retry sync.",
+                &[format!("{}", err)],
+            )
+            .into();
         }
         if let Some(err) = store_error {
-            self.status = format!("{} Secure-store save skipped: {err}", self.status).into();
+            self.status = l10n::interpolate(
+                "{0} Secure-store save skipped: {1}",
+                &[format!("{}", self.status), format!("{}", err)],
+            )
+            .into();
         }
         self.poll_core(cx);
         self.start_poll(cx);
@@ -2557,13 +2628,16 @@ impl Home {
     }
 
     fn recover_pending_send(&mut self, cx: &mut Context<Self>) {
-        if !self.opened || self.send_operation.is_busy() { return; }
+        if !self.opened || self.send_operation.is_busy() {
+            return;
+        }
         match paths::load_pending_send() {
             Ok(None) => return,
             Ok(Some(_)) => {}
             Err(err) => {
-                self.status = format!(
-                    "Pending send recovery data cannot be read; new sends are blocked: {err}"
+                self.status = l10n::interpolate(
+                    "Pending send recovery data cannot be read; new sends are blocked: {0}",
+                    &[format!("{}", err)],
                 )
                 .into();
                 cx.notify();
@@ -2580,23 +2654,30 @@ impl Home {
                 .spawn(async move { send_flow::recover_pending(&node) })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                if !this.finish_send_operation(cx) { return; }
+                if !this.finish_send_operation(cx) {
+                    return;
+                }
                 match result {
                     Ok(Some(recovered)) => {
                         let rate = this.live_rate().cloned();
                         this.fiat_snapshots
                             .record_send(&recovered.txid, rate.as_ref());
-                        this.status = format!(
-                            "Relayed a pending send · {} · {}",
-                            amount::format_xmr(recovered.amount),
-                            recovered.txid.chars().take(12).collect::<String>()
+                        this.status = l10n::interpolate(
+                            "Relayed a pending send · {0} · {1}",
+                            &[
+                                format!("{}", amount::format_xmr(recovered.amount)),
+                                format!("{}", recovered.txid.chars().take(12).collect::<String>()),
+                            ],
                         )
                         .into();
                     }
                     Ok(None) => {}
                     Err(err) => {
-                        this.status =
-                            format!("Pending send still on disk ({err}). Retry send later.").into();
+                        this.status = l10n::interpolate(
+                            "Pending send still on disk ({0}). Retry send later.",
+                            &[format!("{}", err)],
+                        )
+                        .into();
                     }
                 }
                 this.apply_scan_proxy();
@@ -2626,7 +2707,7 @@ impl Home {
         CACHE_PERSISTENCE_SUPPRESSED.store(false, AtomicOrdering::Relaxed);
         self.apply_scan_proxy();
         if let Err(err) = self.start_fast_scan() {
-            self.status = format!("Retry failed: {err}").into();
+            self.status = l10n::interpolate("Retry failed: {0}", &[format!("{}", err)]).into();
             self.scan_needs_retry = true;
             cx.notify();
             return;
@@ -2665,9 +2746,9 @@ impl Home {
         self.benchmark_running = true;
         self.benchmark_status = None;
         self.scan_needs_retry = false;
-        self.status = format!(
-            "Stopping the current sync · benchmarking from block {} on {}…",
-            start_height, node
+        self.status = l10n::interpolate(
+            "Stopping the current sync · benchmarking from block {0} on {1}…",
+            &[format!("{}", start_height), format!("{}", node)],
         )
         .into();
         cx.notify();
@@ -2679,7 +2760,11 @@ impl Home {
             Ok(worker) => worker,
             Err(error) => {
                 self.benchmark_running = false;
-                self.status = format!("Could not start scan benchmark worker: {error}").into();
+                self.status = l10n::interpolate(
+                    "Could not start scan benchmark worker: {0}",
+                    &[format!("{}", error)],
+                )
+                .into();
                 cx.notify();
                 return;
             }
@@ -2693,9 +2778,13 @@ impl Home {
             let _ = this.update(cx, |this, cx| {
                 this.benchmark_running = false;
                 let status = match report_result {
-                    Ok(report) => format!(
-                        "Benchmark complete · {}. Results saved to {} · RPC trace {}",
-                        report.summary, report.results_path, report.rpc_results_path
+                    Ok(report) => l10n::interpolate(
+                        "Benchmark complete · {0}. Results saved to {1} · RPC trace {2}",
+                        &[
+                            format!("{}", report.summary),
+                            format!("{}", report.results_path),
+                            format!("{}", report.rpc_results_path),
+                        ],
                     ),
                     Err(_) => "Scan benchmark worker stopped unexpectedly.".to_string(),
                 };
@@ -2716,7 +2805,7 @@ impl Home {
         let proxy = self.scan_proxy();
         self.node_probe_running = true;
         self.node_probe_status = None;
-        self.status = format!("Testing scan node {node}…").into();
+        self.status = l10n::interpolate("Testing scan node {0}…", &[format!("{}", node)]).into();
         cx.notify();
 
         cx.spawn(async move |this, cx| {
@@ -2733,15 +2822,20 @@ impl Home {
                         } else {
                             probe.target_height.to_string()
                         };
-                        let status = format!(
-                            "Node OK · height {} / target {} · {} ms",
-                            probe.height, target, probe.latency_ms
+                        let status = l10n::interpolate(
+                            "Node OK · height {0} / target {1} · {2} ms",
+                            &[
+                                format!("{}", probe.height),
+                                format!("{}", target),
+                                format!("{}", probe.latency_ms),
+                            ],
                         );
                         this.node_probe_status = Some(status.clone().into());
                         this.status = status.into();
                     }
                     Err(err) => {
-                        let status = format!("Node test failed: {err}");
+                        let status =
+                            l10n::interpolate("Node test failed: {0}", &[format!("{}", err)]);
                         this.node_probe_status = Some(status.clone().into());
                         this.status = status.into();
                     }
@@ -2760,7 +2854,8 @@ impl Home {
         let proxy = self.broadcast_proxy();
         self.broadcast_probe_running = true;
         self.broadcast_probe_status = None;
-        self.status = format!("Testing broadcast node {node}…").into();
+        self.status =
+            l10n::interpolate("Testing broadcast node {0}…", &[format!("{}", node)]).into();
         cx.notify();
 
         cx.spawn(async move |this, cx| {
@@ -2777,15 +2872,22 @@ impl Home {
                         } else {
                             probe.target_height.to_string()
                         };
-                        let status = format!(
-                            "Broadcast node OK · height {} / target {} · {} ms",
-                            probe.height, target, probe.latency_ms
+                        let status = l10n::interpolate(
+                            "Broadcast node OK · height {0} / target {1} · {2} ms",
+                            &[
+                                format!("{}", probe.height),
+                                format!("{}", target),
+                                format!("{}", probe.latency_ms),
+                            ],
                         );
                         this.broadcast_probe_status = Some(status.clone().into());
                         this.status = status.into();
                     }
                     Err(err) => {
-                        let status = format!("Broadcast node test failed: {err}");
+                        let status = l10n::interpolate(
+                            "Broadcast node test failed: {0}",
+                            &[format!("{}", err)],
+                        );
                         this.broadcast_probe_status = Some(status.clone().into());
                         this.status = status.into();
                     }
@@ -2810,7 +2912,9 @@ impl Home {
     }
 
     fn close_locked_wallet(&mut self, cx: &mut Context<Self>) {
-        if self.native_close_pending { return; }
+        if self.native_close_pending {
+            return;
+        }
         self.native_close_pending = true;
         self.native_close_failed = false;
         let cache_path = paths::cache_path();
@@ -2831,13 +2935,13 @@ impl Home {
                 match result {
                     Ok(None) => {}
                     Ok(Some(error)) => {
-                        this.status = format!("Wallet locked; final cache could not be saved: {error}").into();
+                        this.status = l10n::interpolate("Wallet locked; final cache could not be saved: {0}", &[format!("{}", error)]).into();
                     }
                     Err(error) => {
                         // Do not let a new wallet replace keys whose teardown timed out.
                         // Open/restore retries teardown, never bypasses it.
                         this.native_close_failed = true;
-                        this.status = format!("Wallet hidden; native cleanup failed: {error}. Retry unlock to finish cleanup.").into();
+                        this.status = l10n::interpolate("Wallet hidden; native cleanup failed: {0}. Retry unlock to finish cleanup.", &[format!("{}", error)]).into();
                     }
                 }
                 cx.notify();
@@ -2934,9 +3038,16 @@ impl Home {
             self.blocked_by_locked_operation(cx);
             return;
         }
-        if self.send_operation.is_busy() { self.forget(cx); return; }
+        if self.send_operation.is_busy() {
+            self.forget(cx);
+            return;
+        }
         if let Err(error) = paths::archive_pending_send() {
-            self.status = format!("Could not preserve pending-send recovery data; wallet removal stopped: {error}").into();
+            self.status = l10n::interpolate(
+                "Could not preserve pending-send recovery data; wallet removal stopped: {0}",
+                &[format!("{}", error)],
+            )
+            .into();
             cx.notify();
             return;
         }
@@ -2961,7 +3072,9 @@ impl Home {
     }
 
     fn try_unlock_stored(&mut self, cx: &mut Context<Self>) {
-        if self.blocked_by_locked_operation(cx) { return; }
+        if self.blocked_by_locked_operation(cx) {
+            return;
+        }
         if self.blocked_by_terms() || self.opened || self.unlock_started {
             return;
         }
@@ -3017,10 +3130,7 @@ impl Home {
                     Err(err) => {
                         this.has_stored = true;
                         this.show_restore_form = false;
-                        this.status = format!(
-                            "{err}. {}",
-                            l10n::t("Use Open existing wallet to try again, or restore from seed.")
-                        )
+                        this.status = l10n::interpolate("{0}. {1}", &[format!("{}", err), format!("{}", l10n::t("Use Open existing wallet to try again, or restore from seed."))])
                         .into();
                         cx.notify();
                     }
@@ -3097,7 +3207,11 @@ impl Home {
         self.sync_recv_label_from_book();
         self.refresh_receive_address();
         self.ensure_qr();
-        self.status = format!("Receive · {}", self.receive_book.display_label()).into();
+        self.status = l10n::interpolate(
+            "Receive · {0}",
+            &[format!("{}", self.receive_book.display_label())],
+        )
+        .into();
         cx.notify();
     }
 
@@ -3107,8 +3221,11 @@ impl Home {
         self.recv_label.clear();
         self.refresh_receive_address();
         self.ensure_qr();
-        self.status =
-            format!("New receive address · subaddress {index}. Name it if you want.").into();
+        self.status = l10n::interpolate(
+            "New receive address · subaddress {0}. Name it if you want.",
+            &[format!("{}", index)],
+        )
+        .into();
         cx.notify();
     }
 
@@ -3158,9 +3275,9 @@ impl Home {
             let _ = paths::ensure_fiat_opted_in_at();
             self.fiat_last_attempt_ms = 0;
             self.maybe_refresh_fiat(cx);
-            self.status = format!(
-                "Fiat estimates on · {}. Nexatrode will see your IP and selected currency.",
-                self.fiat_currency
+            self.status = l10n::interpolate(
+                "Fiat estimates on · {0}. Nexatrode will see your IP and selected currency.",
+                &[format!("{}", self.fiat_currency)],
             )
             .into();
         } else {
@@ -3185,7 +3302,8 @@ impl Home {
         if self.fiat_enabled {
             self.maybe_refresh_fiat(cx);
         }
-        self.status = format!("Fiat currency {}", self.fiat_currency).into();
+        self.status =
+            l10n::interpolate("Fiat currency {0}", &[format!("{}", self.fiat_currency)]).into();
         cx.notify();
     }
 
@@ -3311,9 +3429,13 @@ impl Home {
                     RefreshJob::Failed(err) => {
                         self.scan_needs_retry = true;
                         self.last_scan_error = Some(err.clone());
-                        self.status = format!(
-                            "Scan stopped at {} / {}: {}. Wallet → Retry sync.",
-                            sync.last_scanned, sync.chain_height, err
+                        self.status = l10n::interpolate(
+                            "Scan stopped at {0} / {1}: {2}. Wallet → Retry sync.",
+                            &[
+                                format!("{}", sync.last_scanned),
+                                format!("{}", sync.chain_height),
+                                format!("{}", err),
+                            ],
                         )
                         .into();
                     }
@@ -3343,16 +3465,21 @@ impl Home {
                                     "Recoverable RPC failure; retry without changing the scan profile.".to_string()
                                 })
                             } else {
-                                format!(
-                                    "Sync stalled: no scan progress for over {}s (lastScanned={}, target={})",
-                                    scan_tuning::STALL_SECS,
-                                    sync.last_scanned,
-                                    sync.chain_height
+                                l10n::interpolate(
+                                    "Sync stalled: no scan progress for over {0}s (lastScanned={1}, target={2})",
+                                    &[
+                                        format!("{}", scan_tuning::STALL_SECS),
+                                        format!("{}", sync.last_scanned),
+                                        format!("{}", sync.chain_height),
+                                    ],
                                 )
                             });
-                            self.status = format!(
-                                "Scan stopped at {} / {}. Wallet → Retry sync.",
-                                sync.last_scanned, sync.chain_height
+                            self.status = l10n::interpolate(
+                                "Scan stopped at {0} / {1}. Wallet → Retry sync.",
+                                &[
+                                    format!("{}", sync.last_scanned),
+                                    format!("{}", sync.chain_height),
+                                ],
                             )
                             .into();
                         }
@@ -3362,20 +3489,30 @@ impl Home {
                             self.scan_needs_retry = false;
                             self.last_scan_error = None;
                             if was_running {
-                                self.status =
-                                    format!("Wallet synced to block {}.", sync.last_scanned).into();
+                                self.status = l10n::interpolate(
+                                    "Wallet synced to block {0}.",
+                                    &[format!("{}", sync.last_scanned)],
+                                )
+                                .into();
                             }
                         } else {
                             self.scan_needs_retry = true;
                             if self.last_scan_error.is_none() {
-                                self.last_scan_error = Some(format!(
-                                    "Sync stalled: no scan progress (lastScanned={}, target={})",
-                                    sync.last_scanned, sync.chain_height
+                                self.last_scan_error = Some(l10n::interpolate(
+                                    "Sync stalled: no scan progress (lastScanned={0}, target={1})",
+                                    &[
+                                        format!("{}", sync.last_scanned),
+                                        format!("{}", sync.chain_height),
+                                    ],
                                 ));
                             }
-                            self.status = format!(
-                                "Scan paused at {} / {} ({} left). Wallet → Retry sync.",
-                                sync.last_scanned, sync.chain_height, remaining
+                            self.status = l10n::interpolate(
+                                "Scan paused at {0} / {1} ({2} left). Wallet → Retry sync.",
+                                &[
+                                    format!("{}", sync.last_scanned),
+                                    format!("{}", sync.chain_height),
+                                    format!("{}", remaining),
+                                ],
                             )
                             .into();
                         }
@@ -4037,10 +4174,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         div()
                             .text_sm()
                             .text_color(rgb(theme_muted()))
-                            .child(format!(
-                                "Your recovery seed is stored in {}. Open it with the same wallet screens, settings, history, and local scan cache.",
-                                wallet_store::secure_store_name()
-                            )),
+                            .child(l10n::interpolate("Your recovery seed is stored in {0}. Open it with the same wallet screens, settings, history, and local scan cache.", &[format!("{}", wallet_store::secure_store_name())])),
                     )
                     .child(
                         div()
@@ -4123,7 +4257,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                     div()
                         .text_xs()
                         .text_color(rgb(theme_muted()))
-                        .child(format!("{} words", home.word_count())),
+                        .child(l10n::interpolate("{0} words", &[format!("{}", home.word_count())])),
                 )
                 .when(home.created_seed, |card| {
                     card.child(
@@ -4290,7 +4424,10 @@ fn challenge_row(
                 .text_sm()
                 .text_color(rgb(theme_muted()))
                 .w(px(80.))
-                .child(format!("Word #{}", word_index + 1)),
+                .child(l10n::interpolate(
+                    "Word #{0}",
+                    &[format!("{}", word_index + 1)],
+                )),
         )
         .child(field_input_for(
             home,
@@ -4451,7 +4588,10 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
         None
     };
     let detail = match visible_rate {
-        Some(rate) if running => format!("{detail} · {rate:.1} blk/s"),
+        Some(rate) if running => l10n::interpolate(
+            "{0} · {1} blk/s",
+            &[format!("{}", detail), format!("{:.1}", rate)],
+        ),
         _ => detail,
     };
     let dot = if error.is_some() && !running {
@@ -4535,18 +4675,21 @@ fn sync_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 (l10n::t("Progress"), format!("{:.1}%", progress * 100.0)),
             ];
             if !synced {
-                rows.push((l10n::t("Remaining"), format!("{remaining} blocks")));
+                rows.push((
+                    l10n::t("Remaining"),
+                    l10n::interpolate("{0} blocks", &[format!("{}", remaining)]),
+                ));
             }
             if home.scan_rate.avg > 0.0 {
                 rows.push((
                     l10n::t("Avg throughput"),
-                    format!("{:.1} blk/s", home.scan_rate.avg),
+                    l10n::interpolate("{0} blk/s", &[format!("{:.1}", home.scan_rate.avg)]),
                 ));
             }
             if home.scan_rate.recent_avg > 0.0 {
                 rows.push((
                     l10n::t("Recent throughput"),
-                    format!("{:.1} blk/s", home.scan_rate.recent_avg),
+                    l10n::interpolate("{0} blk/s", &[format!("{:.1}", home.scan_rate.recent_avg)]),
                 ));
             }
             card.children(rows.into_iter().map(|(label, value)| sync_kv(label, value)))
@@ -4637,9 +4780,10 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
                 .child(div().text_xs().text_color(rgb(theme_muted())).child(
                     match home.recv_amount_mode {
                         AmountMode::Xmr => l10n::t("Amount (optional, XMR)").to_string(),
-                        AmountMode::Fiat => {
-                            format!("Amount (optional, {})", home.fiat_currency)
-                        }
+                        AmountMode::Fiat => l10n::interpolate(
+                            "Amount (optional, {0})",
+                            &[format!("{}", home.fiat_currency)],
+                        ),
                     },
                 ))
                 .child(field_input(
@@ -4786,10 +4930,12 @@ fn receive_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl In
 fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoElement {
     let fee_line = match (home.send_preview_amount, home.send_fee) {
         (Some(amt), Some(fee)) => {
-            let mut line = format!(
-                "Preview · {}  ·  fee {}",
-                amount::format_xmr(amt),
-                amount::format_xmr(fee)
+            let mut line = l10n::interpolate(
+                "Preview · {0}  ·  fee {1}",
+                &[
+                    format!("{}", amount::format_xmr(amt)),
+                    format!("{}", amount::format_xmr(fee)),
+                ],
             );
             if let Some(fiat) = home.fiat_line(amt) {
                 line.push_str("  ·  ");
@@ -4800,21 +4946,37 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
         _ => {
             let mut line = match home.send_unlocked() {
                 Some(unlocked) if home.send_from_subaddress && home.send_source_balance_stale => {
-                    format!(
-                        "Unlocked {} (stale) · {}",
-                        amount::format_xmr(unlocked),
-                        home.receive_book.display_label_for(home.send_source_index)
+                    l10n::interpolate(
+                        "Unlocked {0} (stale) · {1}",
+                        &[
+                            format!("{}", amount::format_xmr(unlocked)),
+                            format!(
+                                "{}",
+                                home.receive_book.display_label_for(home.send_source_index)
+                            ),
+                        ],
                     )
                 }
-                Some(unlocked) if home.send_from_subaddress => format!(
-                    "Unlocked {} · {}",
-                    amount::format_xmr(unlocked),
-                    home.receive_book.display_label_for(home.send_source_index)
+                Some(unlocked) if home.send_from_subaddress => l10n::interpolate(
+                    "Unlocked {0} · {1}",
+                    &[
+                        format!("{}", amount::format_xmr(unlocked)),
+                        format!(
+                            "{}",
+                            home.receive_book.display_label_for(home.send_source_index)
+                        ),
+                    ],
                 ),
-                Some(unlocked) => format!("Unlocked {}", amount::format_xmr(unlocked)),
-                None if home.send_from_subaddress => format!(
-                    "Unlocked unavailable · {}",
-                    home.receive_book.display_label_for(home.send_source_index)
+                Some(unlocked) => l10n::interpolate(
+                    "Unlocked {0}",
+                    &[format!("{}", amount::format_xmr(unlocked))],
+                ),
+                None if home.send_from_subaddress => l10n::interpolate(
+                    "Unlocked unavailable · {0}",
+                    &[format!(
+                        "{}",
+                        home.receive_book.display_label_for(home.send_source_index)
+                    )],
                 ),
                 None => "Unlocked unavailable".into(),
             };
@@ -4916,7 +5078,9 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
                 .child(div().text_xs().text_color(rgb(theme_muted())).child(
                     match home.send_amount_mode {
                         AmountMode::Xmr => l10n::t("Amount (XMR)").to_string(),
-                        AmountMode::Fiat => format!("Amount ({})", home.fiat_currency),
+                        AmountMode::Fiat => {
+                            l10n::interpolate("Amount ({0})", &[format!("{}", home.fiat_currency)])
+                        }
                     },
                 ))
                 .child(field_input(
@@ -5029,16 +5193,22 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
                         cx.listener(|this, _: &ClickEvent, _, cx| this.run_preview(cx)),
                     ))
                 })
-                .when(home.send_fee.is_none() || home.send_operation.is_busy(), |content| {
-                    content.child(disabled_action_button("send-broadcast", l10n::t("Send")))
-                })
-                .when(home.send_fee.is_some() && !home.send_operation.is_busy(), |content| {
-                    content.child(wide_primary_action_button(
-                        "send-broadcast",
-                        l10n::t("Send"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| this.run_send(cx)),
-                    ))
-                }),
+                .when(
+                    home.send_fee.is_none() || home.send_operation.is_busy(),
+                    |content| {
+                        content.child(disabled_action_button("send-broadcast", l10n::t("Send")))
+                    },
+                )
+                .when(
+                    home.send_fee.is_some() && !home.send_operation.is_busy(),
+                    |content| {
+                        content.child(wide_primary_action_button(
+                            "send-broadcast",
+                            l10n::t("Send"),
+                            cx.listener(|this, _: &ClickEvent, _, cx| this.run_send(cx)),
+                        ))
+                    },
+                ),
         ))
 }
 
@@ -5154,7 +5324,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 .gap_3()
                 .child(wide_secondary_action_button(
                     "settings-theme",
-                    format!("Theme: {}", home.theme.label()),
+                    l10n::interpolate("Theme: {0}", &[format!("{}", home.theme.label())]),
                     cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_theme(cx)),
                 ))
                 .child(
@@ -5398,10 +5568,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                         Some(MaintenanceAction::ClearCache) => l10n::t(
                             "This cancels an active scan and deletes only the local scan cache. Continue?",
                         ),
-                        Some(MaintenanceAction::Rescan) => format!(
-                            "This clears tracked wallet state and starts a full rescan from block {}. Continue?",
-                            home.rescan_height()
-                        )
+                        Some(MaintenanceAction::Rescan) => l10n::interpolate("This clears tracked wallet state and starts a full rescan from block {0}. Continue?", &[format!("{}", home.rescan_height())])
                         .into(),
                         None => "".into(),
                     };
@@ -5634,7 +5801,7 @@ fn transfer_detail(row: &Transfer, chain_height: u64, cx: &mut Context<Home>) ->
     let status = if row.is_pending || confirmations == 0 {
         l10n::t("Pending").to_string()
     } else {
-        format!("{} confirmations", confirmations)
+        l10n::t("%lld conf").replace("%lld", &confirmations.to_string())
     };
     let fee = row
         .fee
@@ -5650,25 +5817,21 @@ fn transfer_detail(row: &Transfer, chain_height: u64, cx: &mut Context<Home>) ->
         .id("transfer-detail")
         .child(secondary_action_button(
             "close-transaction-detail",
-            "Back to transactions",
+            l10n::t("Back"),
             cx.listener(|this, _, _, cx| {
                 this.history_pages.selected = None;
                 cx.notify();
             }),
         ))
         .when(row.direction == "in", |view| {
-            view.child(
-                div()
-                    .text_sm()
-                    .child("Network fee paid by the sender; not deducted from your receipt."),
-            )
+            view.child(div().text_sm().child(l10n::t(
+                "Paid by the sender. Not deducted from the amount received.",
+            )))
         })
         .when(row.direction == "out", |view| {
-            view.child(
-                div()
-                    .text_sm()
-                    .child("Amount is the total wallet debit, including the network fee."),
-            )
+            view.child(div().text_sm().child(l10n::t(
+                "Amount is the total wallet debit, including the network fee.",
+            )))
         })
         .p_3()
         .rounded_md()
@@ -5734,7 +5897,7 @@ fn transfer_detail(row: &Transfer, chain_height: u64, cx: &mut Context<Home>) ->
             l10n::t("Copy transaction ID"),
             cx.listener(move |this, _: &ClickEvent, _, cx| {
                 cx.write_to_clipboard(gpui::ClipboardItem::new_string(txid.clone()));
-                this.status = "Transaction ID copied.".into();
+                this.status = l10n::t("Transaction ID copied.").to_string().into();
             }),
         ))
         .child(action_button(
@@ -5752,7 +5915,7 @@ fn transfer_detail(row: &Transfer, chain_height: u64, cx: &mut Context<Home>) ->
                 cx.write_to_clipboard(gpui::ClipboardItem::new_string(amount::format_for_input(
                     amount,
                 )));
-                this.status = "Transaction amount copied.".into();
+                this.status = l10n::t("Transaction amount copied.").to_string().into();
             }),
         ))
 }
