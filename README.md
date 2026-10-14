@@ -6,8 +6,8 @@ This is a **new client**, not a port of the SwiftUI or Compose apps. Scan, resto
 
 ### Session security
 
-Local release-candidate follow-up: all 108 tests pass through the normal WalletCore v0.1.17 Git pin
-and an isolated local-Core override. The local-Core Release build and advisory checks pass. Synthetic fixtures
+Release-candidate follow-up: WalletCore v0.1.18 is pinned to `c3cc89519ff88e68322fcddbcc6227669b943a34`.
+All 108 tests pass; Release builds and advisory checks pass. Synthetic fixtures
 cover idle/stale unlock, native teardown, clipboard expiry/new-copy preservation and safe migration
 failure ordering without reading a user's wallet or Keychain. Missing-item recovery preserves
 actual protection after an interrupted preference write; denied access never selects a fallback.
@@ -30,8 +30,8 @@ retired. Failure is reported, not silently downgraded. This path requires signed
 an unsigned development binary may be refused by Keychain. Linux/Windows retain their OS secure-store
 backends but do not currently implement a per-access biometric/device-auth gate. Auto-lock still applies.
 No hot-wallet implementation here promises complete erasure of UI/framework copies or protection from
-a compromised OS. The published native pin is still WalletCore v0.1.17; the pending Core
-quarantine/FFI hardening must be released and pinned before distributing this batch.
+a compromised OS. The published native pin includes WalletCore v0.1.18 quarantine/FFI hardening.
+Signed-build/device QA remains required before app distribution.
 
 Send and send-max require a separate full-address review, followed by the configured authentication.
 Any change to the reviewed intent invalidates approval, including changes during authentication.
