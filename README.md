@@ -6,8 +6,8 @@ This is a **new client**, not a port of the SwiftUI or Compose apps. Scan, resto
 
 ### Session security
 
-Release security follow-up: all 99 tests and the Release build pass with WalletCore v0.1.17 through
-the normal pinned Git dependency. Advisory checks pass. Synthetic fixtures
+Local release-candidate follow-up: all 108 tests pass through the normal WalletCore v0.1.17 Git pin
+and an isolated local-Core override. The local-Core Release build and advisory checks pass. Synthetic fixtures
 cover idle/stale unlock, native teardown, clipboard expiry/new-copy preservation and safe migration
 failure ordering without reading a user's wallet or Keychain. Missing-item recovery preserves
 actual protection after an interrupted preference write; denied access never selects a fallback.
@@ -15,9 +15,13 @@ Receive-book edits are published only after an atomic save succeeds, and first-c
 cursor placement is tested against shaped multibyte text before caret scrolling.
 
 The desktop session locks after five minutes without keyboard/mouse/scroll activity and on window
-deactivation. Lock hides history, wipes owned seed strings and cancels/joins native operations before
-removing spend/view authority. An already-approved operation may finish before teardown; a busy native
-cleanup is retried and is not treated as completed. Copied seed/challenge text expires after 60 seconds
+deactivation. Lock hides history and wipes owned seed strings immediately. An active scan is joined,
+checkpointed and sealed (spend authority removed), then allowed to continue view-only while locked.
+Completion, failure or a two-hour background limit closes the native wallet and removes view authority
+too. Explicit locking/removal closes rather than continuing the scan. Unlock first joins, saves and
+closes any background scan before restoring authenticated spend authority. An already-approved send
+may finish before teardown; a busy native cleanup is retried and is not treated as completed.
+Copied seed/challenge text expires after 60 seconds
 only if the clipboard still contains that copy. Clipboard history managers may retain earlier copies.
 
 On macOS, device-auth protection uses a user-presence, device-only Data Protection Keychain item.
@@ -26,7 +30,13 @@ retired. Failure is reported, not silently downgraded. This path requires signed
 an unsigned development binary may be refused by Keychain. Linux/Windows retain their OS secure-store
 backends but do not currently implement a per-access biometric/device-auth gate. Auto-lock still applies.
 No hot-wallet implementation here promises complete erasure of UI/framework copies or protection from
-a compromised OS. Native changes are included in the pinned WalletCore v0.1.17 release.
+a compromised OS. The published native pin is still WalletCore v0.1.17; the pending Core
+quarantine/FFI hardening must be released and pinned before distributing this batch.
+
+Send and send-max require a separate full-address review, followed by the configured authentication.
+Any change to the reviewed intent invalidates approval, including changes during authentication.
+Stored-wallet removal requires both a warning and an explicit recovery-seed backup acknowledgement;
+pending-send journals are archived, not rebound to a replacement wallet.
 
 - Desktop app: this repository
 - iOS / Mac Catalyst app: [nexawal](https://github.com/Nexatrode/nexawal)

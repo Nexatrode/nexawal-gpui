@@ -1,6 +1,10 @@
 use std::time::{Duration, Instant};
 pub const IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 pub const CLIPBOARD_TIMEOUT: Duration = Duration::from_secs(60);
+pub const BACKGROUND_SYNC_LIMIT: Duration = Duration::from_secs(2 * 60 * 60);
+pub fn background_sync_should_close(started: Instant, now: Instant, running: bool) -> bool {
+    !running || now.saturating_duration_since(started) >= BACKGROUND_SYNC_LIMIT
+}
 #[derive(Default)]
 pub struct SessionPolicy {
     generation: u64,
@@ -39,5 +43,12 @@ mod tests {
         assert!(!policy.expired(now + IDLE_TIMEOUT));
         policy.invalidate();
         assert!(!policy.accepts(old));
+    }
+    #[test]
+    fn sealed_background_sync_finishes_or_hits_its_privacy_limit() {
+        let start = Instant::now();
+        assert!(!background_sync_should_close(start, start + IDLE_TIMEOUT, true));
+        assert!(background_sync_should_close(start, start, false));
+        assert!(background_sync_should_close(start, start + BACKGROUND_SYNC_LIMIT, true));
     }
 }

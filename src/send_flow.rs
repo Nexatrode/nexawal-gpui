@@ -7,6 +7,19 @@ use crate::paths;
 
 const WALLET_ID: &str = "main_wallet";
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Confirmation {
+    pub destination: String,
+    pub amount: u64,
+    pub fee: u64,
+    pub maximum: bool,
+    pub source: Option<u32>,
+    pub node: String,
+    pub proxy: Option<String>,
+    pub session: u64,
+    pub preview: u64,
+}
+
 /// Native work may finish while the UI is locked, but may never reopen it or let a
 /// replacement wallet take over the single native slot before that work completes.
 #[derive(Default, Debug, PartialEq, Eq)]

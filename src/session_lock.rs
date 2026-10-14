@@ -47,6 +47,13 @@ pub fn close(
     Ok(cache_error)
 }
 
+/// Join the old unsealed scan and strip spend authority before resuming view-only work.
+pub fn seal_for_background(wallet_id: &str, cache_path: PathBuf) -> api::Result<Option<String>> {
+    api::seal(wallet_id, 30_000)?;
+    Ok(api::export_cache(wallet_id).map_err(|error| error.to_string())
+        .and_then(|blob| crate::paths::write_bytes(cache_path, &blob).map_err(|error| error.to_string())).err())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,7 +1,130 @@
-//! Exercise Home's lock handlers with synthetic native wallets, never personal data, Keychain or RPC.
+//! Exercise Home's lock handlers with synthetic native wallets, never personal data, Keychain or public RPC.
 use super::*;
 use gpui::TestAppContext;
 static NATIVE_SESSION_FIXTURE: Mutex<()> = Mutex::new(());
+
+#[gpui::test]
+fn send_click_only_opens_review_and_changed_intents_are_rejected(cx: &mut TestAppContext) {
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        let seed = api::generate_mnemonic_english().unwrap();
+        let destination = api::primary_address_from_mnemonic(&seed, true).unwrap();
+        let home = cx.new(Home::new);
+        home.update(cx, |home, cx| {
+            home.opened = true; home.require_device_auth = false;
+            home.send_dest = destination.clone(); home.send_amount = "0.000000000010".into();
+            home.send_fee = Some(1); home.send_preview_amount = Some(10);
+            home.run_send(cx);
+            assert_eq!(home.send_confirmation.as_ref().unwrap().destination, destination);
+            assert!(!home.send_operation.is_busy());
+            assert!(paths::load_pending_send().unwrap().is_none());
+            home.send_amount = "0.000000000020".into();
+            home.confirm_send(cx);
+            assert!(!home.send_operation.is_busy());
+            assert!(home.send_confirmation.is_none() && home.send_fee.is_none());
+            assert!(paths::load_pending_send().unwrap().is_none());
+            // A lock invalidates a review even when the form later looks identical.
+            home.opened = true; home.send_fee = Some(1); home.send_preview_amount = Some(20);
+            home.run_send(cx);
+            home.session_policy.invalidate();
+            home.confirm_send(cx);
+            assert!(!home.send_operation.is_busy());
+            assert!(paths::load_pending_send().unwrap().is_none());
+        });
+    });
+}
+
+#[gpui::test]
+fn removal_click_requires_a_separate_backup_confirmation(cx: &mut TestAppContext) {
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        paths::save_pending_send("fixture approved journal").unwrap();
+        let home = cx.new(Home::new);
+        home.update(cx, |home, cx| {
+            home.remove_stored_wallet(cx);
+            assert!(home.removal_confirmation);
+            assert!(!home.removal_backup_confirmed);
+            assert_eq!(paths::load_pending_send().unwrap().as_deref(), Some("fixture approved journal"));
+            assert!(!home.native_close_pending);
+        });
+    });
+}
+
+#[gpui::test]
+fn background_privacy_limit_closes_a_sealed_wallet_and_keeps_its_cache(cx: &mut TestAppContext) {
+    let _guard = NATIVE_SESSION_FIXTURE.lock().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        CACHE_PERSISTENCE_SUPPRESSED.store(false, AtomicOrdering::Relaxed);
+        let seed = api::generate_mnemonic_english().unwrap();
+        api::open_from_mnemonic(WALLET_ID, &seed, 123, true).unwrap();
+        session_lock::seal_for_background(WALLET_ID, paths::cache_path()).unwrap();
+        assert!(api::is_sealed(WALLET_ID).unwrap());
+        let home = cx.new(Home::new);
+        home.update(cx, |home, cx| {
+            let started = Instant::now();
+            home.native_background_sync = true;
+            home.native_background_started = Some(started);
+            home.security_tick(started + session_policy::BACKGROUND_SYNC_LIMIT, cx);
+            assert!(!home.opened && home.mnemonic.is_empty());
+            assert!(!home.native_background_sync && home.native_close_pending);
+        });
+        cx.run_until_parked();
+        assert_eq!(api::is_sealed(WALLET_ID).unwrap_err().code, -13);
+        assert!(paths::cache_path().is_file());
+    });
+}
+
+#[gpui::test]
+fn background_scan_seals_before_restart_and_never_reopens_ui(cx: &mut TestAppContext) {
+    use std::{io::{Read, Write}, net::TcpListener};
+    let _guard = NATIVE_SESSION_FIXTURE.lock().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        CACHE_PERSISTENCE_SUPPRESSED.store(false, AtomicOrdering::Relaxed);
+        let seed = api::generate_mnemonic_english().unwrap();
+        api::open_from_mnemonic(WALLET_ID, &seed, 123, true).unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        listener.set_nonblocking(true).unwrap();
+        let server = std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let mut stream = loop {
+                match listener.accept() {
+                    Ok((stream, _)) => break stream,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock && Instant::now() < deadline =>
+                        std::thread::sleep(Duration::from_millis(2)),
+                    Err(error) => panic!("fixture HTTP accept failed: {error}"),
+                }
+            };
+            stream.set_nonblocking(false).unwrap();
+            stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+            let mut request = [0; 8192];
+            stream.read(&mut request).unwrap();
+            // A controlled RPC failure must stay behind the locked surface, not reopen UI.
+            let _ = stream.write_all(b"HTTP/1.1 503 Unavailable\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}");
+        });
+        let home = cx.new(Home::new);
+        home.update(cx, |home, cx| {
+            home.opened = true;
+            home.mnemonic = seed.clone(); home.seed = seed.clone();
+            home.node_url = endpoint;
+            home.lock_wallet(true, cx);
+            assert!(!home.opened && home.mnemonic.is_empty() && home.seed.is_empty());
+        });
+        cx.run_until_parked();
+        assert!(api::is_sealed(WALLET_ID).unwrap(), "restart must not retain spend authority");
+        home.update(cx, |home, _| {
+            assert!(home.native_background_sync && !home.native_close_pending);
+            assert!(!home.opened);
+        });
+        server.join().unwrap();
+        home.update(cx, |home, cx| home.forget(cx));
+        cx.run_until_parked();
+        assert_eq!(api::is_sealed(WALLET_ID).unwrap_err().code, -13);
+        assert!(paths::cache_path().is_file());
+    });
+}
 
 #[gpui::test]
 fn damaged_receive_book_blocks_open_and_all_edits_without_overwriting_it(cx: &mut TestAppContext) {

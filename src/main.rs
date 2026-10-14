@@ -379,6 +379,9 @@ struct Home {
     opened: bool,
     native_close_pending: bool,
     native_close_failed: bool,
+    native_background_sync: bool,
+    native_background_started: Option<Instant>,
+    unlock_after_background_close: bool,
     screen: Screen,
     legal_doc: legal::Document,
     legal_return: Screen,
@@ -424,6 +427,8 @@ struct Home {
     broadcast_probe_running: bool,
     broadcast_probe_status: Option<SharedString>,
     maintenance_confirmation: Option<MaintenanceAction>,
+    removal_confirmation: bool,
+    removal_backup_confirmed: bool,
     address_copied_at: Option<Instant>,
     send_dest: String,
     send_amount: String,
@@ -433,6 +438,7 @@ struct Home {
     send_operation: send_flow::SessionOperation,
     send_preview_epoch: send_flow::PreviewEpoch,
     send_fee: Option<u64>,
+    send_confirmation: Option<send_flow::Confirmation>,
     send_preview_amount: Option<u64>,
     send_amount_mode: AmountMode,
     send_from_subaddress: bool,
@@ -550,6 +556,9 @@ impl Home {
             opened: false,
             native_close_pending: false,
             native_close_failed: false,
+            native_background_sync: false,
+            native_background_started: None,
+            unlock_after_background_close: false,
             screen: if needs_terms {
                 Screen::Terms
             } else {
@@ -599,6 +608,8 @@ impl Home {
             broadcast_probe_running: false,
             broadcast_probe_status: None,
             maintenance_confirmation: None,
+            removal_confirmation: false,
+            removal_backup_confirmed: false,
             address_copied_at: None,
             send_dest: String::new(),
             send_amount: String::new(),
@@ -608,6 +619,7 @@ impl Home {
             send_operation: send_flow::SessionOperation::default(),
             send_preview_epoch: send_flow::PreviewEpoch::default(),
             send_fee: None,
+            send_confirmation: None,
             send_preview_amount: None,
             send_amount_mode: AmountMode::Xmr,
             send_from_subaddress: false,
@@ -2093,6 +2105,7 @@ impl Home {
     }
 
     fn clear_send_preview(&mut self) {
+        self.send_confirmation = None;
         self.send_preview_epoch.invalidate();
         self.send_fee = None;
         self.send_preview_amount = None;
@@ -2345,6 +2358,35 @@ impl Home {
     }
 
     fn run_send(&mut self, cx: &mut Context<Self>) {
+        if !self.opened || self.send_operation.is_busy() { return; }
+        self.send_confirmation = self.send_confirmation_snapshot();
+        self.status = if self.send_confirmation.is_some() {
+            l10n::t("Confirm send").into()
+        } else { l10n::t("Preview the fee before sending.").into() };
+        cx.notify();
+    }
+
+    fn send_confirmation_snapshot(&self) -> Option<send_flow::Confirmation> {
+        let destination = self.send_dest.trim().to_string();
+        if !uri::looks_like_address(&destination) { return None; }
+        let amount = if self.send_max { self.send_preview_amount? } else { self.send_piconero()? };
+        if amount == 0 || self.send_preview_amount != Some(amount) { return None; }
+        Some(send_flow::Confirmation { destination, amount, fee: self.send_fee?, maximum: self.send_max,
+            source: self.send_from_minor(), node: self.broadcast_node_url(), proxy: self.broadcast_proxy(),
+            session: self.session_policy.token(), preview: self.send_preview_epoch.token() })
+    }
+
+    fn confirm_send(&mut self, cx: &mut Context<Self>) {
+        let Some(confirmation) = self.send_confirmation.take() else { return; };
+        if self.send_confirmation_snapshot().as_ref() != Some(&confirmation) {
+            self.clear_send_preview();
+            self.status = l10n::t("Send amount changed. Preview the fee again.").into();
+            cx.notify(); return;
+        }
+        self.run_confirmed_send(confirmation, cx);
+    }
+
+    fn run_confirmed_send(&mut self, confirmation: send_flow::Confirmation, cx: &mut Context<Self>) {
         if !self.opened || self.send_operation.is_busy() {
             return;
         }
@@ -2395,15 +2437,27 @@ impl Home {
                 return;
             }
         }
+        let authority = self.session_policy.token();
         if !self.authenticate_if_required("Authenticate to send Monero", cx) {
+            return;
+        }
+        if !self.opened || !self.session_policy.accepts(authority) || cx.active_window().is_none() {
+            return;
+        }
+        // A platform auth prompt can run a nested event loop. Recheck the full
+        // reviewed intent afterward, and never adopt newly edited routing/source fields.
+        if self.send_confirmation_snapshot().as_ref() != Some(&confirmation) {
+            self.clear_send_preview();
+            self.status = l10n::t("Send amount changed. Preview the fee again.").into();
+            cx.notify();
             return;
         }
         self.send_operation.start();
         self.status = l10n::t("Sending…").into();
         cx.notify();
         self.apply_broadcast_proxy();
-        let node = self.broadcast_node_url();
-        let from = self.send_from_minor();
+        let node = confirmation.node;
+        let from = confirmation.source;
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
@@ -2976,6 +3030,7 @@ impl Home {
     }
 
     fn blocked_by_locked_operation(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.native_background_sync { self.close_locked_wallet(cx); }
         if self.native_close_failed && !self.native_close_pending {
             self.close_locked_wallet(cx);
         }
@@ -2989,6 +3044,8 @@ impl Home {
     }
 
     fn close_locked_wallet(&mut self, cx: &mut Context<Self>) {
+        self.native_background_sync = false;
+        self.native_background_started = None;
         if self.native_close_pending {
             return;
         }
@@ -3021,6 +3078,10 @@ impl Home {
                         this.status = l10n::interpolate("Wallet hidden; native cleanup failed: {0}. Retry unlock to finish cleanup.", &[format!("{}", error)]).into();
                     }
                 }
+                if !this.native_close_failed && this.unlock_after_background_close {
+                    this.unlock_after_background_close = false;
+                    if cx.active_window().is_some() { this.try_unlock_stored(cx); }
+                }
                 cx.notify();
             });
         }).detach();
@@ -3041,6 +3102,20 @@ impl Home {
     }
 
     fn forget(&mut self, cx: &mut Context<Self>) {
+        self.lock_wallet(false, cx);
+    }
+
+    fn lock_for_inactivity(&mut self, cx: &mut Context<Self>) {
+        let keep_scan = self.opened && !self.send_operation.is_busy()
+            && matches!(api::refresh_job(WALLET_ID), RefreshJob::Running);
+        self.lock_wallet(keep_scan, cx);
+    }
+
+    fn lock_wallet(&mut self, keep_scan: bool, cx: &mut Context<Self>) {
+        let node = self.scan_node_url();
+        self.native_background_sync = keep_scan;
+        self.native_background_started = keep_scan.then(Instant::now);
+        self.unlock_after_background_close = false;
         self.session_policy.invalidate();
         let cleanup_now = self.send_operation.lock();
         // Hide and invalidate presentation immediately, even when a fee RPC is stalled.
@@ -3092,6 +3167,9 @@ impl Home {
         zeroize::Zeroize::zeroize(&mut self.challenge_answers);
         self.challenge_slot = 0;
         self.maintenance_confirmation = None;
+        self.send_confirmation = None;
+        self.removal_confirmation = false;
+        self.removal_backup_confirmed = false;
         self.receive_address = "".into();
         self.has_stored = wallet_store::is_marked_stored();
         self.show_restore_form = !self.has_stored;
@@ -3104,14 +3182,47 @@ impl Home {
             l10n::t("Session cleared.").into()
         };
         if cleanup_now {
-            self.close_locked_wallet(cx);
+            if keep_scan { self.seal_background_scan(node, cx); }
+            else { self.close_locked_wallet(cx); }
         } else {
             self.status = l10n::t("Wallet is locked. The in-flight operation is finishing; reopen is available afterward.").into();
         }
         cx.notify();
     }
 
+    fn seal_background_scan(&mut self, node: String, cx: &mut Context<Self>) {
+        if self.native_close_pending { return; }
+        self.native_close_pending = true;
+        let cache = paths::cache_path();
+        cx.spawn(async move |this, cx| {
+            let executor = cx.background_executor().clone();
+            let result = session_lock::retry_until_stopped(
+                || { let cache = cache.clone(); executor.spawn(async move {
+                    session_lock::seal_for_background(WALLET_ID, cache)
+                }) }, || executor.timer(Duration::from_secs(1))).await;
+            let _ = this.update(cx, |this, cx| {
+                this.native_close_pending = false;
+                match result {
+                    Ok(None) if this.native_background_sync && !this.unlock_after_background_close => {
+                        if api::refresh_async(WALLET_ID, &node).is_ok() {
+                            this.status = format!("{} · {}", l10n::t("Wallet is locked. Use Open existing wallet to unlock."),
+                                l10n::t("Syncing wallet")).into();
+                        } else { this.close_locked_wallet(cx); }
+                    }
+                    // A failed checkpoint must not leave a view-only scan relying on unsaved state.
+                    _ => this.close_locked_wallet(cx),
+                }
+                cx.notify();
+            });
+        }).detach();
+    }
+
     fn remove_stored_wallet(&mut self, cx: &mut Context<Self>) {
+        if !self.removal_confirmation || !self.removal_backup_confirmed {
+            self.removal_confirmation = true;
+            self.removal_backup_confirmed = false;
+            cx.notify(); return;
+        }
         if self.native_close_pending || self.native_close_failed {
             self.blocked_by_locked_operation(cx);
             return;
@@ -3150,6 +3261,11 @@ impl Home {
     }
 
     fn try_unlock_stored(&mut self, cx: &mut Context<Self>) {
+        if self.native_background_sync || (self.native_close_pending && self.native_background_started.is_some()) {
+            self.unlock_after_background_close = true;
+            self.close_locked_wallet(cx);
+            return;
+        }
         if self.blocked_by_locked_operation(cx) {
             return;
         }
@@ -3531,8 +3647,13 @@ impl Home {
     }
 
     fn security_tick(&mut self, now: Instant, cx: &mut Context<Self>) {
+        if self.native_background_sync && !self.native_close_pending
+            && self.native_background_started.is_some_and(|start| session_policy::background_sync_should_close(
+                start, now, matches!(api::refresh_job(WALLET_ID), RefreshJob::Running))) {
+            self.close_locked_wallet(cx);
+        }
         if (self.opened || self.unlocking || !self.seed.is_empty()) && self.session_policy.expired(now) {
-            self.forget(cx);
+            self.lock_for_inactivity(cx);
         }
     }
 
@@ -5363,6 +5484,22 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
                     },
                 ),
         ))
+        .when(home.send_confirmation.is_some(), |content| {
+            let approval = home.send_confirmation.as_ref().unwrap();
+            content.child(section_card(l10n::t(if approval.maximum { "Confirm send max" } else { "Confirm send" }),
+                div().flex().flex_col().gap_3()
+                    .child(div().child(l10n::t("Destination")))
+                    .children(approval.destination.chars().collect::<Vec<_>>().chunks(28)
+                        .map(|line| div().text_sm().font_family("monospace").child(line.iter().collect::<String>())))
+                    .child(div().child(format!("{}: {} XMR", l10n::t("Amount"), amount::format_for_input(approval.amount))))
+                    .child(div().child(format!("{}: {} XMR", l10n::t("Fee"), amount::format_for_input(approval.fee))))
+                    .child(div().text_sm().child(approval.node.clone()))
+                    .child(wide_primary_action_button("send-confirm", l10n::t("Confirm"),
+                        cx.listener(|this, _: &ClickEvent, _, cx| this.confirm_send(cx))))
+                    .child(wide_secondary_action_button("send-confirm-cancel", l10n::t("Cancel"),
+                        cx.listener(|this, _: &ClickEvent, _, cx| { this.send_confirmation = None; cx.notify(); })))
+            ))
+        })
 }
 
 fn terms_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
@@ -5844,7 +5981,23 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                     cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.remove_stored_wallet(cx)
                     }),
-                )),
+                ))
+                .when(home.removal_confirmation, |content| {
+                    content
+                        .child(div().text_sm().child(l10n::t("This will replace the existing wallet on this device.\n\nIf you continue, the currently stored mnemonic and scan state will be removed. Make sure you have your mnemonic backed up before proceeding.")))
+                        .child(wide_secondary_action_button("remove-backup-confirm", l10n::t("I wrote down my recovery seed"),
+                            cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.removal_backup_confirmed = !this.removal_backup_confirmed; cx.notify();
+                            })))
+                        .when(home.removal_backup_confirmed, |content| content.child(div().child(l10n::t("Confirmed"))))
+                        .when(home.removal_backup_confirmed, |content| content.child(destructive_action_button(
+                            "remove-confirm", l10n::t("Confirm"),
+                            cx.listener(|this, _: &ClickEvent, _, cx| this.remove_stored_wallet(cx)))))
+                        .child(wide_secondary_action_button("remove-cancel", l10n::t("Cancel"),
+                            cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.removal_confirmation = false; this.removal_backup_confirmed = false; cx.notify();
+                            })))
+                }),
         ))
         .child(wide_secondary_action_button(
             "settings-back",
@@ -6700,7 +6853,7 @@ fn main() {
                     cx.observe_window_activation(window, |this: &mut Home, window, cx| {
                         if !window.is_window_active() && !this.unlocking &&
                             (this.opened || !this.seed.is_empty()) {
-                            this.forget(cx);
+                            this.lock_for_inactivity(cx);
                         }
                     }).detach();
                     cx.observe_window_bounds(window, move |_, window, _| {
