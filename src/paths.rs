@@ -57,6 +57,17 @@ pub fn fiat_enabled_path() -> PathBuf {
     data_dir().join("fiat_estimates_enabled")
 }
 
+pub fn load_explorer_enabled() -> bool {
+    fs::read_to_string(data_dir().join("explorer_details_enabled")).is_ok_and(|s| s.trim() == "1")
+}
+
+pub fn save_explorer_enabled(enabled: bool) -> std::io::Result<()> {
+    write_bytes(
+        data_dir().join("explorer_details_enabled"),
+        if enabled { b"1" } else { b"0" },
+    )
+}
+
 pub fn fiat_currency_path() -> PathBuf {
     data_dir().join("fiat_currency")
 }

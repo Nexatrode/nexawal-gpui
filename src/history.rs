@@ -413,12 +413,7 @@ fn row(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> gpui::Stateful<gp
 
 pub(super) fn preview(home: &Home, cx: &mut Context<Home>) -> gpui::AnyElement {
     if let Some(selected) = &home.history_pages.selected {
-        return transfer_detail(
-            selected,
-            home.sync.as_ref().map_or(0, |s| s.chain_height),
-            cx,
-        )
-        .into_any_element();
+        return transfer_detail(selected, home, cx).into_any_element();
     }
     div()
         .flex()
@@ -458,12 +453,7 @@ pub(super) fn preview(home: &Home, cx: &mut Context<Home>) -> gpui::AnyElement {
 
 pub(super) fn screen(home: &mut Home, window: &Window, cx: &mut Context<Home>) -> gpui::AnyElement {
     if let Some(selected) = &home.history_pages.selected {
-        return transfer_detail(
-            selected,
-            home.sync.as_ref().map_or(0, |s| s.chain_height),
-            cx,
-        )
-        .into_any_element();
+        return transfer_detail(selected, home, cx).into_any_element();
     }
     let key = format!(
         "{}|{}|{}|{}",

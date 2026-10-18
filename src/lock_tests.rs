@@ -1,5 +1,28 @@
 //! Exercise Home's lock handlers with synthetic native wallets, never personal data, Keychain or public RPC.
 use super::*;
+
+#[gpui::test]
+fn explorer_starts_off_and_enabling_does_not_start_a_lookup(cx: &mut TestAppContext) {
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        let home = cx.new(Home::new);
+        home.update(cx, |home, cx| {
+            assert!(!home.explorer_enabled);
+            home.opened = true;
+            home.open_explorer("a".repeat(64), cx);
+            assert!(home.explorer_lookup.visible);
+            assert!(!home.explorer_lookup.loading);
+            assert!(home.explorer_lookup.result.is_none());
+            home.toggle_explorer(cx);
+            assert!(home.explorer_enabled && paths::load_explorer_enabled());
+            assert!(!home.explorer_lookup.visible && !home.explorer_lookup.loading);
+            let token = home.explorer_lookup.cancel.clone();
+            home.toggle_explorer(cx);
+            assert!(!paths::load_explorer_enabled());
+            assert!(token.load(AtomicOrdering::Acquire));
+        });
+    });
+}
 use gpui::TestAppContext;
 static NATIVE_SESSION_FIXTURE: Mutex<()> = Mutex::new(());
 

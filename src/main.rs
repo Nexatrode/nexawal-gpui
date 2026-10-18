@@ -21,6 +21,7 @@ mod benchmark;
 mod camera;
 mod daemon;
 mod device_auth;
+mod explorer;
 mod fiat;
 mod fiat_snapshot;
 mod history;
@@ -460,6 +461,8 @@ struct Home {
     qr_uri: String,
     qr_image: Option<Arc<RenderImage>>,
     fiat_enabled: bool,
+    explorer_enabled: bool,
+    explorer_lookup: explorer::Lookup,
     fiat_currency: String,
     fiat_rate: Option<fiat::Rate>,
     fiat_fetching: bool,
@@ -640,6 +643,8 @@ impl Home {
             qr_uri: String::new(),
             qr_image: None,
             fiat_enabled: paths::load_fiat_enabled(),
+            explorer_enabled: paths::load_explorer_enabled(),
+            explorer_lookup: explorer::Lookup::default(),
             fiat_currency: paths::load_fiat_currency(),
             fiat_rate: paths::load_fiat_rate(),
             fiat_fetching: false,
@@ -3106,12 +3111,14 @@ impl Home {
     }
 
     fn lock_for_inactivity(&mut self, cx: &mut Context<Self>) {
-        let keep_scan = self.opened && !self.send_operation.is_busy()
+        let keep_scan = self.opened
+            && !self.send_operation.is_busy()
             && matches!(api::refresh_job(WALLET_ID), RefreshJob::Running);
         self.lock_wallet(keep_scan, cx);
     }
 
     fn lock_wallet(&mut self, keep_scan: bool, cx: &mut Context<Self>) {
+        self.explorer_lookup.clear();
         let node = self.scan_node_url();
         self.native_background_sync = keep_scan;
         self.native_background_started = keep_scan.then(Instant::now);
@@ -3516,6 +3523,49 @@ impl Home {
         cx.notify();
     }
 
+    fn toggle_explorer(&mut self, cx: &mut Context<Self>) {
+        let enabled = !self.explorer_enabled;
+        if paths::save_explorer_enabled(enabled).is_err() {
+            self.status = l10n::t("Could not save settings.").into();
+        } else {
+            self.explorer_enabled = enabled;
+            self.explorer_lookup.clear();
+        }
+        cx.notify();
+    }
+
+    fn open_explorer(&mut self, txid: String, cx: &mut Context<Self>) {
+        self.explorer_lookup.clear();
+        self.explorer_lookup.visible = true;
+        self.explorer_lookup.txid = txid.clone();
+        if !self.explorer_enabled || !self.opened {
+            cx.notify();
+            return;
+        }
+        self.explorer_lookup.loading = true;
+        let generation = self.explorer_lookup.generation;
+        let cancel = self.explorer_lookup.cancel.clone();
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_executor()
+                .spawn(async move { explorer::fetch(&txid, cancel) })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                if this.explorer_enabled
+                    && this.opened
+                    && this.explorer_lookup.generation == generation
+                    && this.explorer_lookup.visible
+                {
+                    this.explorer_lookup.loading = false;
+                    this.explorer_lookup.result = Some(result);
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+
     fn toggle_fiat(&mut self, cx: &mut Context<Self>) {
         self.fiat_enabled = !self.fiat_enabled;
         let _ = paths::save_fiat_enabled(self.fiat_enabled);
@@ -3839,6 +3889,17 @@ impl Focusable for Home {
 
 impl Render for Home {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.explorer_lookup.visible
+            && (!self.opened
+                || !matches!(self.screen, Screen::Wallet | Screen::Transactions)
+                || !self
+                    .history_pages
+                    .selected
+                    .as_ref()
+                    .is_some_and(|t| t.txid == self.explorer_lookup.txid))
+        {
+            self.explorer_lookup.clear();
+        }
         if self.screen == Screen::Receive {
             self.ensure_qr();
         }
@@ -5764,6 +5825,16 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 ),
         ))
         .child(section_card(
+            l10n::t("Explorer details"),
+            div().flex().flex_col().gap_3()
+                .child(wide_secondary_action_button(
+                    "settings-explorer",
+                    format!("{}: {}", l10n::t("Enable explorer details"), l10n::t(if home.explorer_enabled { "On" } else { "Off" })),
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_explorer(cx)),
+                ))
+                .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t(explorer::HELP))),
+        ))
+        .child(section_card(
             l10n::t("Fiat estimates"),
             div()
                 .flex()
@@ -6100,7 +6171,8 @@ fn history_filter_button(
         .child(label.into())
 }
 
-fn transfer_detail(row: &Transfer, chain_height: u64, cx: &mut Context<Home>) -> impl IntoElement {
+fn transfer_detail(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
+    let chain_height = home.sync.as_ref().map_or(0, |s| s.chain_height);
     let txid = row.txid.clone();
     let explorer_url = format!("https://explorer.nexawal.com/tx/{txid}");
     let amount = row.amount;
@@ -6126,6 +6198,91 @@ fn transfer_detail(row: &Transfer, chain_height: u64, cx: &mut Context<Home>) ->
         .map(|height| height.to_string())
         .unwrap_or_else(|| l10n::t("Not available").to_string());
     let timestamp = format_timestamp(row.timestamp);
+    let lookup_id = row.txid.clone();
+    let refresh_id = row.txid.clone();
+    let mut explorer_panel = div()
+        .flex()
+        .flex_col()
+        .gap_2()
+        .child(div().text_sm().child(l10n::t("Explorer details")))
+        .child(div().text_xs().child(l10n::t(explorer::REPORTED)));
+    if home.explorer_lookup.visible && home.explorer_lookup.txid == row.txid {
+        if !home.explorer_enabled {
+            explorer_panel =
+                explorer_panel.child(div().text_sm().child(l10n::t(explorer::DISABLED)));
+        } else if home.explorer_lookup.loading {
+            explorer_panel =
+                explorer_panel.child(div().text_sm().child(l10n::t("Loading transaction…")));
+        } else if let Some(result) = &home.explorer_lookup.result {
+            match result {
+                Err(error) => {
+                    explorer_panel =
+                        explorer_panel.child(div().text_sm().child(l10n::t(error.message())))
+                }
+                Ok(data) => {
+                    let mut lines = vec![
+                        format!(
+                            "{}: {}",
+                            l10n::t("Status"),
+                            l10n::t(if data.status == "pending" {
+                                "Pending"
+                            } else {
+                                "Confirmed"
+                            })
+                        ),
+                        format!("{}: {}", l10n::t("Confirmations"), data.confirmations),
+                        format!(
+                            "{}: {}",
+                            l10n::t("Fee"),
+                            data.fee
+                                .map(|n| format!("{} XMR", amount::format_for_input(n)))
+                                .unwrap_or_else(|| l10n::t("Not available").to_string())
+                        ),
+                        format!(
+                            "{}: {}",
+                            l10n::t("Observed at"),
+                            format_timestamp(Some(data.observed_at))
+                        ),
+                    ];
+                    if let Some(height) = data.height {
+                        lines.push(format!("{}: {height}", l10n::t("Height")));
+                    }
+                    if let Some(hash) = &data.block_hash {
+                        lines.push(hash.clone());
+                    }
+                    if let Some(time) = data.block_timestamp {
+                        lines.push(format!(
+                            "{}: {}",
+                            l10n::t("Time"),
+                            format_timestamp(Some(time))
+                        ));
+                    }
+                    for line in lines {
+                        explorer_panel = explorer_panel.child(div().text_xs().child(line));
+                    }
+                    if !data.node_ready {
+                        explorer_panel =
+                            explorer_panel.child(div().text_sm().child(l10n::t(explorer::STALE)));
+                    }
+                }
+            }
+        }
+        explorer_panel = explorer_panel.child(secondary_action_button(
+            "close-explorer-details",
+            l10n::t("Close"),
+            cx.listener(|this, _, _, cx| {
+                this.explorer_lookup.clear();
+                cx.notify();
+            }),
+        ));
+        if home.explorer_enabled && !home.explorer_lookup.loading {
+            explorer_panel = explorer_panel.child(secondary_action_button(
+                "refresh-explorer-details",
+                l10n::t("Refresh"),
+                cx.listener(move |this, _, _, cx| this.open_explorer(refresh_id.clone(), cx)),
+            ));
+        }
+    }
 
     div()
         .id("transfer-detail")
@@ -6214,6 +6371,15 @@ fn transfer_detail(row: &Transfer, chain_height: u64, cx: &mut Context<Home>) ->
                 this.status = l10n::t("Transaction ID copied.").to_string().into();
             }),
         ))
+        .child(action_button(
+            "load-explorer-details",
+            l10n::t("Explorer details"),
+            cx.listener(move |this, _, _, cx| this.open_explorer(lookup_id.clone(), cx)),
+        ))
+        .when(
+            home.explorer_lookup.visible && home.explorer_lookup.txid == row.txid,
+            |view| view.child(explorer_panel),
+        )
         .child(action_button(
             "copy-transfer-explorer-link",
             l10n::t("Copy Explorer Link"),
