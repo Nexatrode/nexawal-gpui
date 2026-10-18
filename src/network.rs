@@ -126,7 +126,7 @@ pub fn apply_http_proxy(proxy: Option<&str>) {
 mod tests {
     use super::*;
 
-    const CLEARNET: &str = "https://rpc.nexatrode.com";
+    const CLEARNET: &str = "https://rpc.nexawal.com";
     const I2P: &str = "cvxtgqjorfif6i5x5fenys6fj7hzddbgavpyutps6gphywnlklqa.b32.i2p:18081";
 
     #[test]

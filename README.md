@@ -122,7 +122,7 @@ Optional env:
 ```bash
 export NEXAWAL_MNEMONIC="word1 word2 ... word25"
 export NEXAWAL_RESTORE_HEIGHT=0
-export NEXAWAL_NODE_URL=https://rpc.nexatrode.com
+export NEXAWAL_NODE_URL=https://rpc.nexawal.com
 cargo run
 ```
 
@@ -149,7 +149,7 @@ sync and run shuffled bounded samples. The default suite covers 25, 50, 75, 100,
 150, and 500-block diagnostic profiles. The `fast` and `cuprate` labels both represent
 the 500-block setting; `batch-750` and `batch-1000` are opt-in large-response tests.
 When the configured endpoint is one of the Nexatrode production
-hosts, the benchmark tests both `rpc.nexatrode.com` and `monero.nexatrode.com`; custom endpoints are tested by themselves. Results are appended to
+hosts, the benchmark tests both `rpc.nexawal.com` and `monero.nexatrode.com`; custom endpoints are tested by themselves. Results are appended to
 `scan_benchmarks.jsonl` in the platform's NexaWal data directory. Set
 `NEXAWAL_BENCHMARK_NODES` to a comma-separated list to override the endpoints.
 `NEXAWAL_BENCHMARK_REPETITIONS` and `NEXAWAL_BENCHMARK_SECONDS` can override the
@@ -187,7 +187,7 @@ wallet export from another client:
 export NEXAWAL_MNEMONIC='word1 word2 ... word25'
 export NEXAWAL_AUDIT_START_HEIGHT=3519450
 export NEXAWAL_AUDIT_TARGET_HEIGHT=3671512
-export NEXAWAL_NODE_URL=https://rpc.nexatrode.com
+export NEXAWAL_NODE_URL=https://rpc.nexawal.com
 export NEXAWAL_AUDIT_TIMEOUT_SECS=1800
 cargo run --release -- --sync-audit
 ```
@@ -229,7 +229,7 @@ and failed-network probe.
 export NEXAWAL_MNEMONIC='your mnemonic here'
 export NEXAWAL_AUDIT_START_HEIGHT=3519450
 export NEXAWAL_AUDIT_TARGET_HEIGHT=3671512
-export NEXAWAL_NODE_URL=https://rpc.nexatrode.com
+export NEXAWAL_NODE_URL=https://rpc.nexawal.com
 export NEXAWAL_AUDIT_TIMEOUT_SECS=1800
 
 cargo run --release -- --sync-torture-audit

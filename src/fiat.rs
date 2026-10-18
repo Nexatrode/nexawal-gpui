@@ -187,7 +187,7 @@ pub fn fetch_rate(currency: &str) -> Result<Rate, String> {
     if !is_supported(&code) {
         return Err(format!("unsupported currency {code}"));
     }
-    let json = http_get(&format!("https://rates.nexatrode.com/v1/rates/XMR/{code}"))?;
+    let json = http_get(&format!("https://rates.nexawal.com/v1/rates/XMR/{code}"))?;
     parse_nexatrode_rate(&json, &code, now_ms())
 }
 

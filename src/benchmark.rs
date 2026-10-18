@@ -256,15 +256,15 @@ pub fn targets_for(current: &str) -> Vec<String> {
     }
 
     let current = current.trim();
-    if current.contains("rpc.nexatrode.com") {
+    if current.contains("rpc.nexawal.com") {
         vec![
             current.to_string(),
-            current.replace("rpc.nexatrode.com", "monero.nexatrode.com"),
+            current.replace("rpc.nexawal.com", "monero.nexatrode.com"),
         ]
     } else if current.contains("monero.nexatrode.com") {
         vec![
             current.to_string(),
-            current.replace("monero.nexatrode.com", "rpc.nexatrode.com"),
+            current.replace("monero.nexatrode.com", "rpc.nexawal.com"),
         ]
     } else {
         vec![current.to_string()]
@@ -1957,12 +1957,12 @@ mod tests {
 
     #[test]
     fn production_targets_include_both_nodes() {
-        let targets = targets_for("https://rpc.nexatrode.com");
+        let targets = targets_for("https://rpc.nexawal.com");
         assert_eq!(targets.len(), 2);
         assert!(
             targets
                 .iter()
-                .any(|node| node.contains("rpc.nexatrode.com"))
+                .any(|node| node.contains("rpc.nexawal.com"))
         );
         assert!(
             targets

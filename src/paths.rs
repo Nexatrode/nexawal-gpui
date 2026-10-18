@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const CURRENT_TERMS_VERSION: u32 = 1;
-pub const DEFAULT_NODE: &str = "https://rpc.nexatrode.com";
+pub const DEFAULT_NODE: &str = "https://rpc.nexawal.com";
 
 #[cfg(all(test, feature = "ui-tests"))]
 thread_local! {
@@ -342,9 +342,22 @@ pub fn accept_terms() -> std::io::Result<()> {
 pub fn load_node_url() -> String {
     fs::read_to_string(node_path())
         .ok()
-        .map(|s| s.trim().to_string())
+        .map(|s| migrated_node_url(&s))
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| DEFAULT_NODE.to_string())
+}
+
+fn migrated_node_url(raw: &str) -> String {
+    let trimmed = raw.trim();
+    match trimmed.trim_end_matches('/').to_ascii_lowercase().as_str() {
+        "rpc.nexatrode.com"
+        | "http://rpc.nexatrode.com"
+        | "http://rpc.nexatrode.com:80"
+        | "http://rpc.nexatrode.com:443"
+        | "https://rpc.nexatrode.com"
+        | "https://rpc.nexatrode.com:443" => DEFAULT_NODE.to_string(),
+        _ => trimmed.to_string(),
+    }
 }
 
 pub fn save_node_url(url: &str) -> std::io::Result<()> {
@@ -606,6 +619,28 @@ fn write_bytes_with(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn old_builtin_rpc_moves_but_custom_nodes_are_unchanged() {
+        for old in [
+            "https://rpc.nexatrode.com",
+            " HTTPS://RPC.NEXATRODE.COM/ ",
+            "https://rpc.nexatrode.com:443/",
+            "rpc.nexatrode.com",
+        ] {
+            assert_eq!(super::migrated_node_url(old), "https://rpc.nexawal.com");
+        }
+        for custom in [
+            "https://monero.nexatrode.com",
+            "http://127.0.0.1:18081",
+            "http://example.b32.i2p",
+            "https://rpc.nexatrode.com/custom",
+            "https://rpc.nexatrode.com:18081",
+            "https://rpc.nexawal.com",
+        ] {
+            assert_eq!(super::migrated_node_url(custom), custom);
+        }
+    }
+
     #[test]
     fn fiat_cache_preserves_deadline_and_rejects_legacy_quotes() {
         let rate = crate::fiat::Rate { currency: "USD".into(), fiat_per_xmr: 100.0,

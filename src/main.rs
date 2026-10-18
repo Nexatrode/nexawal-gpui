@@ -5813,7 +5813,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                             div()
                                 .text_xs()
                                 .text_color(rgb(theme_muted()))
-                                .child(l10n::t("Optional. When enabled, NexaWal requests an XMR rate for your selected currency from rates.nexatrode.com over HTTPS. This request uses clearnet even when the wallet node uses I2P. Nexatrode can see your IP address and selected currency; wallet amounts, addresses, seeds, and transaction history are not sent. Estimates only — XMR is what you send and hold.")),
+                                .child(l10n::t("Optional. When enabled, NexaWal requests an XMR rate for your selected currency from rates.nexawal.com over HTTPS. This request uses clearnet even when the wallet node uses I2P. Nexatrode can see your IP address and selected currency; wallet amounts, addresses, seeds, and transaction history are not sent. Estimates only — XMR is what you send and hold.")),
                         )
                 }),
         ))
@@ -6102,7 +6102,7 @@ fn history_filter_button(
 
 fn transfer_detail(row: &Transfer, chain_height: u64, cx: &mut Context<Home>) -> impl IntoElement {
     let txid = row.txid.clone();
-    let explorer_url = format!("https://xmrchain.net/tx/{txid}");
+    let explorer_url = format!("https://explorer.nexawal.com/tx/{txid}");
     let amount = row.amount;
     let direction = match row.direction.as_str() {
         "in" => l10n::t("Received").to_string(),
