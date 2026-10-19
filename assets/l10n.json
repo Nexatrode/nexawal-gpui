@@ -688,7 +688,8 @@
     "Hidden (RingCT)": "مخفي (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "تشير العقدة إلى إنفاق متعارض. لا تعتبره دفعة مؤكدة.",
     "Ring members are possible inputs, not proof of which output was spent.": "أعضاء الحلقة مدخلات محتملة، وليسوا دليلاً على المخرج الذي أُنفق.",
-    "Observed by node": "رصدته العقدة"
+    "Observed by node": "رصدته العقدة",
+    "Sound On": "الصوت مفعّل"
   },
   "az": {
     "\nAmount %@": "\nMəbləğ %@",
@@ -1379,7 +1380,8 @@
     "Hidden (RingCT)": "Gizli (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Düyün ziddiyyətli xərcləmə bildirir. Bunu təsdiqlənmiş ödəniş saymayın.",
     "Ring members are possible inputs, not proof of which output was spent.": "Halqa üzvləri mümkün girişlərdir, hansı çıxışın xərcləndiyinin sübutu deyil.",
-    "Observed by node": "Düyünün müşahidə vaxtı"
+    "Observed by node": "Düyünün müşahidə vaxtı",
+    "Sound On": "Səs aktivdir"
   },
   "bg": {
     "\nAmount %@": "\nСума %@",
@@ -2070,7 +2072,8 @@
     "Hidden (RingCT)": "Скрито (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Възелът съобщава за конфликтно изразходване. Не го считайте за потвърдено плащане.",
     "Ring members are possible inputs, not proof of which output was spent.": "Членовете на пръстена са възможни входове, а не доказателство кой изход е изразходван.",
-    "Observed by node": "Наблюдавано от възела"
+    "Observed by node": "Наблюдавано от възела",
+    "Sound On": "Звукът е включен"
   },
   "bn": {
     "\nAmount %@": "\nপরিমাণ %@",
@@ -2761,7 +2764,8 @@
     "Hidden (RingCT)": "গোপন (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "নোড পরস্পরবিরোধী ব্যয়ের কথা জানিয়েছে। এটিকে নিশ্চিত পেমেন্ট ভাববেন না।",
     "Ring members are possible inputs, not proof of which output was spent.": "রিং সদস্যরা সম্ভাব্য ইনপুট, কোন আউটপুট খরচ হয়েছে তার প্রমাণ নয়।",
-    "Observed by node": "নোডে পর্যবেক্ষিত"
+    "Observed by node": "নোডে পর্যবেক্ষিত",
+    "Sound On": "শব্দ চালু আছে"
   },
   "ca": {
     "\nAmount %@": "\nImport %@",
@@ -3452,7 +3456,8 @@
     "Hidden (RingCT)": "Ocult (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "El node informa d’una despesa en conflicte. No ho considereu un pagament confirmat.",
     "Ring members are possible inputs, not proof of which output was spent.": "Els membres de l’anell són entrades possibles, no una prova de quina sortida s’ha gastat.",
-    "Observed by node": "Observat pel node"
+    "Observed by node": "Observat pel node",
+    "Sound On": "So activat"
   },
   "cs": {
     "\nAmount %@": "\nČástka %@",
@@ -4143,7 +4148,8 @@
     "Hidden (RingCT)": "Skryté (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Uzel hlásí konfliktní utracení. Nepovažujte to za potvrzenou platbu.",
     "Ring members are possible inputs, not proof of which output was spent.": "Členové kruhu jsou možné vstupy, nikoli důkaz, který výstup byl utracen.",
-    "Observed by node": "Pozorováno uzlem"
+    "Observed by node": "Pozorováno uzlem",
+    "Sound On": "Zvuk zapnutý"
   },
   "da": {
     "\nAmount %@": "\nBeløb %@",
@@ -4834,7 +4840,8 @@
     "Hidden (RingCT)": "Skjult (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Noden rapporterer et modstridende forbrug. Betragt det ikke som en bekræftet betaling.",
     "Ring members are possible inputs, not proof of which output was spent.": "Ringmedlemmer er mulige input, ikke bevis for hvilket output der blev brugt.",
-    "Observed by node": "Observeret af noden"
+    "Observed by node": "Observeret af noden",
+    "Sound On": "Lyd slået til"
   },
   "de": {
     "\nAmount %@": "\nBetrag %@",
@@ -5525,7 +5532,8 @@
     "Hidden (RingCT)": "Verborgen (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Der Knoten meldet eine widersprüchliche Ausgabe. Betrachte dies nicht als bestätigte Zahlung.",
     "Ring members are possible inputs, not proof of which output was spent.": "Ringmitglieder sind mögliche Eingänge, kein Beweis dafür, welcher Ausgang ausgegeben wurde.",
-    "Observed by node": "Vom Knoten beobachtet"
+    "Observed by node": "Vom Knoten beobachtet",
+    "Sound On": "Ton an"
   },
   "el": {
     "\nAmount %@": "\nΠοσό %@",
@@ -6216,7 +6224,8 @@
     "Hidden (RingCT)": "Κρυφό (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Ο κόμβος αναφέρει αντικρουόμενη δαπάνη. Μην το θεωρείτε επιβεβαιωμένη πληρωμή.",
     "Ring members are possible inputs, not proof of which output was spent.": "Τα μέλη του δακτυλίου είναι πιθανές είσοδοι, όχι απόδειξη ποια έξοδος δαπανήθηκε.",
-    "Observed by node": "Παρατηρήθηκε από τον κόμβο"
+    "Observed by node": "Παρατηρήθηκε από τον κόμβο",
+    "Sound On": "Ήχος ενεργός"
   },
   "en": {
     "Copy Explorer Link": "Copy Explorer Link",
@@ -6907,7 +6916,8 @@
     "Hidden (RingCT)": "Hidden (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "The node reports a conflicting spend. Do not treat this as a confirmed payment.",
     "Ring members are possible inputs, not proof of which output was spent.": "Ring members are possible inputs, not proof of which output was spent.",
-    "Observed by node": "Observed by node"
+    "Observed by node": "Observed by node",
+    "Sound On": "Sound On"
   },
   "eo": {
     "\nAmount %@": "\nSumo %@",
@@ -7598,7 +7608,8 @@
     "Hidden (RingCT)": "Kaŝita (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "La nodo raportas konfliktan elspezon. Ne konsideru tion konfirmita pago.",
     "Ring members are possible inputs, not proof of which output was spent.": "Ringanoj estas eblaj enigoj, ne pruvo pri kiu eligo estis elspezita.",
-    "Observed by node": "Observita de la nodo"
+    "Observed by node": "Observita de la nodo",
+    "Sound On": "Sono ŝaltita"
   },
   "es": {
     "\nAmount %@": "\nCantidad %@",
@@ -8289,7 +8300,8 @@
     "Hidden (RingCT)": "Oculto (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "El nodo informa de un gasto en conflicto. No lo considere un pago confirmado.",
     "Ring members are possible inputs, not proof of which output was spent.": "Los miembros del anillo son entradas posibles, no una prueba de qué salida se gastó.",
-    "Observed by node": "Observado por el nodo"
+    "Observed by node": "Observado por el nodo",
+    "Sound On": "Sonido activado"
   },
   "et": {
     "\nAmount %@": "\nSumma %@",
@@ -8980,7 +8992,8 @@
     "Hidden (RingCT)": "Peidetud (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Sõlm teatab vastuolulisest kulutusest. Ärge käsitage seda kinnitatud maksena.",
     "Ring members are possible inputs, not proof of which output was spent.": "Ringi liikmed on võimalikud sisendid, mitte tõend selle kohta, milline väljund kulutati.",
-    "Observed by node": "Sõlme vaadeldud"
+    "Observed by node": "Sõlme vaadeldud",
+    "Sound On": "Heli sees"
   },
   "eu": {
     "\nAmount %@": "\nKopurua %@",
@@ -9671,7 +9684,8 @@
     "Hidden (RingCT)": "Ezkutatua (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Nodoak gastu gatazkatsua jakinarazi du. Ez hartu ordainketa baieztatutzat.",
     "Ring members are possible inputs, not proof of which output was spent.": "Eraztuneko kideak balizko sarrerak dira, ez zein irteera gastatu den frogatzeko modua.",
-    "Observed by node": "Nodoak ikusita"
+    "Observed by node": "Nodoak ikusita",
+    "Sound On": "Soinua aktibatuta"
   },
   "fa": {
     "\nAmount %@": "\nمقدار %@",
@@ -10362,7 +10376,8 @@
     "Hidden (RingCT)": "پنهان (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "گره یک خرج متعارض گزارش می‌کند. آن را پرداخت تأییدشده تلقی نکنید.",
     "Ring members are possible inputs, not proof of which output was spent.": "اعضای حلقه ورودی‌های احتمالی هستند، نه مدرکی برای اینکه کدام خروجی خرج شده است.",
-    "Observed by node": "مشاهده‌شده توسط گره"
+    "Observed by node": "مشاهده‌شده توسط گره",
+    "Sound On": "صدا روشن است"
   },
   "fi": {
     "\nAmount %@": "\nMäärä %@",
@@ -11053,7 +11068,8 @@
     "Hidden (RingCT)": "Piilotettu (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Solmu ilmoittaa ristiriitaisesta kulutuksesta. Älä pidä tätä vahvistettuna maksuna.",
     "Ring members are possible inputs, not proof of which output was spent.": "Renkaan jäsenet ovat mahdollisia syötteitä, eivät todiste siitä, mikä tuloste kulutettiin.",
-    "Observed by node": "Solmun havaitsema"
+    "Observed by node": "Solmun havaitsema",
+    "Sound On": "Ääni päällä"
   },
   "fil": {
     "\nAmount %@": "\nHalaga %@",
@@ -11744,7 +11760,8 @@
     "Hidden (RingCT)": "Nakatago (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Nag-ulat ang node ng magkasalungat na paggastos. Huwag itong ituring na kumpirmadong bayad.",
     "Ring members are possible inputs, not proof of which output was spent.": "Ang mga miyembro ng ring ay posibleng input, hindi patunay kung aling output ang nagastos.",
-    "Observed by node": "Naobserbahan ng node"
+    "Observed by node": "Naobserbahan ng node",
+    "Sound On": "Naka-on ang tunog"
   },
   "fr": {
     "\nAmount %@": "\nMontant %@",
@@ -12435,7 +12452,8 @@
     "Hidden (RingCT)": "Masqué (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Le nœud signale une dépense conflictuelle. Ne la considérez pas comme un paiement confirmé.",
     "Ring members are possible inputs, not proof of which output was spent.": "Les membres de l’anneau sont des entrées possibles, pas une preuve de la sortie dépensée.",
-    "Observed by node": "Observé par le nœud"
+    "Observed by node": "Observé par le nœud",
+    "Sound On": "Son activé"
   },
   "ga": {
     "\nAmount %@": "\nMéid %@",
@@ -13126,7 +13144,8 @@
     "Hidden (RingCT)": "Folaithe (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Tuairiscíonn an nód caiteachas contrártha. Ná caith leis mar íocaíocht dheimhnithe.",
     "Ring members are possible inputs, not proof of which output was spent.": "Is ionchuir fhéideartha iad baill an fháinne, ní cruthúnas ar an aschur a caitheadh.",
-    "Observed by node": "Breathnaithe ag an nód"
+    "Observed by node": "Breathnaithe ag an nód",
+    "Sound On": "Fuaim ar siúl"
   },
   "gl": {
     "\nAmount %@": "\nCantidade %@",
@@ -13817,7 +13836,8 @@
     "Hidden (RingCT)": "Oculto (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "O nó informa dun gasto en conflito. Non o considere un pagamento confirmado.",
     "Ring members are possible inputs, not proof of which output was spent.": "Os membros do anel son entradas posibles, non unha proba de que saída se gastou.",
-    "Observed by node": "Observado polo nó"
+    "Observed by node": "Observado polo nó",
+    "Sound On": "Son activado"
   },
   "gn": {
     "\nAmount %@": "\nCantidad %@",
@@ -14508,7 +14528,8 @@
     "Hidden (RingCT)": "Oñemíva (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Nodo omombe’u gasto oñemoĩva ojuehe. Ani eimo’ã ha’eha pago oñemoañetéva.",
     "Ring members are possible inputs, not proof of which output was spent.": "Anillo rehegua ikatu ha’e jeikeha; ndohechaukái mba’e ñesẽha ojeporu.",
-    "Observed by node": "Nodo ohecháva"
+    "Observed by node": "Nodo ohecháva",
+    "Sound On": "Pu hendýma"
   },
   "ha": {
     "\nAmount %@": "\nAdadi %@",
@@ -15199,7 +15220,8 @@
     "Hidden (RingCT)": "A ɓoye (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Node ya ba da rahoton kashewa mai saɓani. Kada a ɗauke shi a matsayin tabbataccen biya.",
     "Ring members are possible inputs, not proof of which output was spent.": "Membobin zobe su ne yiwuwar shigarwa, ba hujjar wace fitarwa aka kashe ba.",
-    "Observed by node": "Node ya lura da shi"
+    "Observed by node": "Node ya lura da shi",
+    "Sound On": "An kunna sauti"
   },
   "he": {
     "\nAmount %@": "\nסכום %@",
@@ -15890,7 +15912,8 @@
     "Hidden (RingCT)": "מוסתר (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "הצומת מדווח על הוצאה סותרת. אין להתייחס לכך כתשלום מאושר.",
     "Ring members are possible inputs, not proof of which output was spent.": "חברי הטבעת הם קלטים אפשריים, לא הוכחה איזה פלט הוצא.",
-    "Observed by node": "נצפה על ידי הצומת"
+    "Observed by node": "נצפה על ידי הצומת",
+    "Sound On": "הצליל מופעל"
   },
   "hi": {
     "\nAmount %@": "\nराशि %@",
@@ -16581,7 +16604,8 @@
     "Hidden (RingCT)": "छिपा हुआ (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "नोड परस्पर विरोधी खर्च की सूचना देता है। इसे पुष्ट भुगतान न मानें।",
     "Ring members are possible inputs, not proof of which output was spent.": "रिंग सदस्य संभावित इनपुट हैं, यह प्रमाण नहीं कि कौन सा आउटपुट खर्च हुआ।",
-    "Observed by node": "नोड द्वारा देखा गया"
+    "Observed by node": "नोड द्वारा देखा गया",
+    "Sound On": "ध्वनि चालू है"
   },
   "hr": {
     "\nAmount %@": "\nIznos %@",
@@ -17272,7 +17296,8 @@
     "Hidden (RingCT)": "Skriveno (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Čvor prijavljuje sukobljeno trošenje. Nemojte to smatrati potvrđenim plaćanjem.",
     "Ring members are possible inputs, not proof of which output was spent.": "Članovi prstena mogući su ulazi, a ne dokaz koji je izlaz potrošen.",
-    "Observed by node": "Zabilježio čvor"
+    "Observed by node": "Zabilježio čvor",
+    "Sound On": "Zvuk je uključen"
   },
   "hu": {
     "\nAmount %@": "\nÖsszeg %@",
@@ -17963,7 +17988,8 @@
     "Hidden (RingCT)": "Rejtett (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "A csomópont ütköző költést jelez. Ne tekintse ezt megerősített fizetésnek.",
     "Ring members are possible inputs, not proof of which output was spent.": "A gyűrű tagjai lehetséges bemenetek, nem bizonyítják, melyik kimenetet költötték el.",
-    "Observed by node": "A csomópont észlelte"
+    "Observed by node": "A csomópont észlelte",
+    "Sound On": "Hang bekapcsolva"
   },
   "hy": {
     "\nAmount %@": "\nԳումար՝ %@",
@@ -18654,7 +18680,8 @@
     "Hidden (RingCT)": "Թաքնված (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Հանգույցը հայտնում է հակասող ծախսի մասին։ Սա հաստատված վճարում մի համարեք։",
     "Ring members are possible inputs, not proof of which output was spent.": "Օղակի անդամները հնարավոր մուտքեր են, ոչ թե ապացույց, թե որ ելքն է ծախսվել։",
-    "Observed by node": "Դիտվել է հանգույցի կողմից"
+    "Observed by node": "Դիտվել է հանգույցի կողմից",
+    "Sound On": "Ձայնը միացված է"
   },
   "id": {
     "\nAmount %@": "\nJumlah %@",
@@ -19345,7 +19372,8 @@
     "Hidden (RingCT)": "Tersembunyi (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Node melaporkan pengeluaran yang bertentangan. Jangan anggap ini pembayaran terkonfirmasi.",
     "Ring members are possible inputs, not proof of which output was spent.": "Anggota ring adalah kemungkinan input, bukan bukti output mana yang dibelanjakan.",
-    "Observed by node": "Diamati oleh node"
+    "Observed by node": "Diamati oleh node",
+    "Sound On": "Suara aktif"
   },
   "it": {
     "\nAmount %@": "\nImporto %@",
@@ -20036,7 +20064,8 @@
     "Hidden (RingCT)": "Nascosto (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Il nodo segnala una spesa in conflitto. Non considerarla un pagamento confermato.",
     "Ring members are possible inputs, not proof of which output was spent.": "I membri dell’anello sono ingressi possibili, non una prova di quale uscita sia stata spesa.",
-    "Observed by node": "Osservato dal nodo"
+    "Observed by node": "Osservato dal nodo",
+    "Sound On": "Suono attivo"
   },
   "ja": {
     "\nAmount %@": "\n金額 %@",
@@ -20727,7 +20756,8 @@
     "Hidden (RingCT)": "非公開（RingCT）",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "ノードが競合する支出を報告しています。確定済みの支払いとして扱わないでください。",
     "Ring members are possible inputs, not proof of which output was spent.": "リングメンバーは入力の候補であり、実際に使用された出力を証明するものではありません。",
-    "Observed by node": "ノードの観測時刻"
+    "Observed by node": "ノードの観測時刻",
+    "Sound On": "サウンドオン"
   },
   "ko": {
     "\nAmount %@": "\n금액 %@",
@@ -21418,7 +21448,8 @@
     "Hidden (RingCT)": "비공개 (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "노드가 충돌하는 지출을 보고했습니다. 이를 확정된 결제로 간주하지 마세요.",
     "Ring members are possible inputs, not proof of which output was spent.": "링 구성원은 가능한 입력일 뿐, 실제로 사용된 출력을 증명하지 않습니다.",
-    "Observed by node": "노드 관측 시각"
+    "Observed by node": "노드 관측 시각",
+    "Sound On": "소리 켜짐"
   },
   "ky": {
     "\nAmount %@": "\nСумма: %@",
@@ -22109,7 +22140,8 @@
     "Hidden (RingCT)": "Жашыруун (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Түйүн карама-каршы сарптоону билдирди. Муну тастыкталган төлөм деп эсептебеңиз.",
     "Ring members are possible inputs, not proof of which output was spent.": "Шакектин мүчөлөрү мүмкүн болгон кириштер, кайсы чыгыш сарпталганын далилдебейт.",
-    "Observed by node": "Түйүн байкаган"
+    "Observed by node": "Түйүн байкаган",
+    "Sound On": "Үн күйгүзүлгөн"
   },
   "lt": {
     "\nAmount %@": "\nSuma %@",
@@ -22800,7 +22832,8 @@
     "Hidden (RingCT)": "Paslėpta (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Mazgas praneša apie prieštaringą išleidimą. Nelaikykite to patvirtintu mokėjimu.",
     "Ring members are possible inputs, not proof of which output was spent.": "Žiedo nariai yra galimos įvestys, o ne įrodymas, kuri išvestis buvo išleista.",
-    "Observed by node": "Pastebėta mazgo"
+    "Observed by node": "Pastebėta mazgo",
+    "Sound On": "Garsas įjungtas"
   },
   "lv": {
     "\nAmount %@": "\nSumma %@",
@@ -23491,7 +23524,8 @@
     "Hidden (RingCT)": "Slēpts (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Mezgls ziņo par konfliktējošu tēriņu. Neuzskatiet to par apstiprinātu maksājumu.",
     "Ring members are possible inputs, not proof of which output was spent.": "Gredzena dalībnieki ir iespējamās ievades, nevis pierādījums, kura izvade iztērēta.",
-    "Observed by node": "Mezgla novērots"
+    "Observed by node": "Mezgla novērots",
+    "Sound On": "Skaņa ieslēgta"
   },
   "ms": {
     "\nAmount %@": "\nJumlah %@",
@@ -24182,7 +24216,8 @@
     "Hidden (RingCT)": "Tersembunyi (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Nod melaporkan perbelanjaan bercanggah. Jangan anggap ini bayaran yang disahkan.",
     "Ring members are possible inputs, not proof of which output was spent.": "Ahli gelang ialah input yang mungkin, bukan bukti output mana yang dibelanjakan.",
-    "Observed by node": "Diperhatikan oleh nod"
+    "Observed by node": "Diperhatikan oleh nod",
+    "Sound On": "Bunyi dihidupkan"
   },
   "my": {
     "\nAmount %@": "\nပမာဏ %@",
@@ -24873,7 +24908,8 @@
     "Hidden (RingCT)": "ဝှက်ထားသည် (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "နိုဒ်က ပဋိပက္ခဖြစ်သောသုံးစွဲမှုကို သတင်းပို့သည်။ အတည်ပြုငွေပေးချေမှုဟု မယူဆပါနှင့်။",
     "Ring members are possible inputs, not proof of which output was spent.": "ရင်းအဖွဲ့ဝင်များသည် ဖြစ်နိုင်သောအဝင်များသာဖြစ်ပြီး မည်သည့်အထွက်သုံးစွဲခဲ့သည်ကို သက်သေမပြပါ။",
-    "Observed by node": "နိုဒ်မှတွေ့ရှိချိန်"
+    "Observed by node": "နိုဒ်မှတွေ့ရှိချိန်",
+    "Sound On": "အသံဖွင့်ထားသည်"
   },
   "nb": {
     "\nAmount %@": "\nBeløp %@",
@@ -25564,7 +25600,8 @@
     "Hidden (RingCT)": "Skjult (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Noden rapporterer motstridende bruk av midler. Ikke betrakt dette som en bekreftet betaling.",
     "Ring members are possible inputs, not proof of which output was spent.": "Ringmedlemmer er mulige inndata, ikke bevis på hvilken utdata som ble brukt.",
-    "Observed by node": "Observert av noden"
+    "Observed by node": "Observert av noden",
+    "Sound On": "Lyd på"
   },
   "nl": {
     "\nAmount %@": "\nBedrag %@",
@@ -26255,7 +26292,8 @@
     "Hidden (RingCT)": "Verborgen (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "De node meldt een conflicterende besteding. Beschouw dit niet als een bevestigde betaling.",
     "Ring members are possible inputs, not proof of which output was spent.": "Ringleden zijn mogelijke ingangen, geen bewijs van welke uitgang is besteed.",
-    "Observed by node": "Waargenomen door de node"
+    "Observed by node": "Waargenomen door de node",
+    "Sound On": "Geluid aan"
   },
   "pl": {
     "\nAmount %@": "\nKwota %@",
@@ -26946,7 +26984,8 @@
     "Hidden (RingCT)": "Ukryte (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Węzeł zgłasza sprzeczne wydanie środków. Nie traktuj tego jako potwierdzonej płatności.",
     "Ring members are possible inputs, not proof of which output was spent.": "Członkowie pierścienia to możliwe wejścia, a nie dowód, które wyjście zostało wydane.",
-    "Observed by node": "Zaobserwowane przez węzeł"
+    "Observed by node": "Zaobserwowane przez węzeł",
+    "Sound On": "Dźwięk włączony"
   },
   "pt-BR": {
     "\nAmount %@": "\nValor %@",
@@ -27637,7 +27676,8 @@
     "Hidden (RingCT)": "Oculto (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "O nó informa um gasto conflitante. Não considere isso um pagamento confirmado.",
     "Ring members are possible inputs, not proof of which output was spent.": "Os membros do anel são possíveis entradas, não uma prova de qual saída foi gasta.",
-    "Observed by node": "Observado pelo nó"
+    "Observed by node": "Observado pelo nó",
+    "Sound On": "Som ativado"
   },
   "ro": {
     "\nAmount %@": "\nSumă %@",
@@ -28328,7 +28368,8 @@
     "Hidden (RingCT)": "Ascuns (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Nodul raportează o cheltuire în conflict. Nu o considerați o plată confirmată.",
     "Ring members are possible inputs, not proof of which output was spent.": "Membrii inelului sunt intrări posibile, nu o dovadă a ieșirii cheltuite.",
-    "Observed by node": "Observat de nod"
+    "Observed by node": "Observat de nod",
+    "Sound On": "Sunet activat"
   },
   "ru": {
     "\nAmount %@": "\nСумма %@",
@@ -29019,7 +29060,8 @@
     "Hidden (RingCT)": "Скрыто (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Узел сообщает о конфликтующем расходовании. Не считайте это подтверждённым платежом.",
     "Ring members are possible inputs, not proof of which output was spent.": "Участники кольца — возможные входы, а не доказательство того, какой выход потрачен.",
-    "Observed by node": "Время наблюдения узлом"
+    "Observed by node": "Время наблюдения узлом",
+    "Sound On": "Звук включён"
   },
   "sk": {
     "\nAmount %@": "\nSuma %@",
@@ -29710,7 +29752,8 @@
     "Hidden (RingCT)": "Skryté (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Uzol hlási konfliktné minutie. Nepovažujte to za potvrdenú platbu.",
     "Ring members are possible inputs, not proof of which output was spent.": "Členovia kruhu sú možné vstupy, nie dôkaz, ktorý výstup bol minutý.",
-    "Observed by node": "Pozorované uzlom"
+    "Observed by node": "Pozorované uzlom",
+    "Sound On": "Zvuk zapnutý"
   },
   "sl": {
     "\nAmount %@": "\nZnesek %@",
@@ -30401,7 +30444,8 @@
     "Hidden (RingCT)": "Skrito (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Vozlišče poroča o nasprotujoči si porabi. Tega ne štejte za potrjeno plačilo.",
     "Ring members are possible inputs, not proof of which output was spent.": "Člani obroča so možni vhodi, ne dokaz, kateri izhod je bil porabljen.",
-    "Observed by node": "Opaženo v vozlišču"
+    "Observed by node": "Opaženo v vozlišču",
+    "Sound On": "Zvok vklopljen"
   },
   "sq": {
     "\nAmount %@": "\nShuma %@",
@@ -31092,7 +31136,8 @@
     "Hidden (RingCT)": "E fshehur (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Nyja raporton një shpenzim konfliktues. Mos e trajtoni si pagesë të konfirmuar.",
     "Ring members are possible inputs, not proof of which output was spent.": "Anëtarët e unazës janë hyrje të mundshme, jo provë se cila dalje është shpenzuar.",
-    "Observed by node": "Vëzhguar nga nyja"
+    "Observed by node": "Vëzhguar nga nyja",
+    "Sound On": "Tingulli është aktiv"
   },
   "sv": {
     "\nAmount %@": "\nBelopp %@",
@@ -31783,7 +31828,8 @@
     "Hidden (RingCT)": "Dolt (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Noden rapporterar en motstridig spendering. Betrakta inte detta som en bekräftad betalning.",
     "Ring members are possible inputs, not proof of which output was spent.": "Ringmedlemmar är möjliga indata, inte bevis på vilken utdata som spenderades.",
-    "Observed by node": "Observerad av noden"
+    "Observed by node": "Observerad av noden",
+    "Sound On": "Ljud på"
   },
   "th": {
     "\nAmount %@": "\nจำนวน %@",
@@ -32474,7 +32520,8 @@
     "Hidden (RingCT)": "ซ่อนอยู่ (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "โหนดรายงานการใช้จ่ายที่ขัดแย้งกัน อย่าถือว่าเป็นการชำระเงินที่ยืนยันแล้ว",
     "Ring members are possible inputs, not proof of which output was spent.": "สมาชิกวงแหวนเป็นอินพุตที่เป็นไปได้ ไม่ใช่หลักฐานว่าเอาต์พุตใดถูกใช้จ่ายจริง",
-    "Observed by node": "เวลาที่โหนดพบ"
+    "Observed by node": "เวลาที่โหนดพบ",
+    "Sound On": "เปิดเสียงแล้ว"
   },
   "tr": {
     "\nAmount %@": "\nMiktar %@",
@@ -33165,7 +33212,8 @@
     "Hidden (RingCT)": "Gizli (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Düğüm çakışan bir harcama bildiriyor. Bunu onaylanmış bir ödeme olarak değerlendirmeyin.",
     "Ring members are possible inputs, not proof of which output was spent.": "Halka üyeleri olası girdilerdir, hangi çıktının harcandığının kanıtı değildir.",
-    "Observed by node": "Düğüm tarafından gözlemlendi"
+    "Observed by node": "Düğüm tarafından gözlemlendi",
+    "Sound On": "Ses açık"
   },
   "uk": {
     "\nAmount %@": "\nСума %@",
@@ -33856,7 +33904,8 @@
     "Hidden (RingCT)": "Приховано (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Вузол повідомляє про конфліктне витрачання. Не вважайте це підтвердженим платежем.",
     "Ring members are possible inputs, not proof of which output was spent.": "Учасники кільця — можливі входи, а не доказ того, який вихід витрачено.",
-    "Observed by node": "Спостережено вузлом"
+    "Observed by node": "Спостережено вузлом",
+    "Sound On": "Звук увімкнено"
   },
   "ur": {
     "\nAmount %@": "\nرقم %@",
@@ -34547,7 +34596,8 @@
     "Hidden (RingCT)": "پوشیدہ (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "نوڈ متضاد خرچ کی اطلاع دیتا ہے۔ اسے تصدیق شدہ ادائیگی نہ سمجھیں۔",
     "Ring members are possible inputs, not proof of which output was spent.": "رِنگ کے ارکان ممکنہ ان پٹس ہیں، اس بات کا ثبوت نہیں کہ کون سا آؤٹ پٹ خرچ ہوا۔",
-    "Observed by node": "نوڈ کے مشاہدے کا وقت"
+    "Observed by node": "نوڈ کے مشاہدے کا وقت",
+    "Sound On": "آواز آن ہے"
   },
   "vi": {
     "\nAmount %@": "\nSố tiền %@",
@@ -35238,7 +35288,8 @@
     "Hidden (RingCT)": "Ẩn (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Nút báo cáo chi tiêu xung đột. Không coi đây là khoản thanh toán đã xác nhận.",
     "Ring members are possible inputs, not proof of which output was spent.": "Thành viên vòng là các đầu vào có thể có, không chứng minh đầu ra nào đã được chi tiêu.",
-    "Observed by node": "Nút quan sát lúc"
+    "Observed by node": "Nút quan sát lúc",
+    "Sound On": "Đã bật âm thanh"
   },
   "yo": {
     "\nAmount %@": "\nIye %@",
@@ -35929,7 +35980,8 @@
     "Hidden (RingCT)": "Fífarapamọ́ (RingCT)",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "Node sọ pé ìnáwó tako ara wọn. Má ṣe kà á sí ìsanwó tí a ti fìdí múlẹ̀.",
     "Ring members are possible inputs, not proof of which output was spent.": "Àwọn ọmọ òrùka jẹ́ àwọn ìwọlé tó ṣeé ṣe, kì í ṣe ẹ̀rí ìjáde tí a ná.",
-    "Observed by node": "Node ṣàkíyèsí rẹ̀"
+    "Observed by node": "Node ṣàkíyèsí rẹ̀",
+    "Sound On": "Ohùn ti tan"
   },
   "zh-Hans": {
     "\nAmount %@": "\n金额 %@",
@@ -36620,7 +36672,8 @@
     "Hidden (RingCT)": "隐藏（RingCT）",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "节点报告了冲突花费。请勿将其视为已确认的付款。",
     "Ring members are possible inputs, not proof of which output was spent.": "环成员是可能的输入，不能证明实际花费了哪个输出。",
-    "Observed by node": "节点观察时间"
+    "Observed by node": "节点观察时间",
+    "Sound On": "声音已开启"
   },
   "zh-Hant": {
     "\nAmount %@": "\n金額 %@",
@@ -37311,6 +37364,7 @@
     "Hidden (RingCT)": "隱藏（RingCT）",
     "The node reports a conflicting spend. Do not treat this as a confirmed payment.": "節點回報了衝突花費。請勿將其視為已確認的付款。",
     "Ring members are possible inputs, not proof of which output was spent.": "環成員是可能的輸入，不能證明實際花費了哪個輸出。",
-    "Observed by node": "節點觀察時間"
+    "Observed by node": "節點觀察時間",
+    "Sound On": "聲音已開啟"
   }
 }
