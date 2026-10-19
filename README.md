@@ -6,8 +6,10 @@ This is a **new client**, not a port of the SwiftUI or Compose apps. Scan, resto
 
 ### Session security
 
-Release-candidate follow-up: WalletCore v0.1.18 is pinned to `c3cc89519ff88e68322fcddbcc6227669b943a34`.
-All 108 tests pass; Release builds and advisory checks pass. Synthetic fixtures
+Release-candidate follow-up: WalletCore v0.1.19 is pinned to `c5430e9ba86ca962aae07e6744f8eaa78abff905`.
+WalletCore's 108 tests and GPUI's 97 tests pass; Release builds succeed. Rustls is patched to 0.23.46.
+The remaining `cargo deny` findings are unmaintained transitive Linux D-Bus crates, not vulnerability
+advisories; no safe upgrade is currently available. Synthetic fixtures
 cover idle/stale unlock, native teardown, clipboard expiry/new-copy preservation and safe migration
 failure ordering without reading a user's wallet or Keychain. Missing-item recovery preserves
 actual protection after an interrupted preference write; denied access never selects a fallback.
@@ -30,7 +32,7 @@ retired. Failure is reported, not silently downgraded. This path requires signed
 an unsigned development binary may be refused by Keychain. Linux/Windows retain their OS secure-store
 backends but do not currently implement a per-access biometric/device-auth gate. Auto-lock still applies.
 No hot-wallet implementation here promises complete erasure of UI/framework copies or protection from
-a compromised OS. The published native pin includes WalletCore v0.1.18 quarantine/FFI hardening.
+a compromised OS. The published native pin includes WalletCore v0.1.19 quarantine/FFI hardening.
 Signed-build/device QA remains required before app distribution.
 
 Send and send-max require a separate full-address review, followed by the configured authentication.
