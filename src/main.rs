@@ -22,6 +22,7 @@ mod camera;
 mod daemon;
 mod device_auth;
 mod explorer;
+mod explorer_advanced;
 mod fiat;
 mod fiat_snapshot;
 mod history;
@@ -3525,6 +3526,12 @@ impl Home {
 
     fn toggle_explorer(&mut self, cx: &mut Context<Self>) {
         let enabled = !self.explorer_enabled;
+        // Revocation is immediate even when disk is full/read-only. An opt-in,
+        // conversely, becomes effective only after it can be persisted.
+        if !enabled {
+            self.explorer_enabled = false;
+            self.explorer_lookup.clear();
+        }
         if paths::save_explorer_enabled(enabled).is_err() {
             self.status = l10n::t("Could not save settings.").into();
         } else {
@@ -3535,8 +3542,53 @@ impl Home {
     }
 
     fn open_explorer(&mut self, txid: String, cx: &mut Context<Self>) {
+        self.start_explorer(txid, |txid, cancel| async move { explorer::fetch(&txid, cancel) }, cx);
+    }
+
+    fn load_explorer_page(&mut self, txid: String, page: u64, cx: &mut Context<Self>) {
+        if page >= 410 { return; }
+        self.start_explorer_page(txid, Some(page), move |id, cancel| async move { explorer::fetch_page(&id, Some(page), cancel) }, cx);
+    }
+
+    fn collapse_explorer_advanced(&mut self, cx: &mut Context<Self>) {
+        let txid = self.explorer_lookup.txid.clone();
+        let result = self.explorer_lookup.result.take();
         self.explorer_lookup.clear();
         self.explorer_lookup.visible = true;
+        self.explorer_lookup.txid = txid;
+        self.explorer_lookup.result = result;
+        cx.notify();
+    }
+
+    fn reconcile_explorer(&mut self) {
+        if self.explorer_lookup.visible
+            && (!self.opened
+                || !matches!(self.screen, Screen::Wallet | Screen::Transactions)
+                || !self.history_pages.selected.as_ref()
+                    .is_some_and(|t| t.txid == self.explorer_lookup.txid))
+        {
+            self.explorer_lookup.clear();
+        }
+    }
+
+    fn start_explorer<F, Fut>(&mut self, txid: String, fetch: F, cx: &mut Context<Self>)
+    where
+        F: FnOnce(String, Arc<AtomicBool>) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = Result<explorer::Observation, explorer::Failure>> + Send + 'static,
+    {
+        self.start_explorer_page(txid, None, fetch, cx);
+    }
+
+    fn start_explorer_page<F, Fut>(&mut self, txid: String, page: Option<u64>, fetch: F, cx: &mut Context<Self>)
+    where
+        F: FnOnce(String, Arc<AtomicBool>) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = Result<explorer::Observation, explorer::Failure>> + Send + 'static,
+    {
+        let previous = if page.is_some() && self.explorer_lookup.txid == txid { self.explorer_lookup.result.take() } else { None };
+        self.explorer_lookup.clear();
+        self.explorer_lookup.visible = true;
+        self.explorer_lookup.advanced_expanded = page.is_some();
+        self.explorer_lookup.result = previous;
         self.explorer_lookup.txid = txid.clone();
         if !self.explorer_enabled || !self.opened {
             cx.notify();
@@ -3548,16 +3600,23 @@ impl Home {
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
-                .spawn(async move { explorer::fetch(&txid, cancel) })
+                .spawn(async move {
+                    if cancel.load(AtomicOrdering::Acquire) { Err(explorer::Failure::Cancelled) }
+                    else { fetch(txid, cancel).await }
+                })
                 .await;
             let _ = this.update(cx, |this, cx| {
+                this.reconcile_explorer();
                 if this.explorer_enabled
                     && this.opened
                     && this.explorer_lookup.generation == generation
                     && this.explorer_lookup.visible
                 {
                     this.explorer_lookup.loading = false;
-                    this.explorer_lookup.result = Some(result);
+                    match result {
+                        Err(error) if page.is_some() && this.explorer_lookup.result.as_ref().is_some_and(Result::is_ok) => this.explorer_lookup.page_error = Some(error),
+                        result => this.explorer_lookup.result = Some(result),
+                    }
                     cx.notify();
                 }
             });
@@ -3889,17 +3948,7 @@ impl Focusable for Home {
 
 impl Render for Home {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if self.explorer_lookup.visible
-            && (!self.opened
-                || !matches!(self.screen, Screen::Wallet | Screen::Transactions)
-                || !self
-                    .history_pages
-                    .selected
-                    .as_ref()
-                    .is_some_and(|t| t.txid == self.explorer_lookup.txid))
-        {
-            self.explorer_lookup.clear();
-        }
+        self.reconcile_explorer();
         if self.screen == Screen::Receive {
             self.ensure_qr();
         }
@@ -6210,7 +6259,7 @@ fn transfer_detail(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> impl 
         if !home.explorer_enabled {
             explorer_panel =
                 explorer_panel.child(div().text_sm().child(l10n::t(explorer::DISABLED)));
-        } else if home.explorer_lookup.loading {
+        } else if home.explorer_lookup.loading && home.explorer_lookup.result.is_none() {
             explorer_panel =
                 explorer_panel.child(div().text_sm().child(l10n::t("Loading transaction…")));
         } else if let Some(result) = &home.explorer_lookup.result {
@@ -6264,8 +6313,26 @@ fn transfer_detail(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> impl 
                         explorer_panel =
                             explorer_panel.child(div().text_sm().child(l10n::t(explorer::STALE)));
                     }
+                    if data.double_spend_seen {
+                        explorer_panel = explorer_panel.child(div().text_sm().text_color(rgb(0xff5959)).child(l10n::t("The node reports a conflicting spend. Do not treat this as a confirmed payment.")));
+                    }
+                    if home.explorer_lookup.advanced_expanded && !home.explorer_lookup.loading {
+                        if let Some(details) = &data.details { explorer_panel = explorer_panel.child(explorer_advanced_panel(details, row.txid.clone(), cx)); }
+                    }
                 }
             }
+        }
+        if let Some(error) = &home.explorer_lookup.page_error { explorer_panel = explorer_panel.child(div().text_sm().child(l10n::t(error.message()))); }
+        if home.explorer_lookup.loading && home.explorer_lookup.result.is_some() { explorer_panel = explorer_panel.child(div().text_sm().child(l10n::t("Loading transaction…"))); }
+        if home.explorer_enabled {
+            let advanced_id = row.txid.clone();
+            explorer_panel = explorer_panel.child(secondary_action_button(
+                "toggle-explorer-advanced", l10n::t("Advanced details"),
+                cx.listener(move |this, _, _, cx| {
+                    if this.explorer_lookup.advanced_expanded { this.collapse_explorer_advanced(cx); }
+                    else if !this.explorer_lookup.loading { this.load_explorer_page(advanced_id.clone(), 0, cx); }
+                }),
+            ));
         }
         explorer_panel = explorer_panel.child(secondary_action_button(
             "close-explorer-details",
@@ -6279,7 +6346,10 @@ fn transfer_detail(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> impl 
             explorer_panel = explorer_panel.child(secondary_action_button(
                 "refresh-explorer-details",
                 l10n::t("Refresh"),
-                cx.listener(move |this, _, _, cx| this.open_explorer(refresh_id.clone(), cx)),
+                cx.listener(move |this, _, _, cx| {
+                    if this.explorer_lookup.advanced_expanded { this.load_explorer_page(refresh_id.clone(), 0, cx); }
+                    else { this.open_explorer(refresh_id.clone(), cx); }
+                }),
             ));
         }
     }
@@ -6398,6 +6468,52 @@ fn transfer_detail(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> impl 
                 this.status = l10n::t("Transaction amount copied.").to_string().into();
             }),
         ))
+}
+
+fn explorer_advanced_panel(d: &explorer_advanced::Advanced, txid: String, cx: &mut Context<Home>) -> impl IntoElement {
+    let unavailable = || l10n::t("Not available").to_string();
+    let bytes = |n: Option<u64>| n.map(|n| format!("{n} B")).unwrap_or_else(unavailable);
+    let mut lines = vec![
+        ("Type", l10n::t(if d.coinbase {"Miner transaction"} else {"Transfer"}).to_string()),
+        ("Version", d.version.to_string()), ("Serialized size", bytes(d.serialized_size)),
+        ("Downloaded size", bytes(Some(d.downloaded_size))), ("Weight", bytes(d.weight)),
+        ("Additional unlock condition", if d.unlock_kind == "none" {"—".into()} else {format!("{}: {}",l10n::t(if d.unlock_kind == "height" {"Height"} else {"Time"}),d.unlock_value)}),
+        ("Inputs", d.input_count.to_string()), ("Outputs", d.output_count.to_string()),
+    ];
+    if let Some(time) = d.received_timestamp { lines.push(("Observed by node",format_timestamp(Some(time)))); }
+    let mut panel = div().flex().flex_col().gap_2().min_w(px(0.));
+    for (label, value) in lines { panel = panel.child(div().text_xs().child(format!("{}: {value}",l10n::t(label)))); }
+    panel = panel.child(div().text_xs().child(l10n::t("Ring members are possible inputs, not proof of which output was spent.")));
+    for input in &d.inputs {
+        for line in [format!("{} #{}",l10n::t("Inputs"),input.index),format!("{}: {}",l10n::t("Key image"),input.key_image),
+            format!("{}: {}",l10n::t("Ring size"),input.ring_size),format!("{}: {}",l10n::t("Absolute output indices"),input.indices.join(", "))] {
+            panel = panel.child(div().text_xs().child(line));
+        }
+        if input.truncated { panel = panel.child(div().text_xs().child(l10n::t("Preview truncated."))); }
+    }
+    for output in &d.outputs {
+        for line in [format!("{} #{}",l10n::t("Outputs"),output.index),format!("{}: {}",l10n::t("One-time output key"),output.key),
+            format!("{}: {}",l10n::t("Amount"),output.amount.map(|n| format!("{} XMR",amount::format_for_input(n))).unwrap_or_else(||l10n::t("Hidden (RingCT)").to_string())),
+            format!("{}: {}",l10n::t("View tag"),output.view_tag.map(|n|format!("{n:02x}")).unwrap_or_else(||"—".into())),
+            format!("{}: {}",l10n::t("Global output index"),output.global_index.as_deref().unwrap_or("—"))] {
+            panel = panel.child(div().text_xs().child(line));
+        }
+    }
+    panel = panel.child(div().text_sm().child(format!("{} {}/{}",l10n::t("Page"),d.page + 1,d.page_count)));
+    if d.page > 0 {
+        let previous_id = txid.clone(); let page = d.page - 1;
+        panel = panel.child(secondary_action_button("explorer-previous-page",l10n::t("Previous"),cx.listener(move |this,_,_,cx| this.load_explorer_page(previous_id.clone(),page,cx))));
+    }
+    if d.page + 1 < d.page_count {
+        let page = d.page + 1;
+        panel = panel.child(secondary_action_button("explorer-next-page",l10n::t("Next"),cx.listener(move |this,_,_,cx| this.load_explorer_page(txid.clone(),page,cx))));
+    }
+    panel = panel.child(div().text_xs().child(l10n::t("Transaction extra (hex)")))
+        .child(div().text_xs().child(if d.extra.is_empty() {"—".to_string()} else {
+            d.extra.as_bytes().chunks(64).map(|line| std::str::from_utf8(line).unwrap_or("")).collect::<Vec<_>>().join("\n")
+        }));
+    if d.extra_truncated { panel = panel.child(div().text_xs().child(l10n::t("Preview truncated."))); }
+    panel
 }
 
 fn format_timestamp(timestamp: Option<u64>) -> String {

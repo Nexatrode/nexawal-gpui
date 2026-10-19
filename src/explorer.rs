@@ -35,6 +35,8 @@ pub struct Observation {
     pub confirmations: u64,
     pub node_ready: bool,
     pub observed_at: u64,
+    pub double_spend_seen: bool,
+    pub details: Option<crate::explorer_advanced::Advanced>,
 }
 pub fn valid_id(id: &str) -> bool {
     id.len() == 64
@@ -43,8 +45,16 @@ pub fn valid_id(id: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 pub fn parse(bytes: &[u8], txid: &str, now: u64) -> Result<Observation, Failure> {
+    parse_page(bytes, txid, now, None)
+}
+pub fn parse_page(
+    bytes: &[u8],
+    txid: &str,
+    now: u64,
+    page: Option<u64>,
+) -> Result<Observation, Failure> {
     let invalid = Failure::Unavailable;
-    if bytes.len() > 16_384 || !valid_id(txid) {
+    if bytes.len() > if page.is_some() { 65_536 } else { 16_384 } || !valid_id(txid) {
         return Err(invalid);
     }
     let v: Value = serde_json::from_slice(bytes).map_err(|_| invalid.clone())?;
@@ -122,6 +132,24 @@ pub fn parse(bytes: &[u8], txid: &str, now: u64) -> Result<Observation, Failure>
         confirmations,
         node_ready: v["node_ready"].as_bool().ok_or(invalid)?,
         observed_at,
+        double_spend_seen: match v.get("double_spend_seen") {
+            None => false,
+            Some(value) => value.as_bool().ok_or(Failure::Unavailable)?,
+        },
+        details: match page {
+            Some(page) => Some(crate::explorer_advanced::Advanced::parse(
+                &v["details"],
+                page,
+                now,
+                status == "pending",
+            )?),
+            None => {
+                if v.get("details").is_some() {
+                    return Err(Failure::Unavailable);
+                }
+                None
+            }
+        },
     })
 }
 
@@ -133,6 +161,8 @@ pub struct Lookup {
     pub loading: bool,
     pub result: Option<Result<Observation, Failure>>,
     pub cancel: Arc<AtomicBool>,
+    pub advanced_expanded: bool,
+    pub page_error: Option<Failure>,
 }
 impl Lookup {
     pub fn clear(&mut self) {
@@ -149,7 +179,14 @@ impl Drop for Lookup {
 }
 
 pub fn fetch(txid: &str, cancel: Arc<AtomicBool>) -> Result<Observation, Failure> {
-    if !valid_id(txid) || cancel.load(Ordering::Acquire) {
+    fetch_page(txid, None, cancel)
+}
+pub fn fetch_page(
+    txid: &str,
+    page: Option<u64>,
+    cancel: Arc<AtomicBool>,
+) -> Result<Observation, Failure> {
+    if !valid_id(txid) || page.is_some_and(|p| p >= 410) || cancel.load(Ordering::Acquire) {
         return Err(Failure::Cancelled);
     }
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -158,6 +195,8 @@ pub fn fetch(txid: &str, cancel: Arc<AtomicBool>) -> Result<Observation, Failure
         .map_err(|_| Failure::Unavailable)?;
     runtime.block_on(async {
         let work = async {
+            let limit = if page.is_some() { 65_536 } else { 16_384 };
+            let suffix = page.map(|p| format!("/details/{p}")).unwrap_or_default();
             let client = reqwest::Client::builder()
                 .no_proxy()
                 .redirect(reqwest::redirect::Policy::none())
@@ -166,7 +205,7 @@ pub fn fetch(txid: &str, cancel: Arc<AtomicBool>) -> Result<Observation, Failure
                 .map_err(|_| Failure::Unavailable)?;
             let mut response = client
                 .get(format!(
-                    "https://explorer.nexawal.com/api/v1/transactions/{txid}"
+                    "https://explorer.nexawal.com/api/v1/transactions/{txid}{suffix}"
                 ))
                 .header("Accept", "application/json")
                 .send()
@@ -174,7 +213,7 @@ pub fn fetch(txid: &str, cancel: Arc<AtomicBool>) -> Result<Observation, Failure
                 .map_err(|_| Failure::Unavailable)?;
             let status = response.status();
             if ![reqwest::StatusCode::OK, reqwest::StatusCode::NOT_FOUND].contains(&status)
-                || response.content_length().is_some_and(|n| n > 16_384)
+                || response.content_length().is_some_and(|n| n > limit)
                 || response
                     .headers()
                     .get("content-type")
@@ -186,7 +225,7 @@ pub fn fetch(txid: &str, cancel: Arc<AtomicBool>) -> Result<Observation, Failure
             }
             let mut bytes = Vec::new();
             while let Some(chunk) = response.chunk().await.map_err(|_| Failure::Unavailable)? {
-                if bytes.len() + chunk.len() > 16_384 {
+                if bytes.len() + chunk.len() > limit as usize {
                     return Err(Failure::Unavailable);
                 }
                 bytes.extend_from_slice(&chunk);
@@ -197,9 +236,17 @@ pub fn fetch(txid: &str, cancel: Arc<AtomicBool>) -> Result<Observation, Failure
                 if error["api_version"] != 1 || error["error"]["code"] != "not_found" {
                     return Err(Failure::Unavailable);
                 }
-                return Err(Failure::Missing);
+                return Err(if page.is_none() {
+                    Failure::Missing
+                } else {
+                    Failure::Unavailable
+                });
             }
-            parse(&bytes, txid, crate::fiat::now_ms() / 1000)
+            let now = crate::fiat::now_ms() / 1000;
+            match page {
+                None => parse(&bytes, txid, now),
+                Some(_) => parse_page(&bytes, txid, now, page),
+            }
         };
         tokio::pin!(work);
         loop {

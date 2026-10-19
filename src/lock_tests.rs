@@ -26,6 +26,218 @@ fn explorer_starts_off_and_enabling_does_not_start_a_lookup(cx: &mut TestAppCont
 use gpui::TestAppContext;
 static NATIVE_SESSION_FIXTURE: Mutex<()> = Mutex::new(());
 
+fn explorer_transfer() -> Transfer {
+    Transfer {
+        txid: "a".repeat(64), direction: "in".into(), amount: 1, fee: Some(1),
+        height: Some(8), timestamp: Some(900), confirmations: 2, is_pending: false,
+        subaddress_major: None, subaddress_minor: None,
+    }
+}
+
+fn explorer_observation(fee: u64) -> explorer::Observation {
+    explorer::Observation {
+        status: "confirmed".into(), fee: Some(fee), height: Some(8),
+        block_hash: Some("b".repeat(64)), block_timestamp: Some(900),
+        confirmations: 2, node_ready: true, observed_at: 1000,
+        double_spend_seen: false, details: None,
+    }
+}
+
+#[gpui::test]
+fn explorer_delayed_responses_cannot_cross_close_background_disable_or_wallet_change(cx: &mut TestAppContext) {
+    let _guard = NATIVE_SESSION_FIXTURE.lock().unwrap();
+    for transition in ["close", "background", "disable", "wallet", "screen"] {
+        let directory = tempfile::tempdir().unwrap();
+        paths::with_test_data_dir(directory.path().to_owned(), || {
+            let home = cx.new(Home::new);
+            let (send, receive) = tokio::sync::oneshot::channel();
+            let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let count = calls.clone();
+            let token = home.update(cx, |home, cx| {
+                home.opened = true; home.screen = Screen::Wallet;
+                home.history_pages.selected = Some(explorer_transfer());
+                home.toggle_explorer(cx);
+                home.start_explorer("a".repeat(64), move |_, _| async move {
+                    count.fetch_add(1, AtomicOrdering::SeqCst);
+                    // Intentionally ignores cancellation to simulate a queued late response.
+                    receive.await.unwrap()
+                }, cx);
+                home.explorer_lookup.cancel.clone()
+            });
+            cx.run_until_parked();
+            assert_eq!(calls.load(AtomicOrdering::SeqCst), 1);
+            home.update(cx, |home, cx| {
+                match transition {
+                    "close" => home.explorer_lookup.clear(),
+                    "background" => home.lock_wallet(false, cx),
+                    "disable" => home.toggle_explorer(cx),
+                    "wallet" => { home.history_pages.clear(); home.reconcile_explorer(); }
+                    "screen" => { home.screen = Screen::Settings; home.reconcile_explorer(); }
+                    _ => unreachable!(),
+                }
+            });
+            cx.run_until_parked();
+            assert!(token.load(AtomicOrdering::Acquire), "{transition}");
+            home.update(cx, |home, cx| {
+                // Merely returning/re-enabling must not query or grant the old work authority.
+                home.opened = true; home.screen = Screen::Wallet;
+                home.history_pages.selected = Some(explorer_transfer());
+                if !home.explorer_enabled { home.toggle_explorer(cx); }
+            });
+            send.send(Ok(explorer_observation(1))).unwrap();
+            cx.run_until_parked();
+            home.update(cx, |home, _| {
+                assert!(home.explorer_lookup.result.is_none(), "{transition}");
+                assert!(!home.explorer_lookup.loading && !home.explorer_lookup.visible);
+            });
+            assert_eq!(calls.load(AtomicOrdering::SeqCst), 1);
+            // A new explicit user lookup is permitted and publishes normally.
+            home.update(cx, |home, cx| home.start_explorer("a".repeat(64), |_, _| async {
+                Ok(explorer_observation(2))
+            }, cx));
+            cx.run_until_parked();
+            home.update(cx, |home, _| {
+                assert_eq!(home.explorer_lookup.result.as_ref().unwrap().as_ref().unwrap().fee, Some(2));
+            });
+        });
+    }
+}
+
+#[gpui::test]
+fn explorer_opt_out_cancels_even_when_preferences_cannot_be_written(cx: &mut TestAppContext) {
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        let home = cx.new(Home::new);
+        let (send, receive) = tokio::sync::oneshot::channel();
+        let token = home.update(cx, |home, cx| {
+            home.opened = true; home.screen = Screen::Wallet;
+            home.history_pages.selected = Some(explorer_transfer());
+            home.toggle_explorer(cx);
+            home.start_explorer("a".repeat(64), |_, _| async { receive.await.unwrap() }, cx);
+            home.explorer_lookup.cancel.clone()
+        });
+        cx.run_until_parked();
+        // A directory cannot be replaced by the preferences file; no personal files touched.
+        let flag = directory.path().join("explorer_details_enabled");
+        fs::rename(&flag, directory.path().join("old-preference")).unwrap();
+        fs::create_dir(&flag).unwrap();
+        home.update(cx, |home, cx| {
+            home.toggle_explorer(cx);
+            assert!(!home.explorer_enabled);
+            assert!(!home.explorer_lookup.visible && !home.explorer_lookup.loading);
+            assert!(home.status.contains(l10n::t("Could not save settings.").as_ref()));
+            // Failed opt-in must remain off, unlike immediate in-memory revocation.
+            home.toggle_explorer(cx);
+            assert!(!home.explorer_enabled);
+        });
+        assert!(token.load(AtomicOrdering::Acquire));
+        send.send(Ok(explorer_observation(1))).unwrap();
+        cx.run_until_parked();
+        home.update(cx, |home, _| assert!(home.explorer_lookup.result.is_none()));
+    });
+}
+
+#[gpui::test]
+fn explorer_old_success_or_error_cannot_replace_a_newer_refresh(cx: &mut TestAppContext) {
+    for old_first in [true, false] {
+        let directory = tempfile::tempdir().unwrap();
+        paths::with_test_data_dir(directory.path().to_owned(), || {
+            let home = cx.new(Home::new);
+            let (old_send, old_receive) = tokio::sync::oneshot::channel();
+            let (new_send, new_receive) = tokio::sync::oneshot::channel();
+            home.update(cx, |home, cx| {
+                home.opened = true; home.screen = Screen::Wallet;
+                home.history_pages.selected = Some(explorer_transfer());
+                home.toggle_explorer(cx);
+                home.start_explorer("a".repeat(64), |_, _| async { old_receive.await.unwrap() }, cx);
+            });
+            cx.run_until_parked();
+            home.update(cx, |home, cx| home.start_explorer("a".repeat(64), |_, _| async { new_receive.await.unwrap() }, cx));
+            cx.run_until_parked();
+            if old_first {
+                old_send.send(Ok(explorer_observation(1))).unwrap();
+                cx.run_until_parked();
+                home.update(cx, |home, _| {
+                    assert!(home.explorer_lookup.loading && home.explorer_lookup.result.is_none());
+                });
+                new_send.send(Ok(explorer_observation(2))).unwrap();
+            } else {
+                new_send.send(Ok(explorer_observation(2))).unwrap();
+                cx.run_until_parked();
+                old_send.send(Err(explorer::Failure::Missing)).unwrap();
+            }
+            cx.run_until_parked();
+            home.update(cx, |home, _| {
+                assert!(!home.explorer_lookup.loading);
+                assert_eq!(home.explorer_lookup.result.as_ref().unwrap().as_ref().unwrap().fee, Some(2));
+            });
+        });
+    }
+}
+
+#[gpui::test]
+fn explorer_cancelled_before_worker_starts_never_invokes_transport(cx: &mut TestAppContext) {
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        let home = cx.new(Home::new);
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let count = calls.clone();
+        home.update(cx, |home, cx| {
+            home.opened = true; home.screen = Screen::Wallet;
+            home.history_pages.selected = Some(explorer_transfer());
+            home.toggle_explorer(cx);
+            home.start_explorer("a".repeat(64), move |_, _| async move {
+                count.fetch_add(1, AtomicOrdering::SeqCst);
+                Ok(explorer_observation(1))
+            }, cx);
+            home.toggle_explorer(cx);
+        });
+        cx.run_until_parked();
+        assert_eq!(calls.load(AtomicOrdering::SeqCst), 0);
+        home.update(cx, |home, _| assert!(home.explorer_lookup.result.is_none()));
+    });
+}
+
+#[gpui::test]
+fn explorer_advanced_collapse_cancels_old_page_and_failure_keeps_summary(cx: &mut TestAppContext) {
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        let home = cx.new(Home::new);
+        let fixture = || explorer::parse_page(include_bytes!("../tests/fixtures/explorer_advanced_page0.json"), &"a".repeat(64),1000,Some(0)).unwrap();
+        let mut summary = fixture(); summary.details = None;
+        home.update(cx, |home,cx| {
+            home.opened = true; home.screen = Screen::Wallet; home.total_piconero = 123;
+            home.history_pages.selected = Some(explorer_transfer()); home.toggle_explorer(cx);
+            home.start_explorer("a".repeat(64),|_,_|async move {Ok(summary)},cx);
+        });
+        cx.run_until_parked();
+        let (send,receive) = tokio::sync::oneshot::channel();
+        let cancel = home.update(cx, |home,cx| {
+            assert!(!home.explorer_lookup.advanced_expanded);
+            home.start_explorer_page("a".repeat(64),Some(0),|_,_|async {receive.await.unwrap()},cx);
+            home.explorer_lookup.cancel.clone()
+        });
+        cx.run_until_parked();
+        home.update(cx, |home,cx| home.collapse_explorer_advanced(cx));
+        assert!(cancel.load(AtomicOrdering::Acquire));
+        send.send(Ok(fixture())).unwrap(); cx.run_until_parked();
+        home.update(cx, |home,cx| {
+            assert!(!home.explorer_lookup.advanced_expanded);
+            assert!(home.explorer_lookup.result.as_ref().unwrap().as_ref().unwrap().details.is_none());
+            let details = fixture(); home.start_explorer_page("a".repeat(64),Some(0),|_,_|async move {Ok(details)},cx);
+        });
+        cx.run_until_parked();
+        home.update(cx, |home,cx| home.start_explorer_page("a".repeat(64),Some(1),|_,_|async {Err(explorer::Failure::Unavailable)},cx));
+        cx.run_until_parked();
+        home.update(cx, |home,_| {
+            assert_eq!(home.explorer_lookup.page_error,Some(explorer::Failure::Unavailable));
+            let previous = home.explorer_lookup.result.as_ref().unwrap().as_ref().unwrap();
+            assert!(previous.double_spend_seen); assert_eq!(previous.details.as_ref().unwrap().page,0);
+            assert_eq!(home.total_piconero,123); // explorer never replaces wallet state
+        });
+    });
+}
+
 #[gpui::test]
 fn send_click_only_opens_review_and_changed_intents_are_rejected(cx: &mut TestAppContext) {
     let directory = tempfile::tempdir().unwrap();
