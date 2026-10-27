@@ -1,5 +1,23 @@
 //! Clearnet / I2P / hybrid routing, matching iOS/Android NetworkRouting.
 
+pub const DEFAULT_I2P_RPC_ADDRESS: &str = "7lfi73h743qm663hv4x5q6ccgc4jc5ncl65dfvpe665m6pawwdxa.b32.i2p";
+
+pub fn validate_i2p_configuration(node: &str, proxy: Option<&str>) -> Result<(), String> {
+    let node = reqwest::Url::parse(&normalize_url(node)).map_err(|_| "Invalid I2P RPC address")?;
+    if node.scheme() != "http" || !node.host_str().is_some_and(|host| host.ends_with(".i2p"))
+        || node.port() == Some(0) || node.query().is_some() || node.fragment().is_some() {
+        return Err("Use an HTTP I2P RPC address ending in .i2p, not a clearnet URL or P2P :0 address".into());
+    }
+    let proxy = proxy.filter(|proxy| !proxy.trim().is_empty()).ok_or("An I2P HTTP proxy is required")?;
+    let proxy = reqwest::Url::parse(&proxy_url(proxy)).map_err(|_| "Invalid I2P HTTP proxy")?;
+    if proxy.scheme() != "http" || proxy.host_str().is_none() || proxy.port_or_known_default().is_none()
+        || proxy.port() == Some(0) || !proxy.username().is_empty() || proxy.password().is_some()
+        || proxy.path() != "/" || proxy.query().is_some() || proxy.fragment().is_some() {
+        return Err("Use an HTTP proxy such as 127.0.0.1:4444 (not SOCKS or HTTPS)".into());
+    }
+    Ok(())
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Policy {
     Clearnet,
@@ -103,31 +121,23 @@ pub fn proxy_url(raw: &str) -> String {
     }
 }
 
-pub fn apply_http_proxy(proxy: Option<&str>) {
-    unsafe {
-        if let Some(raw) = proxy.filter(|s| !s.trim().is_empty()) {
-            let url = proxy_url(raw);
-            std::env::set_var("HTTP_PROXY", &url);
-            std::env::set_var("http_proxy", &url);
-            std::env::set_var("ALL_PROXY", &url);
-            std::env::set_var("all_proxy", &url);
-            std::env::remove_var("NO_PROXY");
-            std::env::remove_var("no_proxy");
-        } else {
-            std::env::remove_var("HTTP_PROXY");
-            std::env::remove_var("http_proxy");
-            std::env::remove_var("ALL_PROXY");
-            std::env::remove_var("all_proxy");
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const CLEARNET: &str = "https://rpc.nexawal.com";
     const I2P: &str = "cvxtgqjorfif6i5x5fenys6fj7hzddbgavpyutps6gphywnlklqa.b32.i2p:18081";
+
+    #[test]
+    fn i2p_configuration_rejects_missing_or_invalid_proxy_and_clearnet_endpoint() {
+        for proxy in [None, Some(""), Some("socks5://127.0.0.1:4447"), Some("https://127.0.0.1:4444"), Some("127.0.0.1:0")] {
+            assert!(validate_i2p_configuration(DEFAULT_I2P_RPC_ADDRESS, proxy).is_err());
+        }
+        for node in ["", CLEARNET, "http://127.0.0.1:18092", "http://test.i2p.evil.example", "test.i2p:0"] {
+            assert!(validate_i2p_configuration(node, Some("127.0.0.1:4444")).is_err());
+        }
+        assert!(validate_i2p_configuration(DEFAULT_I2P_RPC_ADDRESS, Some("127.0.0.1:4444")).is_ok());
+    }
 
     #[test]
     fn scan_uses_clearnet_except_i2p_only() {

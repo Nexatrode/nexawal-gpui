@@ -542,7 +542,8 @@ pub fn load_i2p_rpc() -> String {
     fs::read_to_string(i2p_rpc_path())
         .ok()
         .map(|s| s.trim().to_string())
-        .unwrap_or_default()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| crate::network::DEFAULT_I2P_RPC_ADDRESS.into())
 }
 
 pub fn save_i2p_rpc(value: &str) -> std::io::Result<()> {

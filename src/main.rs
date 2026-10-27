@@ -705,11 +705,12 @@ impl Home {
         self.height_fetching = true;
         let node = self.scan_node_url();
         let proxy = self.scan_proxy();
+        let require_i2p = self.network_policy == network::Policy::I2p;
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    daemon::fetch_suggested_restore_height(&node, proxy.as_deref())
+                    daemon::fetch_suggested_restore_height(&node, proxy.as_deref(), require_i2p)
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
@@ -940,16 +941,25 @@ impl Home {
         }
     }
 
-    fn apply_scan_proxy(&self) {
-        network::apply_http_proxy(self.scan_proxy().as_deref());
+    fn apply_scan_proxy(&self) -> api::Result<()> {
+        self.configure_core_route(false)
     }
 
-    fn apply_broadcast_proxy(&self) {
-        network::apply_http_proxy(self.broadcast_proxy().as_deref());
+    fn apply_broadcast_proxy(&self) -> api::Result<()> {
+        self.configure_core_route(true)
+    }
+
+    fn configure_core_route(&self, broadcast: bool) -> api::Result<()> {
+        if self.network_policy == network::Policy::I2p ||
+            (self.network_policy == network::Policy::Hybrid && broadcast) {
+            network::validate_i2p_configuration(&self.i2p_rpc, Some(&self.i2p_proxy))
+                .map_err(|message| api::Error { code: -14, message })?;
+        }
+        api::set_i2p_http_proxy(Some(&self.i2p_proxy))
     }
 
     fn kick_refresh(&self) -> api::Result<()> {
-        self.apply_scan_proxy();
+        self.apply_scan_proxy()?;
         api::refresh_async(WALLET_ID, &self.scan_node_url())
     }
 
@@ -1332,11 +1342,15 @@ impl Home {
     }
 
     fn apply_network(&mut self, cx: &mut Context<Self>) {
+        if self.network_policy != network::Policy::Clearnet {
+            if let Err(error) = network::validate_i2p_configuration(&self.i2p_rpc, Some(&self.i2p_proxy)) {
+                self.status = error.into(); cx.notify(); return;
+            }
+        }
         let _ = paths::save_node_url(&self.node_url);
         let _ = paths::save_network_policy(self.network_policy);
         let _ = paths::save_i2p_rpc(&self.i2p_rpc);
         let _ = paths::save_i2p_proxy(&self.i2p_proxy);
-        self.apply_scan_proxy();
         self.status = l10n::interpolate(
             "{0} · scan {1} · broadcast {2}",
             &[
@@ -1601,7 +1615,6 @@ impl Home {
         self.scan_rate.reset();
         self.last_scan_progress_at = Some(Instant::now());
         self.last_scanned_for_stall = height;
-        self.apply_scan_proxy();
         if let Err(err) = self.start_fast_scan() {
             self.scan_needs_retry = true;
             self.last_scan_error = Some(err.to_string());
@@ -2300,7 +2313,12 @@ impl Home {
         self.clear_send_preview();
         let preview_token = self.send_preview_epoch.token();
         cx.notify();
-        self.apply_broadcast_proxy();
+        if let Err(error) = self.apply_broadcast_proxy() {
+            self.finish_send_operation(cx);
+            self.status = error.to_string().into();
+            cx.notify();
+            return;
+        }
         let node = self.broadcast_node_url();
         let from = self.send_from_minor();
         let preview_node = node.clone();
@@ -2461,7 +2479,12 @@ impl Home {
         self.send_operation.start();
         self.status = l10n::t("Sending…").into();
         cx.notify();
-        self.apply_broadcast_proxy();
+        if let Err(error) = self.apply_broadcast_proxy() {
+            self.finish_send_operation(cx);
+            self.status = error.to_string().into();
+            cx.notify();
+            return;
+        }
         let node = confirmation.node;
         let from = confirmation.source;
         cx.spawn(async move |this, cx| {
@@ -2496,7 +2519,6 @@ impl Home {
                             ],
                         )
                         .into();
-                        this.apply_scan_proxy();
                         let _ = this.start_fast_scan();
                     }
                     Err(err) => {
@@ -2707,7 +2729,6 @@ impl Home {
         self.last_transfers_poll_at = None;
         self.scan_was_running = false;
         self.scan_rate.reset();
-        self.apply_scan_proxy();
         self.receive_book = receive_book;
         if let Err(error) = api::set_gap_limit(WALLET_ID, self.receive_book.required_coverage().max(self.scan_gap_limit)) {
             self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
@@ -2782,7 +2803,12 @@ impl Home {
             }
         }
         self.send_operation.start();
-        self.apply_broadcast_proxy();
+        if let Err(error) = self.apply_broadcast_proxy() {
+            self.finish_send_operation(cx);
+            self.status = error.to_string().into();
+            cx.notify();
+            return;
+        }
         let node = self.broadcast_node_url();
         self.status = l10n::t("Relaying a pending send…").into();
         cx.spawn(async move |this, cx| {
@@ -2817,7 +2843,6 @@ impl Home {
                         .into();
                     }
                 }
-                this.apply_scan_proxy();
                 this.poll_core(cx);
                 cx.notify();
             });
@@ -2842,7 +2867,6 @@ impl Home {
         }
         // An explicit retry after Clear cache opts back into building a fresh resume cache.
         CACHE_PERSISTENCE_SUPPRESSED.store(false, AtomicOrdering::Relaxed);
-        self.apply_scan_proxy();
         if let Err(err) = self.start_fast_scan() {
             self.status = l10n::interpolate("Retry failed: {0}", &[format!("{}", err)]).into();
             self.scan_needs_retry = true;
@@ -2940,6 +2964,7 @@ impl Home {
         }
         let node = self.scan_node_url();
         let proxy = self.scan_proxy();
+        let require_i2p = self.network_policy == network::Policy::I2p;
         self.node_probe_running = true;
         self.node_probe_status = None;
         self.status = l10n::interpolate("Testing scan node {0}…", &[format!("{}", node)]).into();
@@ -2948,7 +2973,7 @@ impl Home {
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
-                .spawn(async move { daemon::probe(&node, proxy.as_deref()) })
+                .spawn(async move { daemon::probe(&node, proxy.as_deref(), require_i2p) })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 this.node_probe_running = false;
@@ -2989,6 +3014,7 @@ impl Home {
         }
         let node = self.broadcast_node_url();
         let proxy = self.broadcast_proxy();
+        let require_i2p = self.network_policy != network::Policy::Clearnet;
         self.broadcast_probe_running = true;
         self.broadcast_probe_status = None;
         self.status =
@@ -2998,7 +3024,7 @@ impl Home {
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
-                .spawn(async move { daemon::probe(&node, proxy.as_deref()) })
+                .spawn(async move { daemon::probe(&node, proxy.as_deref(), require_i2p) })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 this.broadcast_probe_running = false;
@@ -3095,7 +3121,6 @@ impl Home {
 
     fn finish_send_operation(&mut self, cx: &mut Context<Self>) -> bool {
         let locked = self.send_operation.finish();
-        self.apply_scan_proxy();
         if locked {
             // Preserve any pending/relayed ledger updates before clearing native state.
             // The existing signed-send journal is left intact on failure for recovery.

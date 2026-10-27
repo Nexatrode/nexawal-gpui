@@ -7,25 +7,28 @@ pub struct NodeProbe {
     pub latency_ms: u128,
 }
 
-pub fn fetch_suggested_restore_height(node_url: &str, proxy: Option<&str>) -> Result<u64, String> {
-    let probe = probe(node_url, proxy)?;
+pub fn fetch_suggested_restore_height(node_url: &str, proxy: Option<&str>, require_i2p: bool) -> Result<u64, String> {
+    let probe = probe(node_url, proxy, require_i2p)?;
     let tip = probe.target_height.max(probe.height);
     Ok(if tip > 10 { tip - 10 } else { 0 })
 }
 
-pub fn probe(node_url: &str, proxy: Option<&str>) -> Result<NodeProbe, String> {
+pub fn probe(node_url: &str, proxy: Option<&str>, require_i2p: bool) -> Result<NodeProbe, String> {
     let base = node_url.trim().trim_end_matches('/');
     if base.is_empty() {
         return Err("node URL is empty".into());
     }
+    let parsed = reqwest::Url::parse(base).map_err(|_| "Invalid daemon URL")?;
+    if require_i2p || parsed.host_str().is_some_and(|host| host.ends_with(".i2p")) {
+        crate::network::validate_i2p_configuration(base, proxy)?;
+    }
     let url = format!("{base}/get_info");
     let started = std::time::Instant::now();
-    let mut builder = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(5));
+    let mut builder = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(5))
+        .redirects(0).try_proxy_from_env(false);
     if let Some(proxy) = proxy.filter(|s| !s.trim().is_empty()) {
         let proxy_url = crate::network::proxy_url(proxy);
-        if let Ok(px) = ureq::Proxy::new(&proxy_url) {
-            builder = builder.proxy(px);
-        }
+        builder = builder.proxy(ureq::Proxy::new(&proxy_url).map_err(|_| "Invalid I2P HTTP proxy")?);
     }
     let json = builder
         .build()
