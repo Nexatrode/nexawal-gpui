@@ -772,3 +772,62 @@ fn busy_lock_hides_wallet_blocks_replacement_and_ignores_late_completion(cx: &mu
         });
     });
 }
+
+#[gpui::test]
+fn first_run_network_controls_are_keyboard_tab_stops(cx: &mut TestAppContext) {
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        paths::accept_terms().unwrap();
+        let (home, cx) = cx.add_window_view(|window, cx| {
+            let mut home = Home::new(cx);
+            home.install_setup_focus_handlers(window, cx);
+            home
+        });
+        cx.update(|window, cx| {
+            window.activate_window();
+            home.update(cx, |home, _| {
+                home.screen = Screen::Restore;
+                home.show_restore_form = true;
+                home.setup_network_policy = network::Policy::Clearnet;
+            });
+            window.draw(cx).clear(cx);
+            home.update(cx, |home, cx| {
+                window.focus(&home.setup_policy_clearnet_focus, cx);
+                window.focus_next(cx);
+                assert!(home.setup_policy_i2p_focus.is_focused(window));
+            });
+        });
+    });
+}
+
+#[gpui::test]
+fn first_run_focus_scrolls_to_controls_below_the_viewport(cx: &mut TestAppContext) {
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        paths::accept_terms().unwrap();
+        let (home, cx) = cx.add_window_view(|window, cx| {
+            let mut home = Home::new(cx);
+            home.install_setup_focus_handlers(window, cx);
+            home
+        });
+        cx.update(|window, cx| {
+            window.activate_window();
+            home.update(cx, |home, _| {
+                home.screen = Screen::Restore;
+                home.show_restore_form = true;
+            });
+            window.draw(cx).clear(cx);
+            home.update(cx, |home, cx| {
+                window.focus(&home.setup_scroll_targets["restore-settings"].0, cx);
+            });
+            window.draw(cx).clear(cx);
+        });
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            let callbacks = window.simulate_next_frame(cx);
+            home.read_with(cx, |home, _| {
+                assert!(home.main_scroll_handle.offset().y < px(0.), "callbacks: {callbacks}, bounds: {:?}, offset: {:?}", home.main_scroll_handle.bounds(), home.main_scroll_handle.offset());
+            });
+        });
+    });
+}

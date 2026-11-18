@@ -1,4 +1,5 @@
 use std::fs;
+use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering as AtomicOrdering};
 use std::sync::{Arc, Mutex};
@@ -10,7 +11,7 @@ use gpui::{
     App, Bounds, ClickEvent, ClipboardEntry, Context, CursorStyle, FocusHandle, Focusable,
     ImageSource, KeyBinding, KeyDownEvent, Menu, MenuItem, MouseButton, MouseDownEvent,
     MouseMoveEvent, MouseUpEvent, ObjectFit, OsAction, PathPromptOptions, RenderImage, ResizeEdge,
-    ScrollHandle, SharedString, TitlebarOptions, Window, WindowBounds, WindowOptions, actions, div,
+    ScrollAnchor, ScrollHandle, SharedString, TitlebarOptions, Window, WindowBounds, WindowOptions, actions, div,
     img, point, prelude::*, px, relative, rgb, size,
 };
 use gpui_platform::application;
@@ -381,6 +382,7 @@ struct Home {
     edit_pending_click: Option<(Field, gpui::Point<gpui::Pixels>, bool)>,
     edit_dragging: bool,
     main_scroll_handle: ScrollHandle,
+    setup_scroll_targets: HashMap<&'static str, (FocusHandle, ScrollAnchor)>,
     status: SharedString,
     opened: bool,
     native_close_pending: bool,
@@ -574,6 +576,7 @@ impl Home {
             edit_pending_click: None,
             edit_dragging: false,
             main_scroll_handle: ScrollHandle::new(),
+            setup_scroll_targets: HashMap::new(),
             status: if should_auto_unlock {
                 l10n::t("Unlocking Wallet...").into()
             } else if has_stored {
@@ -1881,6 +1884,44 @@ impl Home {
             self.start_poll(cx);
         }
         cx.notify();
+    }
+
+    fn install_setup_focus_handlers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let existing = [
+            ("setup-policy-clearnet", self.setup_policy_clearnet_focus.clone()),
+            ("setup-policy-i2p", self.setup_policy_i2p_focus.clone()),
+            ("setup-policy-hybrid", self.setup_policy_hybrid_focus.clone()),
+            ("setup-apply-network", self.setup_apply_network_focus.clone()),
+            ("setup-node-field", self.node_focus.clone()),
+            ("setup-i2p-node-field", self.i2p_rpc_focus.clone()),
+            ("setup-i2p-proxy-field", self.i2p_proxy_focus.clone()),
+            ("seed-field", self.seed_focus.clone()),
+            ("height-field", self.height_focus.clone()),
+        ];
+        let mut targets = existing.into_iter().collect::<Vec<_>>();
+        targets.extend(["wrote-seed", "paste-seed", "create-seed", "copy-seed", "open-wallet", "restore-settings"]
+            .into_iter().map(|id| (id, cx.focus_handle())));
+        for (id, handle) in targets {
+            let anchor = ScrollAnchor::for_handle(self.main_scroll_handle.clone());
+            let target = anchor.clone();
+            cx.on_focus(&handle, window, move |home: &mut Home, window, cx| {
+                if home.screen == Screen::Restore {
+                    target.scroll_to(window, cx);
+                    cx.notify();
+                }
+            }).detach();
+            self.setup_scroll_targets.insert(id, (handle, anchor));
+        }
+        for field in [Field::Node, Field::I2pNode, Field::I2pProxy, Field::Seed, Field::Height] {
+            let handle = self.focus_handle_for(field).clone();
+            cx.on_focus(&handle, window, move |home: &mut Home, window, cx| {
+                home.focus_field(field, window, cx);
+            }).detach();
+        }
+    }
+
+    fn setup_scroll_anchor(&self, id: &'static str) -> Option<ScrollAnchor> {
+        self.setup_scroll_targets.get(id).map(|(_, anchor)| anchor.clone())
     }
 
     fn focus_field(&mut self, field: Field, window: &mut Window, cx: &mut Context<Self>) {
@@ -4613,6 +4654,9 @@ impl Render for Home {
             .flex_col()
             .p_6()
             .gap_4()
+            .id("nexawal-root")
+            .role(gpui::Role::Window)
+            .tab_group()
             .key_context("nexawal")
             .track_focus(&self.ui_focus)
             .capture_any_mouse_down(
@@ -4644,8 +4688,13 @@ impl Render for Home {
             .on_action(cx.listener(Self::show_send))
             .on_action(cx.listener(Self::show_wallet))
             .on_action(cx.listener(Self::show_settings))
-            .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
                 this.session_policy.touch(Instant::now());
+                if event.keystroke.key == "tab" && this.screen == Screen::Restore {
+                    if event.keystroke.modifiers.shift { window.focus_prev(cx); } else { window.focus_next(cx); }
+                    cx.stop_propagation();
+                    return;
+                }
                 if event.keystroke.key == "escape" && this.history_pages.selected.is_some() {
                     this.history_pages.selected = None;
                     cx.notify();
@@ -5021,10 +5070,37 @@ fn field_input_for(
     let focused = home.focus_handle_for(field).is_focused(window)
         && challenge_slot.is_none_or(|slot| home.challenge_slot == slot);
     let entity = cx.entity();
+    let placeholder: SharedString = placeholder.into();
+    let accessible_label = match field {
+        Field::Node => l10n::t("Clearnet node URL"),
+        Field::I2pNode => l10n::t("I2P node (host:port)"),
+        Field::I2pProxy => l10n::t("I2P HTTP proxy (host:port)"),
+        Field::Seed => l10n::t("Seed phrase"),
+        Field::Height => l10n::t("Restore height (0 = scan from genesis)"),
+        _ => placeholder.clone(),
+    };
     div()
         .id(id)
+        .anchor_scroll(home.setup_scroll_anchor(id))
+        .role(if multiline { gpui::Role::MultilineTextInput } else { gpui::Role::TextInput })
+        .aria_label(accessible_label)
+        .aria_value(home.field_text_at(field, challenge_slot))
+        .aria_placeholder(placeholder.clone())
+        .on_a11y_action(gpui::AccessibleAction::SetValue, {
+            let entity = entity.clone();
+            move |data, window, cx| {
+                let Some(gpui::accesskit::ActionData::Value(text)) = data else { return; };
+                entity.update(cx, |home, cx| {
+                    if let Some(slot) = challenge_slot { home.challenge_slot = slot; }
+                    home.set_field_text_raw(field, Home::sanitize_edit_text(field, text));
+                    home.reset_edit_cursor(field);
+                    home.focus_field(field, window, cx);
+                });
+            }
+        })
+        .tab_index(0)
         .key_context("Field")
-        .track_focus(home.focus_handle_for(field))
+        .track_focus(&home.focus_handle_for(field).clone().tab_stop(true))
         .cursor(CursorStyle::IBeam)
         .when(multiline, |field| field.min_h(px(88.)))
         .when(compact, |field| field.h(px(36.)))
@@ -5222,7 +5298,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
         })
         .when(show_restore_form, |card| {
             card
-                .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("How to connect")))
+                .child(div().id("setup-network-heading").role(gpui::Role::Heading).aria_label(l10n::t("How to connect")).text_xs().text_color(rgb(theme_muted())).child(l10n::t("How to connect")))
                 .child(focusable_setup_action_button(
                     "setup-policy-clearnet",
                     if home.setup_network_policy == network::Policy::Clearnet {
@@ -5236,6 +5312,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         l10n::t("Clearnet only").to_string()
                     },
                     &home.setup_policy_clearnet_focus,
+                    home.setup_scroll_anchor("setup-policy-clearnet"),
                     home.setup_policy_clearnet_focus.is_focused(window),
                     false,
                     cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -5255,6 +5332,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         l10n::t("I2P only").to_string()
                     },
                     &home.setup_policy_i2p_focus,
+                    home.setup_scroll_anchor("setup-policy-i2p"),
                     home.setup_policy_i2p_focus.is_focused(window),
                     false,
                     cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -5277,6 +5355,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         l10n::t("Scan clearnet, broadcast I2P").to_string()
                     },
                     &home.setup_policy_hybrid_focus,
+                    home.setup_scroll_anchor("setup-policy-hybrid"),
                     home.setup_policy_hybrid_focus.is_focused(window),
                     false,
                     cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -5285,6 +5364,9 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                 ))
                 .child(
                     div()
+                        .id("setup-network-help")
+                        .role(gpui::Role::Label)
+                        .aria_label(l10n::t("Clearnet only uses a clearnet node. I2P only uses an I2P node and proxy. Both scans on clearnet and broadcasts over I2P."))
                         .text_xs()
                         .text_color(rgb(theme_muted()))
                         .child(l10n::t("Clearnet only uses a clearnet node. I2P only uses an I2P node and proxy. Both scans on clearnet and broadcasts over I2P.")),
@@ -5304,7 +5386,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                                 false,
                             ),
                         )
-                        .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("Type the full URL, including http:// or https://. Default: https://rpc.nexawal.com")))
+                        .child(div().id("setup-node-help").role(gpui::Role::Label).aria_label(l10n::t("Type the full URL, including http:// or https://. Default: https://rpc.nexawal.com")).text_xs().text_color(rgb(theme_muted())).child(l10n::t("Type the full URL, including http:// or https://. Default: https://rpc.nexawal.com")))
                 })
                 .when(home.setup_network_policy != network::Policy::Clearnet, |card| {
                     card.child(
@@ -5336,13 +5418,14 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                             false,
                             false,
                         ))
-                        .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("I2P requires an HTTP proxy reachable from this device. 127.0.0.1 refers to this device.")))
+                        .child(div().id("setup-proxy-help").role(gpui::Role::Label).aria_label(l10n::t("I2P requires an HTTP proxy reachable from this device. 127.0.0.1 refers to this device.")).text_xs().text_color(rgb(theme_muted())).child(l10n::t("I2P requires an HTTP proxy reachable from this device. 127.0.0.1 refers to this device.")))
                 })
                 .child(focusable_setup_action_button(
                     "setup-apply-network",
                     l10n::t("Use this node"),
                     l10n::t("Use this node"),
                     &home.setup_apply_network_focus,
+                    home.setup_scroll_anchor("setup-apply-network"),
                     home.setup_apply_network_focus.is_focused(window),
                     true,
                     cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -5373,6 +5456,9 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                 .when(home.created_seed, |card| {
                     card.child(
                         div()
+                            .id("setup-seed-backup-help")
+                            .role(gpui::Role::Label)
+                            .aria_label(l10n::t("Write these words down in order and store them somewhere safe offline. You'll need them to restore the wallet if this phone is lost. NexaWal also keeps an encrypted copy on device for unlock — treat the backup like cash."))
                             .text_xs()
                             .text_color(rgb(theme_muted()))
                             .child(l10n::t(
@@ -5382,6 +5468,13 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                     .child(
                         div()
                             .id("wrote-seed")
+                            .track_focus(&home.setup_scroll_targets.get("wrote-seed").map(|(handle, _)| handle).unwrap_or(&home.ui_focus).clone().tab_stop(true))
+                            .anchor_scroll(home.setup_scroll_anchor("wrote-seed"))
+                            .role(gpui::Role::CheckBox)
+                            .aria_label(l10n::t("I wrote down my recovery seed"))
+                            .aria_toggled(if home.wrote_seed_down { gpui::Toggled::True } else { gpui::Toggled::False })
+                            .tab_index(0)
+                            .focus_visible(|style| style.border_1().border_color(rgb(theme_text())))
                             .cursor(CursorStyle::PointingHand)
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.wrote_seed_down = !this.wrote_seed_down;
@@ -5423,25 +5516,25 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         .flex()
                         .flex_row()
                         .gap_2()
-                        .child(action_button(
+                        .child(setup_action_button(home,
                             "paste-seed",
                             l10n::t("Paste clipboard into seed"),
                             cx.listener(|this, _: &ClickEvent, _, cx| this.paste_seed_button(cx)),
                         ))
-                        .child(action_button(
+                        .child(setup_action_button(home,
                             "create-seed",
                             l10n::t("Create seed"),
                             cx.listener(|this, _: &ClickEvent, _, cx| this.create_seed(cx)),
                         ))
                         .when(home.created_seed, |row| {
-                            row.child(action_button(
+                            row.child(setup_action_button(home,
                                 "copy-seed",
                                 l10n::t("Copy seed"),
                                 cx.listener(|this, _: &ClickEvent, _, cx| this.copy_seed(cx)),
                             ))
                         })
                         .when(home.seed_backup_passed(), |row| {
-                            row.child(action_button(
+                            row.child(setup_action_button(home,
                                 "open-wallet",
                                 l10n::t("Open & sync"),
                                 cx.listener(|this, _: &ClickEvent, _, cx| this.open_from_form(cx)),
@@ -5459,7 +5552,7 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                                     .child(l10n::t("Open & sync")),
                             )
                         })
-                        .child(action_button(
+                        .child(setup_action_button(home,
                             "restore-settings",
                             l10n::t("Settings"),
                             cx.listener(|this: &mut Home, _: &ClickEvent, _, cx| this.go_settings(cx)),
@@ -6817,6 +6910,9 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
 
 fn status_line(home: &Home) -> impl IntoElement {
     div()
+        .id("wallet-status")
+        .role(gpui::Role::Status)
+        .aria_label(home.status.clone())
         .text_sm()
         .text_color(rgb(theme_muted()))
         .child(home.status.clone())
@@ -7437,6 +7533,9 @@ fn clickable_settings_row(
     };
     div()
         .id(id)
+        .role(gpui::Role::Button)
+        .tab_index(0)
+        .focus_visible(|style| style.border_color(rgb(theme_text())))
         .w_full()
         .px_2()
         .py_2()
@@ -7463,6 +7562,19 @@ fn action_button(
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
     clickable_settings_row(id, label, true, false, listener)
+}
+
+fn setup_action_button(
+    home: &Home,
+    id: &'static str,
+    label: impl Into<SharedString>,
+    listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    let label = label.into();
+    focusable_setup_action_button(
+        id, label.clone(), label, home.setup_scroll_targets.get(id).map(|(handle, _)| handle).unwrap_or(&home.ui_focus),
+        home.setup_scroll_anchor(id), false, true, listener,
+    )
 }
 
 fn page_title(label: impl Into<SharedString>) -> impl IntoElement {
@@ -7507,6 +7619,7 @@ fn focusable_setup_action_button(
     label: impl Into<SharedString>,
     accessible_label: impl Into<SharedString>,
     focus_handle: &FocusHandle,
+    scroll_anchor: Option<ScrollAnchor>,
     focused: bool,
     primary: bool,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
@@ -7519,7 +7632,11 @@ fn focusable_setup_action_button(
     };
     div()
         .id(id)
-        .track_focus(focus_handle)
+        .anchor_scroll(scroll_anchor)
+        .track_focus(&focus_handle.clone().tab_stop(true))
+        .role(gpui::Role::Button)
+        .tab_index(0)
+        .focus_visible(|style| style.border_color(rgb(theme_text())))
         .w_full()
         .px_2()
         .py_2()
@@ -8008,6 +8125,7 @@ fn main() {
                     })
                     .detach();
                     let mut home = Home::new(cx);
+                    home.install_setup_focus_handlers(window, cx);
                     home.start_security_watch(cx);
                     if !should_unlock {
                         home.seed_focus.focus(window, cx);
