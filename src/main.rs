@@ -470,6 +470,10 @@ struct Home {
     fiat_last_attempt_ms: u64,
     fiat_last_attempt_currency: String,
     fiat_snapshots: fiat_snapshot::Store,
+    settings_network_policy: network::Policy,
+    settings_node_url: String,
+    settings_i2p_rpc: String,
+    settings_i2p_proxy: String,
     network_policy: network::Policy,
     i2p_rpc: String,
     i2p_proxy: String,
@@ -500,13 +504,14 @@ impl Home {
             let _ = paths::save_device_auth(true);
         }
 
+        let saved_network = paths::load_network_settings().unwrap_or_else(|_| paths::NetworkSettings {
+            node_url: String::new(), policy: network::Policy::I2p, i2p_rpc: String::new(), i2p_proxy: String::new(),
+        });
+        let node_url = std::env::var("NEXAWAL_NODE_URL").ok().map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty()).unwrap_or_else(|| saved_network.node_url.clone());
         Self {
             core_version: api::version().into(),
-            node_url: std::env::var("NEXAWAL_NODE_URL")
-                .ok()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .unwrap_or_else(paths::load_node_url),
+            node_url: node_url.clone(),
             seed: initial_seed.clone(),
             restore_height_text: {
                 let from_env = std::env::var("NEXAWAL_RESTORE_HEIGHT")
@@ -652,9 +657,13 @@ impl Home {
             fiat_last_attempt_ms: 0,
             fiat_last_attempt_currency: String::new(),
             fiat_snapshots: fiat_snapshot::Store::load(),
-            network_policy: paths::load_network_policy(),
-            i2p_rpc: paths::load_i2p_rpc(),
-            i2p_proxy: paths::load_i2p_proxy(),
+            settings_network_policy: saved_network.policy,
+            settings_node_url: node_url,
+            settings_i2p_rpc: saved_network.i2p_rpc.clone(),
+            settings_i2p_proxy: saved_network.i2p_proxy.clone(),
+            network_policy: saved_network.policy,
+            i2p_rpc: saved_network.i2p_rpc,
+            i2p_proxy: saved_network.i2p_proxy,
         }
     }
 
@@ -1331,30 +1340,52 @@ impl Home {
     }
 
     fn cycle_network_policy(&mut self, cx: &mut Context<Self>) {
-        self.network_policy = self.network_policy.next();
-        let _ = paths::save_network_policy(self.network_policy);
+        self.settings_network_policy = self.settings_network_policy.next();
         self.status = l10n::interpolate(
             "Connection mode: {0}. Choose Use this node to apply it.",
-            &[format!("{}", self.network_policy.label())],
+            &[format!("{}", self.settings_network_policy.label())],
         )
         .into();
         cx.notify();
     }
 
     fn apply_network(&mut self, cx: &mut Context<Self>) {
-        if self.network_policy != network::Policy::Clearnet {
-            if let Err(error) = network::validate_i2p_configuration(&self.i2p_rpc, Some(&self.i2p_proxy)) {
-                self.status = error.into(); cx.notify(); return;
+        let i2p_rpc = self.settings_i2p_rpc.trim().to_string();
+        if self.settings_network_policy != network::Policy::I2p
+            && network::explicit_node_url(&self.settings_node_url).is_none()
+        {
+            self.status = l10n::t("Start the node URL with http:// or https://").into();
+            cx.notify();
+            return;
+        }
+        if self.settings_network_policy != network::Policy::Clearnet {
+            if let Err(error) =
+                network::validate_i2p_configuration(&i2p_rpc, Some(&self.settings_i2p_proxy))
+            {
+                self.status = error.into();
+                cx.notify();
+                return;
             }
         }
-        let _ = paths::save_node_url(&self.node_url);
-        let _ = paths::save_network_policy(self.network_policy);
-        let _ = paths::save_i2p_rpc(&self.i2p_rpc);
-        let _ = paths::save_i2p_proxy(&self.i2p_proxy);
+        let persisted = paths::save_network_settings(&paths::NetworkSettings {
+            node_url: self.settings_node_url.trim().to_string(),
+            policy: self.settings_network_policy,
+            i2p_rpc: i2p_rpc.clone(),
+            i2p_proxy: self.settings_i2p_proxy.trim().to_string(),
+        });
+        if let Err(error) = persisted {
+            self.status = l10n::interpolate("Failed to save network settings: {0}", &[error.to_string()]).into();
+            cx.notify();
+            return;
+        }
+        self.node_url = self.settings_node_url.clone();
+        self.i2p_rpc = i2p_rpc;
+        self.i2p_proxy = self.settings_i2p_proxy.clone();
+        self.network_policy = self.settings_network_policy;
         self.status = l10n::interpolate(
             "{0} · scan {1} · broadcast {2}",
             &[
-                format!("{}", self.network_policy.label()),
+                format!("{}", self.settings_network_policy.label()),
                 format!("{}", self.scan_node_url()),
                 format!("{}", self.broadcast_node_url()),
             ],
@@ -1674,7 +1705,7 @@ impl Home {
             Field::RescanHeight => self.rescan_height_text.clone(),
             Field::Dest => self.send_dest.clone(),
             Field::Amount => self.send_amount.clone(),
-            Field::Node => self.node_url.clone(),
+            Field::Node => if self.screen == Screen::Settings { self.settings_node_url.clone() } else { self.node_url.clone() },
             Field::RecvAmount => self.recv_amount.clone(),
             Field::RecvDesc => self.recv_desc.clone(),
             Field::RecvLabel => self.recv_label.clone(),
@@ -1684,8 +1715,8 @@ impl Home {
             Field::Challenge => {
                 self.challenge_answers[challenge_slot.unwrap_or(self.challenge_slot).min(2)].clone()
             }
-            Field::I2pNode => self.i2p_rpc.clone(),
-            Field::I2pProxy => self.i2p_proxy.clone(),
+            Field::I2pNode => self.settings_i2p_rpc.clone(),
+            Field::I2pProxy => self.settings_i2p_proxy.clone(),
         }
     }
 
@@ -1817,7 +1848,7 @@ impl Home {
                 self.clear_send_preview();
             }
             Field::Node => {
-                self.node_url = text;
+                if self.screen == Screen::Settings { self.settings_node_url = text; } else { self.node_url = text; }
             }
             Field::RecvAmount => self.recv_amount = text,
             Field::RecvDesc => self.recv_desc = text,
@@ -1836,12 +1867,10 @@ impl Home {
                 self.challenge_answers[slot] = text;
             }
             Field::I2pNode => {
-                self.i2p_rpc = text;
-                let _ = paths::save_i2p_rpc(&self.i2p_rpc);
+                self.settings_i2p_rpc = text;
             }
             Field::I2pProxy => {
-                self.i2p_proxy = text;
-                let _ = paths::save_i2p_proxy(&self.i2p_proxy);
+                self.settings_i2p_proxy = text;
             }
         }
     }
@@ -2062,7 +2091,7 @@ impl Home {
                 Field::RescanHeight => self.rescan_height_text.clone(),
                 Field::Dest => self.send_dest.clone(),
                 Field::Amount => self.send_amount.clone(),
-                Field::Node => self.node_url.clone(),
+                Field::Node => if self.screen == Screen::Settings { self.settings_node_url.clone() } else { self.node_url.clone() },
                 Field::RecvAmount => self.recv_amount.clone(),
                 Field::RecvDesc => self.recv_desc.clone(),
                 Field::RecvLabel => self.recv_label.clone(),
@@ -2070,8 +2099,8 @@ impl Home {
                 Field::HistoryFrom => self.transfer_from.clone(),
                 Field::HistoryTo => self.transfer_to.clone(),
                 Field::Challenge => self.challenge_answers[self.challenge_slot.min(2)].clone(),
-                Field::I2pNode => self.i2p_rpc.clone(),
-                Field::I2pProxy => self.i2p_proxy.clone(),
+                Field::I2pNode => self.settings_i2p_rpc.clone(),
+                Field::I2pProxy => self.settings_i2p_proxy.clone(),
             }
         };
         if text.is_empty()
@@ -5769,12 +5798,12 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 .gap_3()
                 .child(wide_secondary_action_button(
                     "net-policy",
-                    home.network_policy.label(),
+                    home.settings_network_policy.label(),
                     cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.cycle_network_policy(cx)
                     }),
                 ))
-                .when(home.network_policy != network::Policy::I2p, |content| {
+                .when(home.settings_network_policy != network::Policy::I2p, |content| {
                     content
                         .child(
                             div()
@@ -5793,7 +5822,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                             false,
                         ))
                 })
-                .when(home.network_policy != network::Policy::Clearnet, |content| {
+                .when(home.settings_network_policy != network::Policy::Clearnet, |content| {
                     content
                         .child(
                             div()

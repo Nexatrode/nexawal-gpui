@@ -350,6 +350,51 @@ pub fn accept_terms() -> std::io::Result<()> {
     write_bytes(terms_path(), CURRENT_TERMS_VERSION.to_string().as_bytes())
 }
 
+#[derive(Clone, Debug)]
+pub struct NetworkSettings {
+    pub node_url: String,
+    pub policy: crate::network::Policy,
+    pub i2p_rpc: String,
+    pub i2p_proxy: String,
+}
+
+pub fn load_network_settings() -> std::io::Result<NetworkSettings> {
+    let path = data_dir().join("network_settings.json");
+    let raw = match fs::read_to_string(path) {
+        Ok(raw) => raw,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(NetworkSettings {
+            node_url: load_node_url(), policy: load_network_policy(),
+            i2p_rpc: load_i2p_rpc(), i2p_proxy: load_i2p_proxy(),
+        }),
+        Err(error) => return Err(error),
+    };
+    let value: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+    let field = |key: &str| value.get(key).and_then(|v| v.as_str())
+        .map(str::to_owned).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid network settings"));
+    let policy = field("policy")?;
+    if !["clearnet", "i2p", "hybrid"].contains(&policy.as_str()) {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid network policy"));
+    }
+    Ok(NetworkSettings { node_url: field("node_url")?, policy: crate::network::Policy::from_raw(&policy),
+        i2p_rpc: field("i2p_rpc")?, i2p_proxy: field("i2p_proxy")? })
+}
+
+pub fn save_network_settings(settings: &NetworkSettings) -> std::io::Result<()> {
+    let value = serde_json::json!({"node_url": settings.node_url, "policy": settings.policy.as_str(),
+        "i2p_rpc": settings.i2p_rpc, "i2p_proxy": settings.i2p_proxy});
+    use std::io::Write;
+    let directory = data_dir();
+    fs::create_dir_all(&directory)?;
+    let mut temporary = tempfile::Builder::new().prefix(".nexawal-network-").tempfile_in(&directory)?;
+    temporary.write_all(value.to_string().as_bytes())?;
+    temporary.as_file_mut().sync_all()?;
+    temporary.persist(directory.join("network_settings.json")).map_err(|error| error.error)?;
+    #[cfg(unix)]
+    if let Ok(parent) = fs::File::open(&directory) { let _ = parent.sync_all(); }
+    Ok(())
+}
+
 pub fn load_node_url() -> String {
     fs::read_to_string(node_path())
         .ok()
@@ -631,6 +676,29 @@ fn write_bytes_with(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "ui-tests")]
+    #[test]
+    fn network_settings_migrate_and_replace_as_one_file() {
+        use super::*;
+        let directory = tempfile::tempdir().unwrap();
+        with_test_data_dir(directory.path().to_owned(), || {
+            save_node_url("https://old.example").unwrap();
+            save_network_policy(crate::network::Policy::Clearnet).unwrap();
+            let old = load_network_settings().unwrap();
+            assert_eq!(old.node_url, "https://old.example");
+            let updated = NetworkSettings { node_url: "https://new.example".into(),
+                policy: crate::network::Policy::I2p, i2p_rpc: "node.b32.i2p:18081".into(),
+                i2p_proxy: "127.0.0.1:4444".into() };
+            save_network_settings(&updated).unwrap();
+            let loaded = load_network_settings().unwrap();
+            assert_eq!(loaded.node_url, updated.node_url);
+            assert_eq!(loaded.policy, updated.policy);
+            assert_eq!(loaded.i2p_rpc, updated.i2p_rpc);
+            assert_eq!(loaded.i2p_proxy, updated.i2p_proxy);
+            std::fs::write(data_dir().join("network_settings.json"), b"invalid").unwrap();
+            assert!(load_network_settings().is_err());
+        });
+    }
     #[test]
     fn old_builtin_rpc_moves_but_custom_nodes_are_unchanged() {
         for old in [
