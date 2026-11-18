@@ -433,7 +433,13 @@ pub fn load_node_url() -> String {
 fn canonical_node_url(raw: &str) -> String {
     let trimmed = raw.trim();
     match trimmed.trim_end_matches('/').to_ascii_lowercase().as_str() {
-        "rpc.nexawal.com"
+        "rpc.nexatrode.com"
+        | "http://rpc.nexatrode.com"
+        | "http://rpc.nexatrode.com:80"
+        | "http://rpc.nexatrode.com:443"
+        | "https://rpc.nexatrode.com"
+        | "https://rpc.nexatrode.com:443"
+        | "rpc.nexawal.com"
         | "http://rpc.nexawal.com"
         | "http://rpc.nexawal.com:80"
         | "http://rpc.nexawal.com:443"
@@ -749,6 +755,29 @@ fn write_bytes_with(
 mod tests {
     #[cfg(feature = "ui-tests")]
     #[test]
+    fn network_settings_migrate_and_replace_as_one_file() {
+        use super::*;
+        let directory = tempfile::tempdir().unwrap();
+        with_test_data_dir(directory.path().to_owned(), || {
+            save_node_url("https://old.example").unwrap();
+            save_network_policy(crate::network::Policy::Clearnet).unwrap();
+            let old = load_network_settings().unwrap();
+            assert_eq!(old.node_url, "https://old.example");
+            let updated = NetworkSettings { node_url: "https://new.example".into(),
+                policy: crate::network::Policy::I2p, i2p_rpc: "node.b32.i2p:18081".into(),
+                i2p_proxy: "127.0.0.1:4444".into() };
+            save_network_settings(&updated).unwrap();
+            let loaded = load_network_settings().unwrap();
+            assert_eq!(loaded.node_url, updated.node_url);
+            assert_eq!(loaded.policy, updated.policy);
+            assert_eq!(loaded.i2p_rpc, updated.i2p_rpc);
+            assert_eq!(loaded.i2p_proxy, updated.i2p_proxy);
+            std::fs::write(data_dir().join("network_settings.json"), b"invalid").unwrap();
+            assert!(load_network_settings().is_err());
+        });
+    }
+    #[cfg(feature = "ui-tests")]
+    #[test]
     fn full_reset_removes_only_the_configured_app_data_directory() {
         use super::{data_dir, reset_app_data, with_test_data_dir};
         let directory = tempfile::tempdir().unwrap();
@@ -765,6 +794,8 @@ mod tests {
     #[test]
     fn builtin_rpc_variants_are_canonical_but_custom_nodes_are_unchanged() {
         for variant in [
+            "https://rpc.nexatrode.com",
+            " HTTP://RPC.NEXATRODE.COM/ ",
             "https://rpc.nexawal.com",
             " HTTPS://RPC.NEXAWAL.COM/ ",
             "https://rpc.nexawal.com:443/",

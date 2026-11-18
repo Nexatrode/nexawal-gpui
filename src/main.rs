@@ -1471,6 +1471,13 @@ impl Home {
     fn apply_network(&mut self, cx: &mut Context<Self>) {
         let i2p_rpc = network::effective_i2p_rpc_address(&self.settings_i2p_rpc);
         if self.settings_network_policy != network::Policy::I2p
+            && network::explicit_node_url(&self.settings_node_url).is_none()
+        {
+            self.status = l10n::t("Start the node URL with http:// or https://").into();
+            cx.notify();
+            return;
+        }
+        if self.settings_network_policy != network::Policy::I2p
             && network::is_i2p_hostname_url(&self.settings_node_url)
         {
             self.status =
@@ -1590,6 +1597,10 @@ impl Home {
             self.setup_i2p_rpc = i2p_rpc;
             self.setup_i2p_proxy = i2p_proxy;
         }
+        self.settings_network_policy = self.network_policy;
+        self.settings_node_url = self.node_url.clone();
+        self.settings_i2p_rpc = self.i2p_rpc.clone();
+        self.settings_i2p_proxy = self.i2p_proxy.clone();
         let applied_network_key = self.setup_network_key();
         if self.setup_height_network_key.as_deref() != Some(applied_network_key.as_str()) {
             self.invalidate_setup_height();

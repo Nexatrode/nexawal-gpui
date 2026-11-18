@@ -1,6 +1,6 @@
 [package]
 name = "nexawal-gpui"
-version = "1.0.6"
+version = "0.1.0"
 edition = "2024"
 license = "MIT"
 description = "nexawal desktop app for macOS, Windows, and Linux (GPUI)"
