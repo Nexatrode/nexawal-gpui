@@ -17,17 +17,25 @@ pub struct Book {
 
 impl Book {
     /// Publish edits only after the atomic file replacement succeeds.
-    pub fn update_and_save<T>(&mut self, update: impl FnOnce(&mut Self) -> T) -> std::io::Result<T> {
+    pub fn update_and_save<T>(
+        &mut self,
+        update: impl FnOnce(&mut Self) -> T,
+    ) -> std::io::Result<T> {
         // Do not overwrite an unreadable, corrupt, or externally changed book with the
         // in-memory copy. In particular, absence is not interchangeable with corruption.
         if load()? != *self {
-            return Err(std::io::Error::other("Receive address book changed; reopen the wallet before editing it."));
+            return Err(std::io::Error::other(
+                "Receive address book changed; reopen the wallet before editing it.",
+            ));
         }
         self.update_with_writer(update, save)
     }
 
-    fn update_with_writer<T>(&mut self, update: impl FnOnce(&mut Self) -> T,
-        write: impl FnOnce(&Self) -> std::io::Result<()>) -> std::io::Result<T> {
+    fn update_with_writer<T>(
+        &mut self,
+        update: impl FnOnce(&mut Self) -> T,
+        write: impl FnOnce(&Self) -> std::io::Result<()>,
+    ) -> std::io::Result<T> {
         let mut candidate = self.clone();
         let result = update(&mut candidate);
         write(&candidate)?;
@@ -36,8 +44,13 @@ impl Book {
     }
 
     pub fn required_coverage(&self) -> u32 {
-        self.entries.iter().map(|entry| entry.index).max().unwrap_or(0)
-            .max(self.next_index.saturating_sub(1)).max(50)
+        self.entries
+            .iter()
+            .map(|entry| entry.index)
+            .max()
+            .unwrap_or(0)
+            .max(self.next_index.saturating_sub(1))
+            .max(50)
     }
 
     pub fn primary() -> Self {
@@ -146,14 +159,18 @@ pub fn load() -> std::io::Result<Book> {
 
 fn load_from(path: &std::path::Path) -> std::io::Result<Book> {
     match std::fs::read_to_string(path) {
-        Ok(raw) => parse(&raw).ok_or_else(|| std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "Receive address book is invalid; restore its backup before reopening the wallet.",
-        )),
+        Ok(raw) => parse(&raw).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Receive address book is invalid; restore its backup before reopening the wallet.",
+            )
+        }),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             // A dangling symlink is an existing damaged book, not a fresh installation.
             match std::fs::symlink_metadata(path) {
-                Err(missing) if missing.kind() == std::io::ErrorKind::NotFound => Ok(Book::primary()),
+                Err(missing) if missing.kind() == std::io::ErrorKind::NotFound => {
+                    Ok(Book::primary())
+                }
                 _ => Err(error),
             }
         }
@@ -197,11 +214,16 @@ fn parse(raw: &str) -> Option<Book> {
     entries.sort_by_key(|e| e.index);
     if !entries.iter().any(|e| e.index == 0)
         || !entries.iter().any(|e| e.index == selected)
-        || entries.windows(2).any(|pair| pair[0].index == pair[1].index) {
+        || entries
+            .windows(2)
+            .any(|pair| pair[0].index == pair[1].index)
+    {
         return None;
     }
     let max_index = entries.iter().map(|e| e.index).max().unwrap_or(0);
-    if next_index < max_index.checked_add(1)? || next_index == u32::MAX { return None; }
+    if next_index < max_index.checked_add(1)? || next_index == u32::MAX {
+        return None;
+    }
     Some(Book {
         next_index,
         selected,
@@ -228,11 +250,21 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("book");
         assert_eq!(load_from(&path).unwrap(), Book::primary());
-        for bytes in [b"".as_slice(), b"corrupt", b"2\n1\n0|Primary\nnot-an-index|Shop\n",
-            b"4294967295\n0\n4294967295|Overflow\n", b"2\n0\n", b"2\n1\n0|Primary\n",
-            b"2\n0\n0|Primary\n0|Duplicate\n", b"1\n1\n0|Primary\n1|Shop\n"] {
+        for bytes in [
+            b"".as_slice(),
+            b"corrupt",
+            b"2\n1\n0|Primary\nnot-an-index|Shop\n",
+            b"4294967295\n0\n4294967295|Overflow\n",
+            b"2\n0\n",
+            b"2\n1\n0|Primary\n",
+            b"2\n0\n0|Primary\n0|Duplicate\n",
+            b"1\n1\n0|Primary\n1|Shop\n",
+        ] {
             std::fs::write(&path, bytes).unwrap();
-            assert_eq!(load_from(&path).unwrap_err().kind(), std::io::ErrorKind::InvalidData);
+            assert_eq!(
+                load_from(&path).unwrap_err().kind(),
+                std::io::ErrorKind::InvalidData
+            );
             assert_eq!(std::fs::read(&path).unwrap(), bytes);
         }
         // A directory in place of the file is a read error, not a new book.
@@ -246,7 +278,12 @@ mod tests {
         let path = directory.path().join("book");
         std::os::unix::fs::symlink(directory.path().join("missing-target"), &path).unwrap();
         assert!(load_from(&path).is_err());
-        assert!(std::fs::symlink_metadata(&path).unwrap().file_type().is_symlink());
+        assert!(
+            std::fs::symlink_metadata(&path)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
     }
 
     #[test]
@@ -254,15 +291,22 @@ mod tests {
         let mut book = Book::primary();
         book.next_index = 51;
         let original = book.clone();
-        let result = book.update_with_writer(|b| b.allocate_new("Shop"), |_| {
-            Err(std::io::Error::other("disk full"))
-        });
+        let result = book.update_with_writer(
+            |b| b.allocate_new("Shop"),
+            |_| Err(std::io::Error::other("disk full")),
+        );
         assert!(result.is_err());
         assert_eq!(book, original);
         let mut persisted = String::new();
-        let index = book.update_with_writer(|b| b.allocate_new("Shop"), |b| {
-            persisted = format_book(b); Ok(())
-        }).unwrap();
+        let index = book
+            .update_with_writer(
+                |b| b.allocate_new("Shop"),
+                |b| {
+                    persisted = format_book(b);
+                    Ok(())
+                },
+            )
+            .unwrap();
         assert_eq!(index, 51);
         assert_eq!(parse(&persisted).unwrap(), book);
         assert_eq!(book.required_coverage(), 51);

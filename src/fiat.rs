@@ -245,18 +245,20 @@ fn agent() -> ureq::Agent {
 }
 
 fn http_get(url: &str) -> Result<String, String> {
-    let response = agent()
-        .get(url)
-        .call()
-        .map_err(|err| err.to_string())?;
+    let response = agent().get(url).call().map_err(|err| err.to_string())?;
     bounded_rate_body(response.into_reader())
 }
 
 fn bounded_rate_body(reader: impl std::io::Read) -> Result<String, String> {
     use std::io::Read;
     let mut bytes = Vec::new();
-    reader.take(16_385).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
-    if bytes.len() > 16_384 { return Err("rates response too large".into()); }
+    reader
+        .take(16_385)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() > 16_384 {
+        return Err("rates response too large".into());
+    }
     String::from_utf8(bytes).map_err(|e| e.to_string())
 }
 
@@ -264,8 +266,12 @@ fn valid_rate_decimal(value: &str) -> bool {
     let mut parts = value.split('.');
     let whole = parts.next().unwrap_or("");
     let fraction = parts.next();
-    !whole.is_empty() && whole.len() <= 12 && whole.bytes().all(|b| b.is_ascii_digit()) &&
-        fraction.is_none_or(|f| !f.is_empty() && f.len() <= 24 && f.bytes().all(|b| b.is_ascii_digit())) && parts.next().is_none()
+    !whole.is_empty()
+        && whole.len() <= 12
+        && whole.bytes().all(|b| b.is_ascii_digit())
+        && fraction
+            .is_none_or(|f| !f.is_empty() && f.len() <= 24 && f.bytes().all(|b| b.is_ascii_digit()))
+        && parts.next().is_none()
 }
 
 #[cfg(test)]
@@ -277,7 +283,10 @@ mod tests {
         assert_eq!(bounded_rate_body(&b"{}"[..]).unwrap(), "{}");
         assert!(bounded_rate_body(std::io::repeat(b'x')).is_err());
         assert!(bounded_rate_body(&[0xff][..]).is_err());
-        assert_eq!(bounded_rate_body(&vec![b'x'; 16_384][..]).unwrap().len(), 16_384);
+        assert_eq!(
+            bounded_rate_body(&vec![b'x'; 16_384][..]).unwrap().len(),
+            16_384
+        );
     }
 
     #[test]
@@ -351,12 +360,20 @@ mod tests {
 
     #[test]
     fn live_quote_expires_at_server_deadline_not_local_maximum() {
-        let rate = Rate { currency: "USD".into(), fiat_per_xmr: 100.0,
-            fetched_at_ms: 1_000_000, expires_at_ms: 1_001_000, source: "nexatrode".into() };
+        let rate = Rate {
+            currency: "USD".into(),
+            fiat_per_xmr: 100.0,
+            fetched_at_ms: 1_000_000,
+            expires_at_ms: 1_001_000,
+            source: "nexatrode".into(),
+        };
         assert!(live(Some(&rate), 1_000_999).is_some());
         assert!(live(Some(&rate), 1_001_000).is_none());
         assert!(live(Some(&rate), 999_999).is_none());
-        let extended = Rate { expires_at_ms: u64::MAX, ..rate };
+        let extended = Rate {
+            expires_at_ms: u64::MAX,
+            ..rate
+        };
         assert!(live(Some(&extended), 1_000_000 + MAX_AGE_MS).is_none());
     }
 

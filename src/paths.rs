@@ -15,7 +15,9 @@ thread_local! {
 pub(crate) fn with_test_data_dir<T>(path: PathBuf, test: impl FnOnce() -> T) -> T {
     struct Reset(Option<PathBuf>);
     impl Drop for Reset {
-        fn drop(&mut self) { TEST_DATA_DIR.with(|value| *value.borrow_mut() = self.0.take()); }
+        fn drop(&mut self) {
+            TEST_DATA_DIR.with(|value| *value.borrow_mut() = self.0.take());
+        }
     }
     let _reset = Reset(TEST_DATA_DIR.with(|value| value.replace(Some(path))));
     test()
@@ -23,7 +25,9 @@ pub(crate) fn with_test_data_dir<T>(path: PathBuf, test: impl FnOnce() -> T) -> 
 
 pub fn data_dir() -> PathBuf {
     #[cfg(all(test, feature = "ui-tests"))]
-    if let Some(path) = TEST_DATA_DIR.with(|value| value.borrow().clone()) { return path; }
+    if let Some(path) = TEST_DATA_DIR.with(|value| value.borrow().clone()) {
+        return path;
+    }
     dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("nexawal")
@@ -66,6 +70,29 @@ pub fn save_explorer_enabled(enabled: bool) -> std::io::Result<()> {
         data_dir().join("explorer_details_enabled"),
         if enabled { b"1" } else { b"0" },
     )
+}
+
+pub fn send_sounds_enabled_path() -> PathBuf {
+    data_dir().join("ui_send_sounds_enabled")
+}
+
+pub fn load_send_sounds_enabled() -> bool {
+    load_bool_preference_at(&send_sounds_enabled_path(), false)
+}
+
+pub fn save_send_sounds_enabled(enabled: bool) -> std::io::Result<()> {
+    save_bool_preference_at(send_sounds_enabled_path(), enabled)
+}
+
+fn load_bool_preference_at(path: &Path, default: bool) -> bool {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|value| parse_bool_preference(&value))
+        .unwrap_or(default)
+}
+
+fn save_bool_preference_at(path: PathBuf, enabled: bool) -> std::io::Result<()> {
+    write_bytes(path, if enabled { b"1" } else { b"0" })
 }
 
 pub fn fiat_currency_path() -> PathBuf {
@@ -350,23 +377,68 @@ pub fn accept_terms() -> std::io::Result<()> {
     write_bytes(terms_path(), CURRENT_TERMS_VERSION.to_string().as_bytes())
 }
 
+#[derive(Clone, Debug)]
+pub struct NetworkSettings {
+    pub node_url: String,
+    pub policy: crate::network::Policy,
+    pub i2p_rpc: String,
+    pub i2p_proxy: String,
+}
+
+pub fn load_network_settings() -> std::io::Result<NetworkSettings> {
+    let path = data_dir().join("network_settings.json");
+    let raw = match fs::read_to_string(path) {
+        Ok(raw) => raw,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(NetworkSettings {
+            node_url: load_node_url(), policy: load_network_policy(),
+            i2p_rpc: load_i2p_rpc(), i2p_proxy: load_i2p_proxy(),
+        }),
+        Err(error) => return Err(error),
+    };
+    let value: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+    let field = |key: &str| value.get(key).and_then(|v| v.as_str())
+        .map(str::to_owned).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid network settings"));
+    let policy = field("policy")?;
+    if !["clearnet", "i2p", "hybrid"].contains(&policy.as_str()) {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid network policy"));
+    }
+    Ok(NetworkSettings { node_url: field("node_url")?, policy: crate::network::Policy::from_raw(&policy),
+        i2p_rpc: field("i2p_rpc")?, i2p_proxy: field("i2p_proxy")? })
+}
+
+pub fn save_network_settings(settings: &NetworkSettings) -> std::io::Result<()> {
+    let value = serde_json::json!({"node_url": settings.node_url, "policy": settings.policy.as_str(),
+        "i2p_rpc": settings.i2p_rpc, "i2p_proxy": settings.i2p_proxy});
+    use std::io::Write;
+    let directory = data_dir();
+    fs::create_dir_all(&directory)?;
+    let mut temporary = tempfile::Builder::new().prefix(".nexawal-network-").tempfile_in(&directory)?;
+    temporary.write_all(value.to_string().as_bytes())?;
+    temporary.as_file_mut().sync_all()?;
+    temporary.persist(directory.join("network_settings.json")).map_err(|error| error.error)?;
+    #[cfg(unix)]
+    if let Ok(parent) = fs::File::open(&directory) { let _ = parent.sync_all(); }
+    Ok(())
+}
+
 pub fn load_node_url() -> String {
     fs::read_to_string(node_path())
         .ok()
-        .map(|s| migrated_node_url(&s))
+        .map(|s| canonical_node_url(&s))
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| DEFAULT_NODE.to_string())
 }
 
-fn migrated_node_url(raw: &str) -> String {
+fn canonical_node_url(raw: &str) -> String {
     let trimmed = raw.trim();
     match trimmed.trim_end_matches('/').to_ascii_lowercase().as_str() {
-        "rpc.nexatrode.com"
-        | "http://rpc.nexatrode.com"
-        | "http://rpc.nexatrode.com:80"
-        | "http://rpc.nexatrode.com:443"
-        | "https://rpc.nexatrode.com"
-        | "https://rpc.nexatrode.com:443" => DEFAULT_NODE.to_string(),
+        "rpc.nexawal.com"
+        | "http://rpc.nexawal.com"
+        | "http://rpc.nexawal.com:80"
+        | "http://rpc.nexawal.com:443"
+        | "https://rpc.nexawal.com"
+        | "https://rpc.nexawal.com:443" => DEFAULT_NODE.to_string(),
         _ => trimmed.to_string(),
     }
 }
@@ -432,21 +504,60 @@ pub fn save_restore_height(height: u64) -> std::io::Result<()> {
 }
 
 pub fn load_scan_gap_limit() -> u32 {
-    fs::read_to_string(data_dir().join("scan_gap_limit.txt")).ok()
+    fs::read_to_string(data_dir().join("scan_gap_limit.txt"))
+        .ok()
         .and_then(|s| s.trim().parse::<u32>().ok())
-        .filter(|n| (50..=100_000).contains(n)).unwrap_or(50)
+        .filter(|n| (50..=100_000).contains(n))
+        .unwrap_or(50)
 }
 
 pub fn save_scan_gap_limit(limit: u32) -> std::io::Result<()> {
     if !(50..=100_000).contains(&limit) {
-        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid scan lookahead"));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "invalid scan lookahead",
+        ));
     }
-    write_bytes(data_dir().join("scan_gap_limit.txt"), limit.to_string().as_bytes())
+    write_bytes(
+        data_dir().join("scan_gap_limit.txt"),
+        limit.to_string().as_bytes(),
+    )
 }
 
 pub fn clear_wallet_slot() {
     let _ = fs::remove_file(wallet_slot_path());
     let _ = fs::remove_file(restore_height_path());
+}
+
+/// Remove this app's complete local data directory after the native wallet is closed.
+/// In production, refuse any path other than the app-scoped `.../nexawal` directory.
+pub fn reset_app_data() -> std::io::Result<()> {
+    let dir = data_dir();
+    #[cfg(not(all(test, feature = "ui-tests")))]
+    {
+        let expected = dirs::data_local_dir()
+            .ok_or_else(|| {
+                std::io::Error::other("local application data directory is unavailable")
+            })?
+            .join("nexawal");
+        if dir != expected {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "refusing to reset an unexpected data directory",
+            ));
+        }
+    }
+    if !dir.exists() {
+        return Ok(());
+    }
+    let metadata = fs::symlink_metadata(&dir)?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "refusing to reset a non-directory or symlink",
+        ));
+    }
+    fs::remove_dir_all(dir)
 }
 
 pub fn load_fiat_enabled() -> bool {
@@ -485,8 +596,10 @@ fn decode_fiat_rate(raw: &str) -> Option<crate::fiat::Rate> {
     let source = lines.next().unwrap_or("kraken").trim().to_string();
     // Do not reuse a legacy quote whose server expiry was discarded.
     let expires_at_ms: u64 = lines.next()?.trim().parse().ok()?;
-    if !crate::fiat::is_supported(&currency) || !fiat_per_xmr.is_finite()
-        || fiat_per_xmr <= 0.0 || expires_at_ms <= fetched_at_ms
+    if !crate::fiat::is_supported(&currency)
+        || !fiat_per_xmr.is_finite()
+        || fiat_per_xmr <= 0.0
+        || expires_at_ms <= fetched_at_ms
     {
         return None;
     }
@@ -504,8 +617,10 @@ pub fn save_fiat_rate(rate: &crate::fiat::Rate) -> std::io::Result<()> {
 }
 
 fn encode_fiat_rate(rate: &crate::fiat::Rate) -> String {
-    format!("{}\n{}\n{}\n{}\n{}\n", rate.currency, rate.fiat_per_xmr,
-        rate.fetched_at_ms, rate.source, rate.expires_at_ms)
+    format!(
+        "{}\n{}\n{}\n{}\n{}\n",
+        rate.currency, rate.fiat_per_xmr, rate.fetched_at_ms, rate.source, rate.expires_at_ms
+    )
 }
 
 pub fn clear_fiat_rate() {
@@ -539,15 +654,16 @@ pub fn save_network_policy(policy: crate::network::Policy) -> std::io::Result<()
 }
 
 pub fn load_i2p_rpc() -> String {
-    fs::read_to_string(i2p_rpc_path())
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| crate::network::DEFAULT_I2P_RPC_ADDRESS.into())
+    crate::network::effective_i2p_rpc_address(
+        &fs::read_to_string(i2p_rpc_path()).unwrap_or_default(),
+    )
 }
 
 pub fn save_i2p_rpc(value: &str) -> std::io::Result<()> {
-    write_bytes(i2p_rpc_path(), value.trim().as_bytes())
+    write_bytes(
+        i2p_rpc_path(),
+        crate::network::effective_i2p_rpc_address(value).as_bytes(),
+    )
 }
 
 pub fn load_i2p_proxy() -> String {
@@ -631,32 +747,56 @@ fn write_bytes_with(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "ui-tests")]
     #[test]
-    fn old_builtin_rpc_moves_but_custom_nodes_are_unchanged() {
-        for old in [
-            "https://rpc.nexatrode.com",
-            " HTTPS://RPC.NEXATRODE.COM/ ",
-            "https://rpc.nexatrode.com:443/",
-            "rpc.nexatrode.com",
+    fn full_reset_removes_only_the_configured_app_data_directory() {
+        use super::{data_dir, reset_app_data, with_test_data_dir};
+        let directory = tempfile::tempdir().unwrap();
+        let app_data = directory.path().join("nexawal-test-data");
+        with_test_data_dir(app_data.clone(), || {
+            std::fs::create_dir_all(&app_data).unwrap();
+            std::fs::write(data_dir().join("wallet_slot"), b"1").unwrap();
+            std::fs::write(data_dir().join("terms_version"), b"1").unwrap();
+            reset_app_data().unwrap();
+            assert!(!app_data.exists());
+        });
+    }
+
+    #[test]
+    fn builtin_rpc_variants_are_canonical_but_custom_nodes_are_unchanged() {
+        for variant in [
+            "https://rpc.nexawal.com",
+            " HTTPS://RPC.NEXAWAL.COM/ ",
+            "https://rpc.nexawal.com:443/",
+            "http://rpc.nexawal.com",
+            "rpc.nexawal.com",
         ] {
-            assert_eq!(super::migrated_node_url(old), "https://rpc.nexawal.com");
+            assert_eq!(
+                super::canonical_node_url(variant),
+                "https://rpc.nexawal.com"
+            );
         }
         for custom in [
             "https://monero.nexatrode.com",
             "http://127.0.0.1:18081",
             "http://example.b32.i2p",
-            "https://rpc.nexatrode.com/custom",
-            "https://rpc.nexatrode.com:18081",
+            "https://rpc.nexawal.com/custom",
+            "https://rpc.nexawal.com:18081",
             "https://rpc.nexawal.com",
         ] {
-            assert_eq!(super::migrated_node_url(custom), custom);
+            assert_eq!(super::canonical_node_url(custom), custom);
         }
     }
 
     #[test]
     fn fiat_cache_preserves_deadline_and_rejects_legacy_quotes() {
-        let rate = crate::fiat::Rate { currency: "USD".into(), fiat_per_xmr: 100.0,
-            fetched_at_ms: 1_000_000, expires_at_ms: 1_001_000, source: "nexatrode".into() };
+        let rate = crate::fiat::Rate {
+            currency: "USD".into(),
+            fiat_per_xmr: 100.0,
+            fetched_at_ms: 1_000_000,
+            expires_at_ms: 1_001_000,
+            source: "nexatrode".into(),
+        };
         let restored = super::decode_fiat_rate(&super::encode_fiat_rate(&rate)).unwrap();
         assert_eq!(restored.expires_at_ms, rate.expires_at_ms);
         assert!(crate::fiat::live(Some(&restored), rate.expires_at_ms).is_none());
@@ -706,6 +846,19 @@ mod tests {
         assert_eq!(parse_bool_preference("false"), Some(false));
         assert_eq!(parse_bool_preference(""), None);
         assert_eq!(parse_bool_preference("invalid"), None);
+    }
+
+    #[test]
+    fn send_sounds_preference_defaults_off_and_round_trips() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("ui_send_sounds_enabled");
+        assert!(!super::load_bool_preference_at(&path, false));
+        super::save_bool_preference_at(path.clone(), true).unwrap();
+        assert!(super::load_bool_preference_at(&path, false));
+        super::save_bool_preference_at(path.clone(), false).unwrap();
+        assert!(!super::load_bool_preference_at(&path, false));
+        fs::write(&path, "not-a-setting").unwrap();
+        assert!(!super::load_bool_preference_at(&path, false));
     }
 
     #[test]

@@ -193,15 +193,13 @@ mod tests {
 
     #[test]
     fn identical_amount_duplicates_are_accepted() {
-        let parsed =
-            parse(&format!("monero:{PRIMARY}?amount=1.5&tx_amount=1.5")).unwrap();
+        let parsed = parse(&format!("monero:{PRIMARY}?amount=1.5&tx_amount=1.5")).unwrap();
         assert_eq!(parsed.amount_xmr.as_deref(), Some("1.5"));
     }
 
     #[test]
     fn equivalent_amount_aliases_normalize_to_same_piconero() {
-        let parsed =
-            parse(&format!("monero:{PRIMARY}?amount=1.5&tx_amount=1.500")).unwrap();
+        let parsed = parse(&format!("monero:{PRIMARY}?amount=1.5&tx_amount=1.500")).unwrap();
         assert_eq!(parsed.amount_xmr.as_deref(), Some("1.5"));
         assert_eq!(parse_amount_piconero("1.5"), parse_amount_piconero("1.500"));
         assert_eq!(parse_amount_piconero("1.5"), Some(1_500_000_000_000));

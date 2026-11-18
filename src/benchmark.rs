@@ -1959,11 +1959,7 @@ mod tests {
     fn production_targets_include_both_nodes() {
         let targets = targets_for("https://rpc.nexawal.com");
         assert_eq!(targets.len(), 2);
-        assert!(
-            targets
-                .iter()
-                .any(|node| node.contains("rpc.nexawal.com"))
-        );
+        assert!(targets.iter().any(|node| node.contains("rpc.nexawal.com")));
         assert!(
             targets
                 .iter()

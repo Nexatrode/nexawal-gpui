@@ -146,8 +146,8 @@ mod protected_macos {
         access_control::{ProtectionMode, SecAccessControl},
         base::Result,
         passwords::{
-            delete_generic_password_options, generic_password, set_generic_password_options,
-            PasswordOptions,
+            PasswordOptions, delete_generic_password_options, generic_password,
+            set_generic_password_options,
         },
         passwords_options::AccessControlOptions,
     };
@@ -216,24 +216,28 @@ mod tests {
     fn migration_failure_never_retires_the_previous_seed() {
         use std::cell::Cell;
         let retired = Cell::new(false);
-        assert!(commit_replacement(
-            || Err("synthetic write failure".into()),
-            || {
-                retired.set(true);
-                Ok(())
-            }
-        )
-        .is_err());
+        assert!(
+            commit_replacement(
+                || Err("synthetic write failure".into()),
+                || {
+                    retired.set(true);
+                    Ok(())
+                }
+            )
+            .is_err()
+        );
         assert!(!retired.get());
         let committed = Cell::new(false);
-        assert!(commit_replacement(
-            || {
-                committed.set(true);
-                Ok(())
-            },
-            || Err("synthetic retirement failure".into())
-        )
-        .is_err());
+        assert!(
+            commit_replacement(
+                || {
+                    committed.set(true);
+                    Ok(())
+                },
+                || Err("synthetic retirement failure".into())
+            )
+            .is_err()
+        );
         assert!(committed.get());
     }
 

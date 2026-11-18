@@ -31,7 +31,9 @@ pub enum SessionOperation {
 }
 
 impl SessionOperation {
-    pub fn is_busy(&self) -> bool { *self != Self::Idle }
+    pub fn is_busy(&self) -> bool {
+        *self != Self::Idle
+    }
     pub fn start(&mut self) {
         assert!(!self.is_busy());
         *self = Self::Active;
@@ -136,11 +138,23 @@ pub fn send_max(
 }
 
 fn recovered_payment_error(txid: &str) -> api::Error {
-    api::Error { code: -18, message: format!("{}\nTXID: {}", crate::l10n::t("Previous payment recovered. The new payment was not sent. Preview it again."), txid) }
+    api::Error {
+        code: -18,
+        message: format!(
+            "{}\nTXID: {}",
+            crate::l10n::t(
+                "Previous payment recovered. The new payment was not sent. Preview it again."
+            ),
+            txid
+        ),
+    }
 }
 
 fn require_new_payment(recovered: Option<RecoveredSend>) -> api::Result<()> {
-    match recovered { Some(payment) => Err(recovered_payment_error(&payment.txid)), None => Ok(()) }
+    match recovered {
+        Some(payment) => Err(recovered_payment_error(&payment.txid)),
+        None => Ok(()),
+    }
 }
 
 fn persist_and_relay(node_url: &str, json: &str, fee: u64) -> api::Result<SendResult> {
@@ -182,7 +196,10 @@ mod tests {
     fn recovery_stops_a_new_exact_or_max_payment() {
         let calls = Cell::new(0);
         let action = || -> api::Result<()> {
-            super::require_new_payment(Some(super::RecoveredSend { txid: "previous-txid".into(), amount: 10 }))?;
+            super::require_new_payment(Some(super::RecoveredSend {
+                txid: "previous-txid".into(),
+                amount: 10,
+            }))?;
             calls.set(calls.get() + 1);
             Ok(())
         };
@@ -196,13 +213,28 @@ mod tests {
         for _operation in ["preview", "send", "pending recovery"] {
             let mut state = super::SessionOperation::default();
             state.start();
-            assert!(!state.lock(), "must not reset a wallet owned by native work");
-            assert!(state.is_busy(), "opening/replacing stays blocked while locked");
+            assert!(
+                !state.lock(),
+                "must not reset a wallet owned by native work"
+            );
+            assert!(
+                state.is_busy(),
+                "opening/replacing stays blocked while locked"
+            );
             assert!(!state.lock(), "repeated lock must preserve pending cleanup");
-            assert!(state.finish(), "late success/error must clean up, not show wallet data");
-            assert!(!state.is_busy(), "explicit authenticated reopen is now allowed");
+            assert!(
+                state.finish(),
+                "late success/error must clean up, not show wallet data"
+            );
+            assert!(
+                !state.is_busy(),
+                "explicit authenticated reopen is now allowed"
+            );
             state.start();
-            assert!(!state.finish(), "normal foreground operation may publish its result");
+            assert!(
+                !state.finish(),
+                "normal foreground operation may publish its result"
+            );
             assert!(state.lock(), "idle lock can clean up immediately");
         }
     }

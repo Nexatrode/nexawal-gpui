@@ -46,6 +46,11 @@ pub fn format_for_input(piconero: u64) -> String {
 }
 
 pub fn format_xmr(piconero: u64) -> String {
+    if piconero > 0 && piconero < 1_000_000 {
+        let whole = piconero / PICONERO_PER_XMR;
+        let frac = piconero % PICONERO_PER_XMR;
+        return format!("{whole}.{frac:012} XMR");
+    }
     let whole = piconero / PICONERO_PER_XMR;
     let frac = (piconero % PICONERO_PER_XMR) / 1_000_000;
     format!("{whole}.{frac:06} XMR")

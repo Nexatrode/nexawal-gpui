@@ -22,7 +22,7 @@ trap 'rm -f "$temp_file"' EXIT
 jq --slurpfile existing "$out_file" '
   .strings
   | to_entries
-  | map(select(.key != "" and .value.extractionState != "stale"))
+  | map(select(.key != "" and .value.extractionState != "stale" and .value.shouldTranslate != false))
   | reduce .[] as $item ($existing[0];
       . as $acc
       | reduce (($item.value.localizations // {}) | to_entries[] | select((.value.stringUnit.value // "") != "")) as $loc ($acc; .[$loc.key] = (($acc[$loc.key] // {}) + {($item.key): $loc.value.stringUnit.value}))

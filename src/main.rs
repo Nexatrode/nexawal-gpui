@@ -35,8 +35,8 @@ mod platform_icon;
 mod qr;
 mod receive_book;
 mod scan_tuning;
-mod seed_backup;
 mod send_flow;
+mod send_sounds;
 mod session_lock;
 mod session_policy;
 mod sync_status;
@@ -362,6 +362,10 @@ struct Home {
     dest_focus: FocusHandle,
     amount_focus: FocusHandle,
     node_focus: FocusHandle,
+    setup_policy_clearnet_focus: FocusHandle,
+    setup_policy_i2p_focus: FocusHandle,
+    setup_policy_hybrid_focus: FocusHandle,
+    setup_apply_network_focus: FocusHandle,
     recv_amount_focus: FocusHandle,
     recv_desc_focus: FocusHandle,
     recv_label_focus: FocusHandle,
@@ -409,6 +413,7 @@ struct Home {
     transfer_search: String,
     history_focus: history_focus::HistoryFocus,
     theme: Theme,
+    send_sounds_enabled: bool,
     last_exported_scanned: Option<u64>,
     last_cache_persist_at: Option<Instant>,
     last_balance_poll_at: Option<Instant>,
@@ -429,8 +434,9 @@ struct Home {
     broadcast_probe_running: bool,
     broadcast_probe_status: Option<SharedString>,
     maintenance_confirmation: Option<MaintenanceAction>,
-    removal_confirmation: bool,
-    removal_backup_confirmed: bool,
+    wipe_confirmation: bool,
+    wipe_after_close: bool,
+    wipe_in_progress: bool,
     address_copied_at: Option<Instant>,
     send_dest: String,
     send_amount: String,
@@ -459,9 +465,12 @@ struct Home {
     challenge_answers: [String; 3],
     challenge_slot: usize,
     height_fetching: bool,
+    setup_height_network_key: Option<String>,
+    restore_height_is_suggestion: bool,
     qr_uri: String,
     qr_image: Option<Arc<RenderImage>>,
     fiat_enabled: bool,
+    fiat_wipe_generation: u64,
     explorer_enabled: bool,
     explorer_lookup: explorer::Lookup,
     fiat_currency: String,
@@ -473,6 +482,14 @@ struct Home {
     network_policy: network::Policy,
     i2p_rpc: String,
     i2p_proxy: String,
+    settings_network_policy: network::Policy,
+    settings_node_url: String,
+    settings_i2p_rpc: String,
+    settings_i2p_proxy: String,
+    setup_network_policy: network::Policy,
+    setup_node_url: String,
+    setup_i2p_rpc: String,
+    setup_i2p_proxy: String,
 }
 
 impl Drop for Home {
@@ -488,6 +505,16 @@ impl Home {
     fn new(cx: &mut Context<Self>) -> Self {
         let theme = Theme::from_stored(&paths::load_theme());
         apply_theme(theme);
+        let saved_network = paths::load_network_settings().unwrap_or_else(|error| {
+            eprintln!("Could not load network settings: {error}");
+            paths::NetworkSettings { node_url: String::new(), policy: network::Policy::I2p,
+                i2p_rpc: String::new(), i2p_proxy: String::new() }
+        });
+        let node_url = std::env::var("NEXAWAL_NODE_URL").ok().map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty()).unwrap_or(saved_network.node_url);
+        let network_policy = saved_network.policy;
+        let i2p_rpc = saved_network.i2p_rpc;
+        let i2p_proxy = saved_network.i2p_proxy;
         let has_stored = wallet_store::is_marked_stored();
         let needs_terms = paths::terms_need_accept();
         let initial_seed = env_or("NEXAWAL_MNEMONIC", "");
@@ -502,11 +529,7 @@ impl Home {
 
         Self {
             core_version: api::version().into(),
-            node_url: std::env::var("NEXAWAL_NODE_URL")
-                .ok()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .unwrap_or_else(paths::load_node_url),
+            node_url: node_url.clone(),
             seed: initial_seed.clone(),
             restore_height_text: {
                 let from_env = std::env::var("NEXAWAL_RESTORE_HEIGHT")
@@ -531,6 +554,10 @@ impl Home {
             dest_focus: cx.focus_handle(),
             amount_focus: cx.focus_handle(),
             node_focus: cx.focus_handle(),
+            setup_policy_clearnet_focus: cx.focus_handle(),
+            setup_policy_i2p_focus: cx.focus_handle(),
+            setup_policy_hybrid_focus: cx.focus_handle(),
+            setup_apply_network_focus: cx.focus_handle(),
             recv_amount_focus: cx.focus_handle(),
             recv_desc_focus: cx.focus_handle(),
             recv_label_focus: cx.focus_handle(),
@@ -593,6 +620,7 @@ impl Home {
             transfer_search: String::new(),
             last_exported_scanned: None,
             theme,
+            send_sounds_enabled: paths::load_send_sounds_enabled(),
             last_cache_persist_at: None,
             last_balance_poll_at: None,
             last_transfers_poll_at: None,
@@ -612,8 +640,9 @@ impl Home {
             broadcast_probe_running: false,
             broadcast_probe_status: None,
             maintenance_confirmation: None,
-            removal_confirmation: false,
-            removal_backup_confirmed: false,
+            wipe_confirmation: false,
+            wipe_after_close: false,
+            wipe_in_progress: false,
             address_copied_at: None,
             send_dest: String::new(),
             send_amount: String::new(),
@@ -641,9 +670,12 @@ impl Home {
             challenge_answers: Default::default(),
             challenge_slot: 0,
             height_fetching: false,
+            setup_height_network_key: None,
+            restore_height_is_suggestion: false,
             qr_uri: String::new(),
             qr_image: None,
             fiat_enabled: paths::load_fiat_enabled(),
+            fiat_wipe_generation: 0,
             explorer_enabled: paths::load_explorer_enabled(),
             explorer_lookup: explorer::Lookup::default(),
             fiat_currency: paths::load_fiat_currency(),
@@ -652,14 +684,44 @@ impl Home {
             fiat_last_attempt_ms: 0,
             fiat_last_attempt_currency: String::new(),
             fiat_snapshots: fiat_snapshot::Store::load(),
-            network_policy: paths::load_network_policy(),
-            i2p_rpc: paths::load_i2p_rpc(),
-            i2p_proxy: paths::load_i2p_proxy(),
+            network_policy,
+            i2p_rpc: i2p_rpc.clone(),
+            i2p_proxy: i2p_proxy.clone(),
+            settings_network_policy: network_policy,
+            settings_node_url: node_url.clone(),
+            settings_i2p_rpc: i2p_rpc.clone(),
+            settings_i2p_proxy: i2p_proxy.clone(),
+            setup_network_policy: network_policy,
+            setup_node_url: node_url,
+            setup_i2p_rpc: i2p_rpc,
+            setup_i2p_proxy: i2p_proxy,
         }
     }
 
     fn restore_height(&self) -> u64 {
         self.restore_height_text.trim().parse().unwrap_or(0)
+    }
+
+    fn editing_setup_route(&self) -> bool {
+        self.screen == Screen::Restore && self.show_restore_form
+    }
+
+    fn setup_network_key(&self) -> String {
+        [
+            self.setup_network_policy.as_str(),
+            self.setup_node_url.trim(),
+            self.setup_i2p_rpc.trim(),
+            self.setup_i2p_proxy.trim(),
+        ]
+        .join("\u{0}")
+    }
+
+    fn invalidate_setup_height(&mut self) {
+        self.setup_height_network_key = None;
+        if self.restore_height_is_suggestion {
+            self.restore_height_text = "0".into();
+            self.restore_height_is_suggestion = false;
+        }
     }
 
     fn rescan_height(&self) -> u64 {
@@ -671,17 +733,16 @@ impl Home {
     }
 
     fn seed_backup_passed(&self) -> bool {
-        !self.created_seed
-            || (self.wrote_seed_down
-                && seed_backup::answers_match(
-                    &self.seed,
-                    &self.challenge_indices,
-                    &self.challenge_answers,
-                ))
+        !self.created_seed || self.wrote_seed_down
     }
 
     fn mark_imported_seed(&mut self) {
         self.created_seed = false;
+        if self.restore_height_is_suggestion {
+            self.restore_height_text = "0".into();
+        }
+        self.restore_height_is_suggestion = false;
+        self.setup_height_network_key = None;
         self.wrote_seed_down = false;
         self.challenge_indices.clear();
         zeroize::Zeroize::zeroize(&mut self.challenge_answers);
@@ -689,7 +750,10 @@ impl Home {
     }
 
     fn persist_recv_label(&mut self) {
-        if let Err(error) = self.receive_book.update_and_save(|book| book.set_selected_label(&self.recv_label)) {
+        if let Err(error) = self
+            .receive_book
+            .update_and_save(|book| book.set_selected_label(&self.recv_label))
+        {
             self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
         }
     }
@@ -703,6 +767,11 @@ impl Home {
             return;
         }
         self.height_fetching = true;
+        let request_network_key = self.setup_network_key();
+        if self.restore_height_is_suggestion {
+            self.restore_height_text = "0".into();
+            self.restore_height_is_suggestion = false;
+        }
         let node = self.scan_node_url();
         let proxy = self.scan_proxy();
         let require_i2p = self.network_policy == network::Policy::I2p;
@@ -715,15 +784,29 @@ impl Home {
                 .await;
             let _ = this.update(cx, |this, cx| {
                 this.height_fetching = false;
+                if this.screen != Screen::Restore || !this.show_restore_form || !this.created_seed {
+                    cx.notify();
+                    return;
+                }
                 match result {
                     Ok(height) => {
+                        if this.setup_network_key() != request_network_key {
+                            cx.notify();
+                            return;
+                        }
                         if this.created_seed || this.restore_height() == 0 {
                             this.restore_height_text = height.to_string();
+                            this.restore_height_is_suggestion = true;
+                            this.setup_height_network_key = Some(request_network_key.clone());
                         }
                         this.status = l10n::interpolate("Starting height (fast): {0}.", &[format!("{}", this.restore_height())])
                         .into();
                     }
                     Err(err) => {
+                        if this.setup_network_key() != request_network_key {
+                            cx.notify();
+                            return;
+                        }
                         this.status = l10n::interpolate("Couldn't fetch a fast restore height ({0}). Leaving restore height as 0.", &[format!("{}", err)])
                         .into();
                     }
@@ -888,7 +971,8 @@ impl Home {
             cx.notify();
             return;
         }
-        self.copy_secret(self.seed.clone(), cx);
+        let phrase = self.seed.split_whitespace().collect::<Vec<_>>().join(" ");
+        self.copy_secret(phrase, cx);
         self.status = l10n::t("Seed copied. Store it offline, then clear the clipboard.").into();
         cx.notify();
     }
@@ -899,14 +983,23 @@ impl Home {
         let fingerprint = Sha256::digest(text.as_bytes());
         cx.write_to_clipboard(gpui::ClipboardItem::new_string(text.to_string()));
         cx.spawn(async move |_, cx| {
-            cx.background_executor().timer(session_policy::CLIPBOARD_TIMEOUT).await;
+            cx.background_executor()
+                .timer(session_policy::CLIPBOARD_TIMEOUT)
+                .await;
             let _ = cx.update(|cx| {
-                let current = cx.read_from_clipboard().and_then(|item| item.text()).map(zeroize::Zeroizing::new);
-                if current.as_ref().is_some_and(|value| Sha256::digest(value.as_bytes()) == fingerprint) {
+                let current = cx
+                    .read_from_clipboard()
+                    .and_then(|item| item.text())
+                    .map(zeroize::Zeroizing::new);
+                if current
+                    .as_ref()
+                    .is_some_and(|value| Sha256::digest(value.as_bytes()) == fingerprint)
+                {
                     cx.write_to_clipboard(gpui::ClipboardItem::new_string(String::new()));
                 }
             });
-        }).detach();
+        })
+        .detach();
     }
 
     fn scan_node_url(&self) -> String {
@@ -950,8 +1043,23 @@ impl Home {
     }
 
     fn configure_core_route(&self, broadcast: bool) -> api::Result<()> {
-        if self.network_policy == network::Policy::I2p ||
-            (self.network_policy == network::Policy::Hybrid && broadcast) {
+        let route_requires_i2p = self.network_policy == network::Policy::I2p
+            || (self.network_policy == network::Policy::Hybrid && broadcast);
+        let endpoint = if broadcast {
+            self.broadcast_node_url()
+        } else {
+            self.scan_node_url()
+        };
+        if !route_requires_i2p && network::is_i2p_hostname_url(&endpoint) {
+            return Err(api::Error {
+                code: -14,
+                message: l10n::t("I2P node addresses require I2P only or Both and an HTTP proxy.")
+                    .to_string(),
+            });
+        }
+        if self.network_policy == network::Policy::I2p
+            || (self.network_policy == network::Policy::Hybrid && broadcast)
+        {
             network::validate_i2p_configuration(&self.i2p_rpc, Some(&self.i2p_proxy))
                 .map_err(|message| api::Error { code: -14, message })?;
         }
@@ -1017,7 +1125,11 @@ impl Home {
 
     fn send_unlocked(&self) -> Option<u64> {
         if self.send_from_subaddress {
-            self.send_source_unlocked
+            if self.send_source_balance_stale {
+                None
+            } else {
+                self.send_source_unlocked
+            }
         } else {
             Some(self.unlocked_piconero)
         }
@@ -1088,42 +1200,49 @@ impl Home {
             if !valid {
                 return;
             }
-            let result =
-                cx.background_executor()
-                    .spawn(async move {
-                        use std::io::Write;
-                        let mut spool = tempfile::NamedTempFile::new().map_err(|e| e.to_string())?;
-                        let mut writer = std::io::BufWriter::new(spool.as_file_mut());
-                        let mut count = 0;
-                        let mut first = true;
-                        let mut expected_revision: Option<String> = None;
-                        loop {
-                            let page = api::query_transfers(WALLET_ID, &query)
-                                .map_err(|e| e.to_string())?;
-                            if expected_revision
-                                .as_ref()
-                                .is_some_and(|revision| revision != &page.revision)
-                            {
-                                return Err("History changed during export; reload and try again."
-                                    .to_string());
-                            }
-                            expected_revision.get_or_insert_with(|| page.revision.clone());
-                            let csv = transfer_history_csv(&page.transfers);
-                            let body = if first { csv.as_str() } else { csv.split_once('\n').map_or("", |(_, body)| body) };
-                            writer.write_all(body.as_bytes()).map_err(|e| e.to_string())?;
-                            first = false;
-                            count += page.transfers.len();
-                            let Some(offset) = page.next_offset else {
-                                break;
-                            };
-                            query.offset = offset;
-                            query.revision = expected_revision.clone();
+            let result = cx
+                .background_executor()
+                .spawn(async move {
+                    use std::io::Write;
+                    let mut spool = tempfile::NamedTempFile::new().map_err(|e| e.to_string())?;
+                    let mut writer = std::io::BufWriter::new(spool.as_file_mut());
+                    let mut count = 0;
+                    let mut first = true;
+                    let mut expected_revision: Option<String> = None;
+                    loop {
+                        let page =
+                            api::query_transfers(WALLET_ID, &query).map_err(|e| e.to_string())?;
+                        if expected_revision
+                            .as_ref()
+                            .is_some_and(|revision| revision != &page.revision)
+                        {
+                            return Err(
+                                "History changed during export; reload and try again.".to_string()
+                            );
                         }
-                        writer.flush().map_err(|e| e.to_string())?;
-                        drop(writer);
-                        Ok::<_, String>((count, spool))
-                    })
-                    .await;
+                        expected_revision.get_or_insert_with(|| page.revision.clone());
+                        let csv = transfer_history_csv(&page.transfers);
+                        let body = if first {
+                            csv.as_str()
+                        } else {
+                            csv.split_once('\n').map_or("", |(_, body)| body)
+                        };
+                        writer
+                            .write_all(body.as_bytes())
+                            .map_err(|e| e.to_string())?;
+                        first = false;
+                        count += page.transfers.len();
+                        let Some(offset) = page.next_offset else {
+                            break;
+                        };
+                        query.offset = offset;
+                        query.revision = expected_revision.clone();
+                    }
+                    writer.flush().map_err(|e| e.to_string())?;
+                    drop(writer);
+                    Ok::<_, String>((count, spool))
+                })
+                .await;
             let valid = this
                 .update(cx, |this, _| {
                     this.opened
@@ -1140,10 +1259,19 @@ impl Home {
                     let (count, mut spool) = result?;
                     use std::io::Seek;
                     spool.as_file_mut().rewind().map_err(|e| e.to_string())?;
-                    let mut destination = tempfile::NamedTempFile::new_in(path.parent().ok_or("missing export directory")?).map_err(|e| e.to_string())?;
-                    std::io::copy(spool.as_file_mut(), destination.as_file_mut()).map_err(|e| e.to_string())?;
-                    destination.as_file_mut().sync_all().map_err(|e| e.to_string())?;
-                    destination.persist_noclobber(&path).map_err(|e| e.to_string())?;
+                    let mut destination = tempfile::NamedTempFile::new_in(
+                        path.parent().ok_or("missing export directory")?,
+                    )
+                    .map_err(|e| e.to_string())?;
+                    std::io::copy(spool.as_file_mut(), destination.as_file_mut())
+                        .map_err(|e| e.to_string())?;
+                    destination
+                        .as_file_mut()
+                        .sync_all()
+                        .map_err(|e| e.to_string())?;
+                    destination
+                        .persist_noclobber(&path)
+                        .map_err(|e| e.to_string())?;
                     Ok::<_, String>((count, path))
                 })
                 .await;
@@ -1331,30 +1459,53 @@ impl Home {
     }
 
     fn cycle_network_policy(&mut self, cx: &mut Context<Self>) {
-        self.network_policy = self.network_policy.next();
-        let _ = paths::save_network_policy(self.network_policy);
+        self.settings_network_policy = self.settings_network_policy.next();
         self.status = l10n::interpolate(
             "Connection mode: {0}. Choose Use this node to apply it.",
-            &[format!("{}", self.network_policy.label())],
+            &[format!("{}", self.settings_network_policy.label())],
         )
         .into();
         cx.notify();
     }
 
     fn apply_network(&mut self, cx: &mut Context<Self>) {
-        if self.network_policy != network::Policy::Clearnet {
-            if let Err(error) = network::validate_i2p_configuration(&self.i2p_rpc, Some(&self.i2p_proxy)) {
-                self.status = error.into(); cx.notify(); return;
+        let i2p_rpc = network::effective_i2p_rpc_address(&self.settings_i2p_rpc);
+        if self.settings_network_policy != network::Policy::I2p
+            && network::is_i2p_hostname_url(&self.settings_node_url)
+        {
+            self.status =
+                l10n::t("I2P node addresses require I2P only or Both and an HTTP proxy.").into();
+            cx.notify();
+            return;
+        }
+        if self.settings_network_policy != network::Policy::Clearnet {
+            if let Err(error) =
+                network::validate_i2p_configuration(&i2p_rpc, Some(&self.settings_i2p_proxy))
+            {
+                self.status = error.into();
+                cx.notify();
+                return;
             }
         }
-        let _ = paths::save_node_url(&self.node_url);
-        let _ = paths::save_network_policy(self.network_policy);
-        let _ = paths::save_i2p_rpc(&self.i2p_rpc);
-        let _ = paths::save_i2p_proxy(&self.i2p_proxy);
+        let persisted = paths::save_network_settings(&paths::NetworkSettings {
+            node_url: self.settings_node_url.trim().to_string(),
+            policy: self.settings_network_policy,
+            i2p_rpc: i2p_rpc.clone(),
+            i2p_proxy: self.settings_i2p_proxy.trim().to_string(),
+        });
+        if let Err(error) = persisted {
+            self.status = l10n::interpolate("Failed to save network settings: {0}", &[error.to_string()]).into();
+            cx.notify();
+            return;
+        }
+        self.node_url = self.settings_node_url.clone();
+        self.i2p_rpc = i2p_rpc;
+        self.i2p_proxy = self.settings_i2p_proxy.clone();
+        self.network_policy = self.settings_network_policy;
         self.status = l10n::interpolate(
             "{0} · scan {1} · broadcast {2}",
             &[
-                format!("{}", self.network_policy.label()),
+                format!("{}", self.settings_network_policy.label()),
                 format!("{}", self.scan_node_url()),
                 format!("{}", self.broadcast_node_url()),
             ],
@@ -1364,6 +1515,96 @@ impl Home {
             self.restart_scan_after_cancel(cx);
         }
         cx.notify();
+    }
+
+    fn choose_setup_network_policy(&mut self, policy: network::Policy, cx: &mut Context<Self>) {
+        if self.setup_network_policy != policy {
+            self.setup_network_policy = policy;
+            self.invalidate_setup_height();
+        }
+        self.status = l10n::interpolate(
+            "Connection mode: {0}. Choose Use this node to apply it.",
+            &[format!("{}", policy.label())],
+        )
+        .into();
+        cx.notify();
+    }
+
+    fn apply_setup_network(&mut self, cx: &mut Context<Self>) -> bool {
+        let policy = self.setup_network_policy;
+        let clearnet_node = if policy != network::Policy::I2p {
+            let candidate = if self.setup_node_url.trim().is_empty() {
+                paths::DEFAULT_NODE.to_string()
+            } else {
+                self.setup_node_url.trim().to_string()
+            };
+            let Some(explicit) = network::explicit_node_url(&candidate) else {
+                self.status = l10n::t("Start the node URL with http:// or https://").into();
+                cx.notify();
+                return false;
+            };
+            if network::is_i2p_hostname_url(explicit) {
+                self.status =
+                    l10n::t("I2P node addresses require I2P only or Both and an HTTP proxy.")
+                        .into();
+                cx.notify();
+                return false;
+            }
+            Some(explicit.to_string())
+        } else {
+            None
+        };
+        let i2p_rpc = network::effective_i2p_rpc_address(&self.setup_i2p_rpc);
+        let i2p_proxy = self.setup_i2p_proxy.trim().to_string();
+        if policy != network::Policy::Clearnet {
+            if let Err(error) = network::validate_i2p_configuration(&i2p_rpc, Some(&i2p_proxy)) {
+                self.status = error.into();
+                cx.notify();
+                return false;
+            }
+        }
+
+        // Do not mutate active settings until all enabled endpoints have passed validation.
+        let persisted = paths::save_network_settings(&paths::NetworkSettings {
+            node_url: clearnet_node.clone().unwrap_or_else(|| self.node_url.clone()),
+            policy,
+            i2p_rpc: if policy != network::Policy::Clearnet { i2p_rpc.clone() } else { self.i2p_rpc.clone() },
+            i2p_proxy: if policy != network::Policy::Clearnet { i2p_proxy.clone() } else { self.i2p_proxy.clone() },
+        });
+        if let Err(error) = persisted {
+            self.status =
+                l10n::interpolate("Failed to save network settings: {0}", &[error.to_string()])
+                    .into();
+            cx.notify();
+            return false;
+        }
+
+        self.network_policy = policy;
+        if let Some(node) = clearnet_node {
+            self.node_url = node.clone();
+            self.setup_node_url = node;
+        }
+        if policy != network::Policy::Clearnet {
+            self.i2p_rpc = i2p_rpc.clone();
+            self.i2p_proxy = i2p_proxy.clone();
+            self.setup_i2p_rpc = i2p_rpc;
+            self.setup_i2p_proxy = i2p_proxy;
+        }
+        let applied_network_key = self.setup_network_key();
+        if self.setup_height_network_key.as_deref() != Some(applied_network_key.as_str()) {
+            self.invalidate_setup_height();
+        }
+        self.status = l10n::interpolate(
+            "{0} · scan {1} · broadcast {2}",
+            &[
+                format!("{}", self.network_policy.label()),
+                format!("{}", self.scan_node_url()),
+                format!("{}", self.broadcast_node_url()),
+            ],
+        )
+        .into();
+        cx.notify();
+        true
     }
 
     fn restart_scan_after_cancel(&mut self, cx: &mut Context<Self>) {
@@ -1674,7 +1915,13 @@ impl Home {
             Field::RescanHeight => self.rescan_height_text.clone(),
             Field::Dest => self.send_dest.clone(),
             Field::Amount => self.send_amount.clone(),
-            Field::Node => self.node_url.clone(),
+            Field::Node => {
+                if self.editing_setup_route() {
+                    self.setup_node_url.clone()
+                } else {
+                    self.settings_node_url.clone()
+                }
+            }
             Field::RecvAmount => self.recv_amount.clone(),
             Field::RecvDesc => self.recv_desc.clone(),
             Field::RecvLabel => self.recv_label.clone(),
@@ -1684,8 +1931,20 @@ impl Home {
             Field::Challenge => {
                 self.challenge_answers[challenge_slot.unwrap_or(self.challenge_slot).min(2)].clone()
             }
-            Field::I2pNode => self.i2p_rpc.clone(),
-            Field::I2pProxy => self.i2p_proxy.clone(),
+            Field::I2pNode => {
+                if self.editing_setup_route() {
+                    self.setup_i2p_rpc.clone()
+                } else {
+                    self.settings_i2p_rpc.clone()
+                }
+            }
+            Field::I2pProxy => {
+                if self.editing_setup_route() {
+                    self.setup_i2p_proxy.clone()
+                } else {
+                    self.settings_i2p_proxy.clone()
+                }
+            }
         }
     }
 
@@ -1803,7 +2062,11 @@ impl Home {
                 self.seed = text;
                 self.mark_imported_seed();
             }
-            Field::Height => self.restore_height_text = text,
+            Field::Height => {
+                self.restore_height_text = text;
+                self.restore_height_is_suggestion = false;
+                self.setup_height_network_key = None;
+            }
             Field::RescanHeight => self.rescan_height_text = text,
             Field::Dest => {
                 self.send_dest = text;
@@ -1817,7 +2080,12 @@ impl Home {
                 self.clear_send_preview();
             }
             Field::Node => {
-                self.node_url = text;
+                if self.editing_setup_route() {
+                    self.setup_node_url = text;
+                    self.invalidate_setup_height();
+                } else {
+                    self.settings_node_url = text;
+                }
             }
             Field::RecvAmount => self.recv_amount = text,
             Field::RecvDesc => self.recv_desc = text,
@@ -1836,12 +2104,20 @@ impl Home {
                 self.challenge_answers[slot] = text;
             }
             Field::I2pNode => {
-                self.i2p_rpc = text;
-                let _ = paths::save_i2p_rpc(&self.i2p_rpc);
+                if self.editing_setup_route() {
+                    self.setup_i2p_rpc = text;
+                    self.invalidate_setup_height();
+                } else {
+                    self.settings_i2p_rpc = text;
+                }
             }
             Field::I2pProxy => {
-                self.i2p_proxy = text;
-                let _ = paths::save_i2p_proxy(&self.i2p_proxy);
+                if self.editing_setup_route() {
+                    self.setup_i2p_proxy = text;
+                    self.invalidate_setup_height();
+                } else {
+                    self.settings_i2p_proxy = text;
+                }
             }
         }
     }
@@ -2056,23 +2332,7 @@ impl Home {
             let current = self.field_text(self.active);
             current[self.edit_selection.clone()].to_string()
         } else {
-            match self.active {
-                Field::Seed => self.seed.clone(),
-                Field::Height => self.restore_height_text.clone(),
-                Field::RescanHeight => self.rescan_height_text.clone(),
-                Field::Dest => self.send_dest.clone(),
-                Field::Amount => self.send_amount.clone(),
-                Field::Node => self.node_url.clone(),
-                Field::RecvAmount => self.recv_amount.clone(),
-                Field::RecvDesc => self.recv_desc.clone(),
-                Field::RecvLabel => self.recv_label.clone(),
-                Field::TransferSearch => self.transfer_search.clone(),
-                Field::HistoryFrom => self.transfer_from.clone(),
-                Field::HistoryTo => self.transfer_to.clone(),
-                Field::Challenge => self.challenge_answers[self.challenge_slot.min(2)].clone(),
-                Field::I2pNode => self.i2p_rpc.clone(),
-                Field::I2pProxy => self.i2p_proxy.clone(),
-            }
+            self.field_text(self.active)
         };
         if text.is_empty()
             && self.opened
@@ -2215,6 +2475,22 @@ impl Home {
         self.qr_uri.clear();
         self.qr_image = None;
         self.status = l10n::interpolate("Theme: {0}.", &[format!("{}", self.theme.label())]).into();
+        cx.notify();
+    }
+
+    fn toggle_send_sounds(&mut self, cx: &mut Context<Self>) {
+        let enabled = !self.send_sounds_enabled;
+        if paths::save_send_sounds_enabled(enabled).is_err() {
+            self.status = l10n::t("Could not save settings.").into();
+        } else {
+            self.send_sounds_enabled = enabled;
+            self.status = format!(
+                "{}: {}",
+                l10n::t("Sound On"),
+                l10n::t(if enabled { "On" } else { "Off" }),
+            )
+            .into();
+        }
         cx.notify();
     }
 
@@ -2382,35 +2658,62 @@ impl Home {
     }
 
     fn run_send(&mut self, cx: &mut Context<Self>) {
-        if !self.opened || self.send_operation.is_busy() { return; }
+        if !self.opened || self.send_operation.is_busy() {
+            return;
+        }
         self.send_confirmation = self.send_confirmation_snapshot();
         self.status = if self.send_confirmation.is_some() {
             l10n::t("Confirm send").into()
-        } else { l10n::t("Preview the fee before sending.").into() };
+        } else {
+            l10n::t("Preview the fee before sending.").into()
+        };
         cx.notify();
     }
 
     fn send_confirmation_snapshot(&self) -> Option<send_flow::Confirmation> {
         let destination = self.send_dest.trim().to_string();
-        if !uri::looks_like_address(&destination) { return None; }
-        let amount = if self.send_max { self.send_preview_amount? } else { self.send_piconero()? };
-        if amount == 0 || self.send_preview_amount != Some(amount) { return None; }
-        Some(send_flow::Confirmation { destination, amount, fee: self.send_fee?, maximum: self.send_max,
-            source: self.send_from_minor(), node: self.broadcast_node_url(), proxy: self.broadcast_proxy(),
-            session: self.session_policy.token(), preview: self.send_preview_epoch.token() })
+        if !uri::looks_like_address(&destination) {
+            return None;
+        }
+        let amount = if self.send_max {
+            self.send_preview_amount?
+        } else {
+            self.send_piconero()?
+        };
+        if amount == 0 || self.send_preview_amount != Some(amount) {
+            return None;
+        }
+        Some(send_flow::Confirmation {
+            destination,
+            amount,
+            fee: self.send_fee?,
+            maximum: self.send_max,
+            source: self.send_from_minor(),
+            node: self.broadcast_node_url(),
+            proxy: self.broadcast_proxy(),
+            session: self.session_policy.token(),
+            preview: self.send_preview_epoch.token(),
+        })
     }
 
     fn confirm_send(&mut self, cx: &mut Context<Self>) {
-        let Some(confirmation) = self.send_confirmation.take() else { return; };
+        let Some(confirmation) = self.send_confirmation.take() else {
+            return;
+        };
         if self.send_confirmation_snapshot().as_ref() != Some(&confirmation) {
             self.clear_send_preview();
             self.status = l10n::t("Send amount changed. Preview the fee again.").into();
-            cx.notify(); return;
+            cx.notify();
+            return;
         }
         self.run_confirmed_send(confirmation, cx);
     }
 
-    fn run_confirmed_send(&mut self, confirmation: send_flow::Confirmation, cx: &mut Context<Self>) {
+    fn run_confirmed_send(
+        &mut self,
+        confirmation: send_flow::Confirmation,
+        cx: &mut Context<Self>,
+    ) {
         if !self.opened || self.send_operation.is_busy() {
             return;
         }
@@ -2504,6 +2807,7 @@ impl Home {
                 }
                 match result {
                     Ok((txid, amt, fee)) => {
+                        send_sounds::success(this.send_sounds_enabled);
                         this.clear_send_preview();
                         this.send_max = false;
                         this.send_amount_mode = AmountMode::Xmr;
@@ -2522,6 +2826,11 @@ impl Home {
                         let _ = this.start_fast_scan();
                     }
                     Err(err) => {
+                        // Recovering a prior broadcast is not a new failed send. A fee
+                        // rejection or a real relay failure gets the normal error cue.
+                        if err.code != -18 {
+                            send_sounds::failure(this.send_sounds_enabled);
+                        }
                         this.clear_send_preview();
                         this.status =
                             l10n::interpolate("Send failed: {0}", &[format!("{}", err)]).into();
@@ -2608,17 +2917,23 @@ impl Home {
         if self.blocked_by_locked_operation(cx) {
             return;
         }
+        if !self.apply_setup_network(cx) {
+            return;
+        }
         match api::generate_mnemonic_english() {
             Ok(mnemonic) => {
                 self.seed = normalize_seed(&mnemonic);
                 self.created_seed = true;
+                self.restore_height_text = "0".into();
+                self.restore_height_is_suggestion = false;
+                self.setup_height_network_key = None;
                 self.wrote_seed_down = false;
-                self.challenge_indices = seed_backup::pick_indices(self.word_count());
+                self.challenge_indices.clear();
                 self.challenge_answers = Default::default();
                 self.challenge_slot = 0;
                 self.fetch_suggested_height(cx);
                 self.status = l10n::t(
-                    "Write this seed down on paper. Open is locked until you confirm three words.",
+                    "Write this seed down on paper and confirm the acknowledgement before opening.",
                 )
                 .into();
             }
@@ -2656,12 +2971,19 @@ impl Home {
             return;
         }
         if self.created_seed && !self.seed_backup_passed() {
-            self.status = l10n::t(
-                "Check that you wrote the seed down and confirm the three words before opening.",
-            )
-            .into();
+            self.status =
+                l10n::t("Confirm that you wrote the recovery seed down before opening.").into();
             cx.notify();
             return;
+        }
+        if !self.apply_setup_network(cx) {
+            return;
+        }
+        let current_network_key = self.setup_network_key();
+        if self.restore_height_is_suggestion
+            && self.setup_height_network_key.as_deref() != Some(current_network_key.as_str())
+        {
+            self.invalidate_setup_height();
         }
         self.open_with_mnemonic(&mnemonic, self.restore_height(), cx);
     }
@@ -2730,7 +3052,12 @@ impl Home {
         self.scan_was_running = false;
         self.scan_rate.reset();
         self.receive_book = receive_book;
-        if let Err(error) = api::set_gap_limit(WALLET_ID, self.receive_book.required_coverage().max(self.scan_gap_limit)) {
+        if let Err(error) = api::set_gap_limit(
+            WALLET_ID,
+            self.receive_book
+                .required_coverage()
+                .max(self.scan_gap_limit),
+        ) {
             self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
             let _ = api::close(WALLET_ID, 1_000);
             cx.notify();
@@ -2748,8 +3075,8 @@ impl Home {
         self.challenge_indices.clear();
         self.challenge_answers = Default::default();
         self.refresh_receive_address();
-        let protection = self.require_device_auth ||
-            (paths::load_device_auth_preference().is_none() && device_auth::is_available());
+        let protection = self.require_device_auth
+            || (paths::load_device_auth_preference().is_none() && device_auth::is_available());
         let store_error = match wallet_store::save(mnemonic, restore_height, protection) {
             Ok(()) => {
                 self.has_stored = true;
@@ -3062,7 +3389,9 @@ impl Home {
     }
 
     fn blocked_by_locked_operation(&mut self, cx: &mut Context<Self>) -> bool {
-        if self.native_background_sync { self.close_locked_wallet(cx); }
+        if self.native_background_sync {
+            self.close_locked_wallet(cx);
+        }
         if self.native_close_failed && !self.native_close_pending {
             self.close_locked_wallet(cx);
         }
@@ -3098,6 +3427,8 @@ impl Home {
             ).await;
             let _ = this.update(cx, |this, cx| {
                 this.native_close_pending = false;
+                let continue_wipe = this.wipe_after_close && result.is_ok();
+                let close_failed = result.is_err();
                 match result {
                     Ok(None) => {}
                     Ok(Some(error)) => {
@@ -3110,7 +3441,14 @@ impl Home {
                         this.status = l10n::interpolate("Wallet hidden; native cleanup failed: {0}. Retry unlock to finish cleanup.", &[format!("{}", error)]).into();
                     }
                 }
-                if !this.native_close_failed && this.unlock_after_background_close {
+                if continue_wipe {
+                    this.wipe_after_close = false;
+                    this.finish_wipe_after_native_close(cx);
+                } else if this.wipe_after_close && close_failed {
+                    // Keep cache writes suppressed and leave the confirmed wipe retryable.
+                    this.wipe_in_progress = false;
+                }
+                if !this.native_close_failed && this.unlock_after_background_close && !continue_wipe {
                     this.unlock_after_background_close = false;
                     if cx.active_window().is_some() { this.try_unlock_stored(cx); }
                 }
@@ -3201,8 +3539,7 @@ impl Home {
         self.challenge_slot = 0;
         self.maintenance_confirmation = None;
         self.send_confirmation = None;
-        self.removal_confirmation = false;
-        self.removal_backup_confirmed = false;
+        self.wipe_confirmation = false;
         self.receive_address = "".into();
         self.has_stored = wallet_store::is_marked_stored();
         self.show_restore_form = !self.has_stored;
@@ -3215,8 +3552,11 @@ impl Home {
             l10n::t("Session cleared.").into()
         };
         if cleanup_now {
-            if keep_scan { self.seal_background_scan(node, cx); }
-            else { self.close_locked_wallet(cx); }
+            if keep_scan {
+                self.seal_background_scan(node, cx);
+            } else {
+                self.close_locked_wallet(cx);
+            }
         } else {
             self.status = l10n::t("Wallet is locked. The in-flight operation is finishing; reopen is available afterward.").into();
         }
@@ -3224,77 +3564,193 @@ impl Home {
     }
 
     fn seal_background_scan(&mut self, node: String, cx: &mut Context<Self>) {
-        if self.native_close_pending { return; }
+        if self.native_close_pending {
+            return;
+        }
         self.native_close_pending = true;
         let cache = paths::cache_path();
         cx.spawn(async move |this, cx| {
             let executor = cx.background_executor().clone();
             let result = session_lock::retry_until_stopped(
-                || { let cache = cache.clone(); executor.spawn(async move {
-                    session_lock::seal_for_background(WALLET_ID, cache)
-                }) }, || executor.timer(Duration::from_secs(1))).await;
+                || {
+                    let cache = cache.clone();
+                    executor
+                        .spawn(async move { session_lock::seal_for_background(WALLET_ID, cache) })
+                },
+                || executor.timer(Duration::from_secs(1)),
+            )
+            .await;
             let _ = this.update(cx, |this, cx| {
                 this.native_close_pending = false;
                 match result {
-                    Ok(None) if this.native_background_sync && !this.unlock_after_background_close => {
+                    Ok(None)
+                        if this.native_background_sync && !this.unlock_after_background_close =>
+                    {
                         if api::refresh_async(WALLET_ID, &node).is_ok() {
-                            this.status = format!("{} · {}", l10n::t("Wallet is locked. Use Open existing wallet to unlock."),
-                                l10n::t("Syncing wallet")).into();
-                        } else { this.close_locked_wallet(cx); }
+                            this.status = format!(
+                                "{} · {}",
+                                l10n::t("Wallet is locked. Use Open existing wallet to unlock."),
+                                l10n::t("Syncing wallet")
+                            )
+                            .into();
+                        } else {
+                            this.close_locked_wallet(cx);
+                        }
                     }
                     // A failed checkpoint must not leave a view-only scan relying on unsaved state.
                     _ => this.close_locked_wallet(cx),
                 }
                 cx.notify();
             });
-        }).detach();
+        })
+        .detach();
     }
 
-    fn remove_stored_wallet(&mut self, cx: &mut Context<Self>) {
-        if !self.removal_confirmation || !self.removal_backup_confirmed {
-            self.removal_confirmation = true;
-            self.removal_backup_confirmed = false;
-            cx.notify(); return;
-        }
-        if self.native_close_pending || self.native_close_failed {
-            self.blocked_by_locked_operation(cx);
+    fn request_wipe_confirmation(&mut self, cx: &mut Context<Self>) {
+        if self.wipe_in_progress {
             return;
         }
-        if self.send_operation.is_busy() {
-            self.forget(cx);
-            return;
-        }
-        if let Err(error) = paths::archive_pending_send() {
-            self.status = l10n::interpolate(
-                "Could not preserve pending-send recovery data; wallet removal stopped: {0}",
-                &[format!("{}", error)],
-            )
-            .into();
-            cx.notify();
-            return;
-        }
-        // Removal must not let the asynchronous lock export resurrect a deleted cache.
-        CACHE_PERSISTENCE_SUPPRESSED.store(true, AtomicOrdering::Relaxed);
-        self.forget(cx);
-        if let Err(err) = wallet_store::delete() {
-            self.has_stored = wallet_store::is_marked_stored();
-            self.show_restore_form = !self.has_stored;
-            self.status = err.into();
-            cx.notify();
-            return;
-        }
-        let _ = fs::remove_file(paths::cache_path());
-        receive_book::clear();
-        self.receive_book = receive_book::Book::primary();
-        self.has_stored = false;
-        self.show_restore_form = true;
-        self.restore_height_text = "0".into();
-        self.status = l10n::t("Removed the stored wallet from this computer.").into();
+        self.wipe_confirmation = true;
         cx.notify();
     }
 
+    fn confirm_wipe_wallet(&mut self, cx: &mut Context<Self>) {
+        if !self.wipe_confirmation {
+            return;
+        }
+        if self.native_close_pending {
+            self.status =
+                l10n::t("Wait for wallet cleanup to finish, then try the wipe again.").into();
+            cx.notify();
+            return;
+        }
+        if self.native_close_failed {
+            self.wipe_confirmation = false;
+            self.wipe_after_close = true;
+            self.wipe_in_progress = true;
+            CACHE_PERSISTENCE_SUPPRESSED.store(true, AtomicOrdering::Relaxed);
+            self.status = l10n::t("Retrying wallet shutdown before wiping local data…").into();
+            self.close_locked_wallet(cx);
+            cx.notify();
+            return;
+        }
+        if self.send_operation.is_busy() {
+            self.status = l10n::t("Finish the current send before wiping the wallet.").into();
+            cx.notify();
+            return;
+        }
+        self.wipe_confirmation = false;
+        self.wipe_after_close = true;
+        self.wipe_in_progress = true;
+        self.fiat_wipe_generation = self.fiat_wipe_generation.wrapping_add(1);
+        // A final native close must not write the old cache back after deletion begins.
+        CACHE_PERSISTENCE_SUPPRESSED.store(true, AtomicOrdering::Relaxed);
+        self.forget(cx);
+        self.status = l10n::t("Closing wallet before wiping local data…").into();
+        cx.notify();
+    }
+
+    fn finish_wipe_after_native_close(&mut self, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_executor()
+                .spawn(async move {
+                    wallet_store::delete()?;
+                    paths::reset_app_data()
+                        .map_err(|error| format!("Could not clear NexaWal local data: {error}"))?;
+                    Ok::<(), String>(())
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                CACHE_PERSISTENCE_SUPPRESSED.store(false, AtomicOrdering::Relaxed);
+                this.wipe_in_progress = false;
+                match result {
+                    Ok(()) => {
+                        use zeroize::Zeroize;
+                        this.seed.zeroize();
+                        this.mnemonic.zeroize();
+                        this.challenge_answers.zeroize();
+                        this.opened = false;
+                        this.has_stored = false;
+                        this.show_restore_form = true;
+                        this.unlocking = false;
+                        this.unlock_started = false;
+                        this.screen = Screen::Terms;
+                        this.legal_return = Screen::Restore;
+                        this.terms_checked = false;
+                        this.restore_height_text = "0".into();
+                        this.restore_height_is_suggestion = false;
+                        this.setup_height_network_key = None;
+                        this.rescan_height_text = "0".into();
+                        this.scan_gap_limit = paths::load_scan_gap_limit();
+                        this.node_url = paths::DEFAULT_NODE.to_string();
+                        this.network_policy = paths::load_network_policy();
+                        this.i2p_rpc = paths::load_i2p_rpc();
+                        this.i2p_proxy = paths::load_i2p_proxy();
+                        this.settings_network_policy = this.network_policy;
+                        this.settings_node_url = this.node_url.clone();
+                        this.settings_i2p_rpc = this.i2p_rpc.clone();
+                        this.settings_i2p_proxy = this.i2p_proxy.clone();
+                        this.setup_network_policy = this.network_policy;
+                        this.setup_node_url = this.node_url.clone();
+                        this.setup_i2p_rpc = this.i2p_rpc.clone();
+                        this.setup_i2p_proxy = this.i2p_proxy.clone();
+                        this.require_device_auth = false;
+                        this.theme = Theme::Classic;
+                        apply_theme(this.theme);
+                        this.send_sounds_enabled = false;
+                        this.fiat_enabled = false;
+                        this.fiat_fetching = false;
+                        this.fiat_last_attempt_ms = 0;
+                        this.fiat_last_attempt_currency.clear();
+                        this.explorer_enabled = false;
+                        this.fiat_currency = "USD".into();
+                        this.fiat_rate = None;
+                        this.fiat_snapshots = fiat_snapshot::Store::load();
+                        this.receive_book = receive_book::Book::primary();
+                        this.receive_address = "".into();
+                        this.address = "".into();
+                        this.total_piconero = 0;
+                        this.unlocked_piconero = 0;
+                        this.sync = None;
+                        this.transfers.clear();
+                        this.history_pages.clear();
+                        this.send_dest.clear();
+                        this.send_amount.clear();
+                        this.send_description.clear();
+                        this.send_recipient_name.clear();
+                        this.recv_amount.clear();
+                        this.recv_desc.clear();
+                        this.recv_label.clear();
+                        this.qr_uri.clear();
+                        this.qr_image = None;
+                        this.created_seed = false;
+                        this.wrote_seed_down = false;
+                        this.challenge_indices.clear();
+                        this.challenge_slot = 0;
+                        this.scan_restart_generation = this.scan_restart_generation.wrapping_add(1);
+                        this.status = l10n::t(
+                            "Wallet and local settings were wiped. Accept the Terms to start over.",
+                        )
+                        .into();
+                    }
+                    Err(error) => {
+                        this.has_stored = wallet_store::is_marked_stored();
+                        this.show_restore_form = !this.has_stored;
+                        this.wipe_after_close = false;
+                        this.status = error.into();
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     fn try_unlock_stored(&mut self, cx: &mut Context<Self>) {
-        if self.native_background_sync || (self.native_close_pending && self.native_background_started.is_some()) {
+        if self.native_background_sync
+            || (self.native_close_pending && self.native_background_started.is_some())
+        {
             self.unlock_after_background_close = true;
             self.close_locked_wallet(cx);
             return;
@@ -3433,10 +3889,15 @@ impl Home {
 
     fn cycle_receive_address(&mut self, next: bool, cx: &mut Context<Self>) {
         if let Err(error) = self.receive_book.update_and_save(|book| {
-            if next { book.select_next(); } else { book.select_prev(); }
+            if next {
+                book.select_next();
+            } else {
+                book.select_prev();
+            }
         }) {
             self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
-            cx.notify(); return;
+            cx.notify();
+            return;
         }
         self.sync_recv_label_from_book();
         self.refresh_receive_address();
@@ -3456,11 +3917,15 @@ impl Home {
             cx.notify();
             return;
         }
-        let index = match self.receive_book.update_and_save(|book| book.allocate_new("")) {
+        let index = match self
+            .receive_book
+            .update_and_save(|book| book.allocate_new(""))
+        {
             Ok(index) => index,
             Err(error) => {
                 self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
-                cx.notify(); return;
+                cx.notify();
+                return;
             }
         };
         self.recv_label.clear();
@@ -3475,42 +3940,62 @@ impl Home {
     }
 
     fn increase_scan_lookahead(&mut self, cx: &mut Context<Self>) {
-        let current = self.scan_gap_limit.max(self.receive_book.required_coverage());
-        let Some(next) = [50, 100, 500, 1_000, 5_000, 10_000, 100_000].into_iter().find(|n| *n > current) else { return; };
+        let current = self
+            .scan_gap_limit
+            .max(self.receive_book.required_coverage());
+        let Some(next) = [50, 100, 500, 1_000, 5_000, 10_000, 100_000]
+            .into_iter()
+            .find(|n| *n > current)
+        else {
+            return;
+        };
         // Growth rewinds the native cursor while retaining verified history. Refuse
         // changes during an active scan instead of racing its scanner snapshot.
-        if self.opened && let Err(error) = api::set_gap_limit(WALLET_ID, next) {
+        if self.opened
+            && let Err(error) = api::set_gap_limit(WALLET_ID, next)
+        {
             self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
-            cx.notify(); return;
+            cx.notify();
+            return;
         }
         if let Err(error) = paths::save_scan_gap_limit(next) {
             self.status = l10n::interpolate("Address failed: {0}", &[error.to_string()]).into();
-            cx.notify(); return;
+            cx.notify();
+            return;
         }
         self.scan_gap_limit = next;
         if self.opened {
             self.persist_scan_cache();
             if let Err(error) = self.start_fast_scan() {
-                self.status = l10n::interpolate("Rescan prepared, but refresh failed: {0}", &[error.to_string()]).into();
+                self.status = l10n::interpolate(
+                    "Rescan prepared, but refresh failed: {0}",
+                    &[error.to_string()],
+                )
+                .into();
             }
         }
         cx.notify();
     }
 
     fn toggle_device_auth(&mut self, cx: &mut Context<Self>) {
-        if !self.opened || self.mnemonic.is_empty() { return; }
+        if !self.opened || self.mnemonic.is_empty() {
+            return;
+        }
         if self.require_device_auth {
             if !self.authenticate_if_required("Authenticate to turn off device authentication", cx)
             {
                 return;
             }
             if let Err(error) = wallet_store::set_protection(&self.mnemonic, false) {
-                self.status = error.into(); cx.notify(); return;
+                self.status = error.into();
+                cx.notify();
+                return;
             }
             self.require_device_auth = false;
             if let Err(error) = paths::save_device_auth(false) {
                 self.status = format!("Could not save device-auth preference: {error}").into();
-                cx.notify(); return;
+                cx.notify();
+                return;
             }
             self.status = l10n::t("Device authentication off.").into();
         } else {
@@ -3529,12 +4014,15 @@ impl Home {
                 return;
             }
             if let Err(error) = wallet_store::set_protection(&self.mnemonic, true) {
-                self.status = error.into(); cx.notify(); return;
+                self.status = error.into();
+                cx.notify();
+                return;
             }
             self.require_device_auth = true;
             if let Err(error) = paths::save_device_auth(true) {
                 self.status = format!("Could not save device-auth preference: {error}").into();
-                cx.notify(); return;
+                cx.notify();
+                return;
             }
             self.status = l10n::t("Device authentication on · required to unlock and send.").into();
         }
@@ -3567,12 +4055,23 @@ impl Home {
     }
 
     fn open_explorer(&mut self, txid: String, cx: &mut Context<Self>) {
-        self.start_explorer(txid, |txid, cancel| async move { explorer::fetch(&txid, cancel) }, cx);
+        self.start_explorer(
+            txid,
+            |txid, cancel| async move { explorer::fetch(&txid, cancel) },
+            cx,
+        );
     }
 
     fn load_explorer_page(&mut self, txid: String, page: u64, cx: &mut Context<Self>) {
-        if page >= 410 { return; }
-        self.start_explorer_page(txid, Some(page), move |id, cancel| async move { explorer::fetch_page(&id, Some(page), cancel) }, cx);
+        if page >= 410 {
+            return;
+        }
+        self.start_explorer_page(
+            txid,
+            Some(page),
+            move |id, cancel| async move { explorer::fetch_page(&id, Some(page), cancel) },
+            cx,
+        );
     }
 
     fn collapse_explorer_advanced(&mut self, cx: &mut Context<Self>) {
@@ -3589,7 +4088,10 @@ impl Home {
         if self.explorer_lookup.visible
             && (!self.opened
                 || !matches!(self.screen, Screen::Wallet | Screen::Transactions)
-                || !self.history_pages.selected.as_ref()
+                || !self
+                    .history_pages
+                    .selected
+                    .as_ref()
                     .is_some_and(|t| t.txid == self.explorer_lookup.txid))
         {
             self.explorer_lookup.clear();
@@ -3599,17 +4101,30 @@ impl Home {
     fn start_explorer<F, Fut>(&mut self, txid: String, fetch: F, cx: &mut Context<Self>)
     where
         F: FnOnce(String, Arc<AtomicBool>) -> Fut + Send + 'static,
-        Fut: std::future::Future<Output = Result<explorer::Observation, explorer::Failure>> + Send + 'static,
+        Fut: std::future::Future<Output = Result<explorer::Observation, explorer::Failure>>
+            + Send
+            + 'static,
     {
         self.start_explorer_page(txid, None, fetch, cx);
     }
 
-    fn start_explorer_page<F, Fut>(&mut self, txid: String, page: Option<u64>, fetch: F, cx: &mut Context<Self>)
-    where
+    fn start_explorer_page<F, Fut>(
+        &mut self,
+        txid: String,
+        page: Option<u64>,
+        fetch: F,
+        cx: &mut Context<Self>,
+    ) where
         F: FnOnce(String, Arc<AtomicBool>) -> Fut + Send + 'static,
-        Fut: std::future::Future<Output = Result<explorer::Observation, explorer::Failure>> + Send + 'static,
+        Fut: std::future::Future<Output = Result<explorer::Observation, explorer::Failure>>
+            + Send
+            + 'static,
     {
-        let previous = if page.is_some() && self.explorer_lookup.txid == txid { self.explorer_lookup.result.take() } else { None };
+        let previous = if page.is_some() && self.explorer_lookup.txid == txid {
+            self.explorer_lookup.result.take()
+        } else {
+            None
+        };
         self.explorer_lookup.clear();
         self.explorer_lookup.visible = true;
         self.explorer_lookup.advanced_expanded = page.is_some();
@@ -3626,8 +4141,11 @@ impl Home {
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    if cancel.load(AtomicOrdering::Acquire) { Err(explorer::Failure::Cancelled) }
-                    else { fetch(txid, cancel).await }
+                    if cancel.load(AtomicOrdering::Acquire) {
+                        Err(explorer::Failure::Cancelled)
+                    } else {
+                        fetch(txid, cancel).await
+                    }
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
@@ -3639,7 +4157,16 @@ impl Home {
                 {
                     this.explorer_lookup.loading = false;
                     match result {
-                        Err(error) if page.is_some() && this.explorer_lookup.result.as_ref().is_some_and(Result::is_ok) => this.explorer_lookup.page_error = Some(error),
+                        Err(error)
+                            if page.is_some()
+                                && this
+                                    .explorer_lookup
+                                    .result
+                                    .as_ref()
+                                    .is_some_and(Result::is_ok) =>
+                        {
+                            this.explorer_lookup.page_error = Some(error)
+                        }
                         result => this.explorer_lookup.result = Some(result),
                     }
                     cx.notify();
@@ -3712,6 +4239,7 @@ impl Home {
         self.fiat_last_attempt_ms = now;
         self.fiat_last_attempt_currency = self.fiat_currency.clone();
         self.fiat_fetching = true;
+        let wipe_generation = self.fiat_wipe_generation;
         let currency = self.fiat_currency.clone();
         cx.spawn(async move |this, cx| {
             let result = cx
@@ -3720,6 +4248,9 @@ impl Home {
                 .await;
             let _ = this.update(cx, |this, cx| {
                 this.fiat_fetching = false;
+                if this.fiat_wipe_generation != wipe_generation {
+                    return;
+                }
                 if !this.fiat_enabled {
                     this.fiat_rate = None;
                     cx.notify();
@@ -3781,12 +4312,21 @@ impl Home {
     }
 
     fn security_tick(&mut self, now: Instant, cx: &mut Context<Self>) {
-        if self.native_background_sync && !self.native_close_pending
-            && self.native_background_started.is_some_and(|start| session_policy::background_sync_should_close(
-                start, now, matches!(api::refresh_job(WALLET_ID), RefreshJob::Running))) {
+        if self.native_background_sync
+            && !self.native_close_pending
+            && self.native_background_started.is_some_and(|start| {
+                session_policy::background_sync_should_close(
+                    start,
+                    now,
+                    matches!(api::refresh_job(WALLET_ID), RefreshJob::Running),
+                )
+            })
+        {
             self.close_locked_wallet(cx);
         }
-        if (self.opened || self.unlocking || !self.seed.is_empty()) && self.session_policy.expired(now) {
+        if (self.opened || self.unlocking || !self.seed.is_empty())
+            && self.session_policy.expired(now)
+        {
             self.lock_for_inactivity(cx);
         }
     }
@@ -3796,9 +4336,15 @@ impl Home {
         cx.spawn(async move |this, cx| {
             loop {
                 cx.background_executor().timer(Duration::from_secs(1)).await;
-                if this.update(cx, |this, cx| this.security_tick(Instant::now(), cx)).is_err() { break; }
+                if this
+                    .update(cx, |this, cx| this.security_tick(Instant::now(), cx))
+                    .is_err()
+                {
+                    break;
+                }
             }
-        }).detach();
+        })
+        .detach();
     }
 
     fn poll_core(&mut self, cx: &mut Context<Self>) {
@@ -4058,8 +4604,12 @@ impl Render for Home {
             .gap_4()
             .key_context("nexawal")
             .track_focus(&self.ui_focus)
-            .capture_any_mouse_down(cx.listener(|this, _, _, _| this.session_policy.touch(Instant::now())))
-            .capture_key_down(cx.listener(|this, _, _, _| this.session_policy.touch(Instant::now())))
+            .capture_any_mouse_down(
+                cx.listener(|this, _, _, _| this.session_policy.touch(Instant::now())),
+            )
+            .capture_key_down(
+                cx.listener(|this, _, _, _| this.session_policy.touch(Instant::now())),
+            )
             .on_scroll_wheel(cx.listener(|this, _, _, _| this.session_policy.touch(Instant::now())))
             .on_action(cx.listener(Self::paste_field))
             .on_action(cx.listener(Self::copy_field))
@@ -4620,35 +5170,176 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         l10n::t("Restore a different wallet"),
                         cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.show_restore_form = true;
+                            this.setup_network_policy = this.network_policy;
+                            this.setup_node_url = this.node_url.clone();
+                            this.setup_i2p_rpc = this.i2p_rpc.clone();
+                            this.setup_i2p_proxy = this.i2p_proxy.clone();
+                            this.invalidate_setup_height();
                             cx.notify();
                         }),
                     ))
                 },
             )
+            .child(destructive_action_button(
+                "locked-wipe-wallet",
+                l10n::t("Wipe wallet and start over"),
+                cx.listener(|this, _: &ClickEvent, _, cx| this.request_wipe_confirmation(cx)),
+            ))
+            .when(home.wipe_confirmation, |card| {
+                card.child(
+                    div()
+                        .p_3()
+                        .rounded_md()
+                        .bg(rgb(theme_field()))
+                        .text_sm()
+                        .child(l10n::t("This permanently removes your saved recovery phrase, wallet data, local sync cache, prepared-send recovery data, and settings. You will need to accept the Terms again, then create or restore a wallet. Make sure your recovery phrase is backed up; this cannot be undone.")),
+                )
+                .child(destructive_action_button(
+                    "locked-wipe-confirm",
+                    l10n::t("Confirm wipe and start over"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.confirm_wipe_wallet(cx)),
+                ))
+                .child(wide_secondary_action_button(
+                    "locked-wipe-cancel",
+                    l10n::t("Cancel"),
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.wipe_confirmation = false;
+                        cx.notify();
+                    }),
+                ))
+            })
         })
         .when(show_restore_form, |card| {
             card
-                .child(
-                    div().text_xs().text_color(rgb(theme_muted())).child(if home.network_policy == network::Policy::I2p {
-                        l10n::t("Scan uses the I2P node from Settings")
+                .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("How to connect")))
+                .child(focusable_setup_action_button(
+                    "setup-policy-clearnet",
+                    if home.setup_network_policy == network::Policy::Clearnet {
+                        format!("✓ {}", l10n::t("Clearnet only"))
                     } else {
-                        l10n::t("Node URL")
+                        l10n::t("Clearnet only").to_string()
+                    },
+                    if home.setup_network_policy == network::Policy::Clearnet {
+                        l10n::interpolate("Selected: {0}", &[l10n::t("Clearnet only").to_string()])
+                    } else {
+                        l10n::t("Clearnet only").to_string()
+                    },
+                    &home.setup_policy_clearnet_focus,
+                    home.setup_policy_clearnet_focus.is_focused(window),
+                    false,
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.choose_setup_network_policy(network::Policy::Clearnet, cx)
                     }),
+                ))
+                .child(focusable_setup_action_button(
+                    "setup-policy-i2p",
+                    if home.setup_network_policy == network::Policy::I2p {
+                        format!("✓ {}", l10n::t("I2P only"))
+                    } else {
+                        l10n::t("I2P only").to_string()
+                    },
+                    if home.setup_network_policy == network::Policy::I2p {
+                        l10n::interpolate("Selected: {0}", &[l10n::t("I2P only").to_string()])
+                    } else {
+                        l10n::t("I2P only").to_string()
+                    },
+                    &home.setup_policy_i2p_focus,
+                    home.setup_policy_i2p_focus.is_focused(window),
+                    false,
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.choose_setup_network_policy(network::Policy::I2p, cx)
+                    }),
+                ))
+                .child(focusable_setup_action_button(
+                    "setup-policy-hybrid",
+                    if home.setup_network_policy == network::Policy::Hybrid {
+                        format!("✓ {}", l10n::t("Scan clearnet, broadcast I2P"))
+                    } else {
+                        l10n::t("Scan clearnet, broadcast I2P").to_string()
+                    },
+                    if home.setup_network_policy == network::Policy::Hybrid {
+                        l10n::interpolate(
+                            "Selected: {0}",
+                            &[l10n::t("Scan clearnet, broadcast I2P").to_string()],
+                        )
+                    } else {
+                        l10n::t("Scan clearnet, broadcast I2P").to_string()
+                    },
+                    &home.setup_policy_hybrid_focus,
+                    home.setup_policy_hybrid_focus.is_focused(window),
+                    false,
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.choose_setup_network_policy(network::Policy::Hybrid, cx)
+                    }),
+                ))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(theme_muted()))
+                        .child(l10n::t("Clearnet only uses a clearnet node. I2P only uses an I2P node and proxy. Both scans on clearnet and broadcasts over I2P.")),
                 )
-                .when(home.network_policy != network::Policy::I2p, |card| {
+                .when(home.setup_network_policy != network::Policy::I2p, |card| {
+                    card
+                        .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("Clearnet node URL")))
+                        .child(
+                            field_input(
+                                home,
+                                window,
+                                cx,
+                                Field::Node,
+                                "setup-node-field",
+                                paths::DEFAULT_NODE,
+                                false,
+                                false,
+                            ),
+                        )
+                        .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("Type the full URL, including http:// or https://. Default: https://rpc.nexawal.com")))
+                })
+                .when(home.setup_network_policy != network::Policy::Clearnet, |card| {
                     card.child(
+                        div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("I2P node (host:port)")),
+                    )
+                    .child(
                         field_input(
                             home,
                             window,
                             cx,
-                            Field::Node,
-                            "node-field",
-                            "http://127.0.0.1:18081",
+                            Field::I2pNode,
+                            "setup-i2p-node-field",
+                            "7lfi73h743qm663hv4x5q6ccgc4jc5ncl65dfvpe665m6pawwdxa.b32.i2p",
                             false,
                             false,
                         ),
                     )
                 })
+                .when(home.setup_network_policy != network::Policy::Clearnet, |card| {
+                    card
+                        .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("I2P HTTP proxy (host:port)")))
+                        .child(field_input(
+                            home,
+                            window,
+                            cx,
+                            Field::I2pProxy,
+                            "setup-i2p-proxy-field",
+                            "127.0.0.1:4444",
+                            false,
+                            false,
+                        ))
+                        .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("I2P requires an HTTP proxy reachable from this device. 127.0.0.1 refers to this device.")))
+                })
+                .child(focusable_setup_action_button(
+                    "setup-apply-network",
+                    l10n::t("Use this node"),
+                    l10n::t("Use this node"),
+                    &home.setup_apply_network_focus,
+                    home.setup_apply_network_focus.is_focused(window),
+                    true,
+                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                        if this.apply_setup_network(cx) && this.created_seed {
+                            this.fetch_suggested_height(cx);
+                        }
+                    }),
+                ))
                 .child(div().text_xs().text_color(rgb(theme_muted())).child(l10n::t("Seed phrase")))
                 .child(
                     field_input(
@@ -4691,51 +5382,6 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                                 l10n::t("I wrote down my recovery seed")
                             )),
                     )
-                })
-                .when(home.created_seed && home.wrote_seed_down, |card| {
-                    card.child(
-                        div()
-                            .text_xs()
-                            .text_color(rgb(theme_muted()))
-                            .child(l10n::t(
-                                "Confirm you wrote it down: enter the requested words below.",
-                            )),
-                    )
-                    .when(!home.challenge_indices.is_empty(), |card| {
-                        card.child(challenge_row(
-                            home,
-                            window,
-                            cx,
-                            0,
-                            home.challenge_indices[0],
-                        ))
-                    })
-                    .when(home.challenge_indices.len() > 1, |card| {
-                        card.child(challenge_row(
-                            home,
-                            window,
-                            cx,
-                            1,
-                            home.challenge_indices[1],
-                        ))
-                    })
-                    .when(home.challenge_indices.len() > 2, |card| {
-                        card.child(challenge_row(
-                            home,
-                            window,
-                            cx,
-                            2,
-                            home.challenge_indices[2],
-                        ))
-                    })
-                    .when(!home.seed_backup_passed(), |card| {
-                        card.child(
-                            div()
-                                .text_xs()
-                                .text_color(rgb(theme_out()))
-                                .child(l10n::t("Word(s) don't match yet.")),
-                        )
-                    })
                 })
                 .child(
                     div()
@@ -4809,46 +5455,6 @@ fn locked_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl Int
                         )),
                 )
         })
-}
-
-fn challenge_row(
-    home: &Home,
-    window: &Window,
-    cx: &mut Context<Home>,
-    slot: usize,
-    word_index: usize,
-) -> impl IntoElement {
-    let id = match slot {
-        0 => "challenge-0",
-        1 => "challenge-1",
-        _ => "challenge-2",
-    };
-    div()
-        .flex()
-        .flex_row()
-        .gap_2()
-        .items_center()
-        .child(
-            div()
-                .text_sm()
-                .text_color(rgb(theme_muted()))
-                .w(px(80.))
-                .child(l10n::interpolate(
-                    "Word #{0}",
-                    &[format!("{}", word_index + 1)],
-                )),
-        )
-        .child(field_input_for(
-            home,
-            window,
-            cx,
-            Field::Challenge,
-            id,
-            "type the word",
-            false,
-            false,
-            Some(slot),
-        ))
 }
 
 fn opened_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
@@ -5354,18 +5960,6 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
         }
         _ => {
             let mut line = match home.send_unlocked() {
-                Some(unlocked) if home.send_from_subaddress && home.send_source_balance_stale => {
-                    l10n::interpolate(
-                        "Unlocked {0} (stale) · {1}",
-                        &[
-                            format!("{}", amount::format_xmr(unlocked)),
-                            format!(
-                                "{}",
-                                home.receive_book.display_label_for(home.send_source_index)
-                            ),
-                        ],
-                    )
-                }
                 Some(unlocked) if home.send_from_subaddress => l10n::interpolate(
                     "Unlocked {0} · {1}",
                     &[
@@ -5621,18 +6215,54 @@ fn send_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl IntoE
         ))
         .when(home.send_confirmation.is_some(), |content| {
             let approval = home.send_confirmation.as_ref().unwrap();
-            content.child(section_card(l10n::t(if approval.maximum { "Confirm send max" } else { "Confirm send" }),
-                div().flex().flex_col().gap_3()
+            content.child(section_card(
+                l10n::t(if approval.maximum {
+                    "Confirm send max"
+                } else {
+                    "Confirm send"
+                }),
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
                     .child(div().child(l10n::t("Destination")))
-                    .children(approval.destination.chars().collect::<Vec<_>>().chunks(28)
-                        .map(|line| div().text_sm().font_family("monospace").child(line.iter().collect::<String>())))
-                    .child(div().child(format!("{}: {} XMR", l10n::t("Amount"), amount::format_for_input(approval.amount))))
-                    .child(div().child(format!("{}: {} XMR", l10n::t("Fee"), amount::format_for_input(approval.fee))))
+                    .children(
+                        approval
+                            .destination
+                            .chars()
+                            .collect::<Vec<_>>()
+                            .chunks(28)
+                            .map(|line| {
+                                div()
+                                    .text_sm()
+                                    .font_family("monospace")
+                                    .child(line.iter().collect::<String>())
+                            }),
+                    )
+                    .child(div().child(format!(
+                        "{}: {} XMR",
+                        l10n::t("Amount"),
+                        amount::format_for_input(approval.amount)
+                    )))
+                    .child(div().child(format!(
+                        "{}: {} XMR",
+                        l10n::t("Fee"),
+                        amount::format_for_input(approval.fee)
+                    )))
                     .child(div().text_sm().child(approval.node.clone()))
-                    .child(wide_primary_action_button("send-confirm", l10n::t("Confirm"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| this.confirm_send(cx))))
-                    .child(wide_secondary_action_button("send-confirm-cancel", l10n::t("Cancel"),
-                        cx.listener(|this, _: &ClickEvent, _, cx| { this.send_confirmation = None; cx.notify(); })))
+                    .child(wide_primary_action_button(
+                        "send-confirm",
+                        l10n::t("Confirm"),
+                        cx.listener(|this, _: &ClickEvent, _, cx| this.confirm_send(cx)),
+                    ))
+                    .child(wide_secondary_action_button(
+                        "send-confirm-cancel",
+                        l10n::t("Cancel"),
+                        cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.send_confirmation = None;
+                            cx.notify();
+                        }),
+                    )),
             ))
         })
 }
@@ -5651,18 +6281,26 @@ fn terms_card(home: &Home, cx: &mut Context<Home>) -> impl IntoElement {
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .child(l10n::t("Terms of Use")),
         )
-        .children(
-            legal::SUMMARY
-                .iter()
-                .map(|line| div().text_sm().text_color(rgb(theme_muted())).child(*line)),
-        )
-        .child(action_button(
-            "review-terms",
-            l10n::t("Review full Terms of Use"),
-            cx.listener(|this, _: &ClickEvent, _, cx| {
-                this.open_legal(legal::Document::Terms, cx);
-            }),
-        ))
+        .children([
+            "nexawal by Nexatrode LLC is a self-custodial interface for managing digital assets. You hold exclusive responsibility for your private keys and 25-word seed phrase.",
+            "The app is provided as is, with no warranties express or implied. Use is at your own risk. Nexatrode LLC is not liable for lost assets, user errors, downtime, or issues with third-party services or nodes.",
+            "Running or connecting to your own Monero node is recommended. Public defaults are for convenience only.",
+        ].into_iter().map(|line| div().text_sm().text_color(rgb(theme_muted())).child(l10n::t(line))))
+        .children(legal::parse_markdown(legal::TERMS).into_iter().map(|block| match block {
+            legal::MarkdownBlock::Heading { level, text } => div()
+                .text_sm()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(rgb(if level == 1 { theme_text() } else { theme_accent() }))
+                .child(text),
+            legal::MarkdownBlock::Paragraph(text) => div()
+                .text_sm()
+                .text_color(rgb(theme_muted()))
+                .child(text),
+            legal::MarkdownBlock::Bullet(text) => div()
+                .text_sm()
+                .text_color(rgb(theme_muted()))
+                .child(format!("• {text}")),
+        }))
         .child(
             div()
                 .id("terms-check")
@@ -5759,7 +6397,16 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                         .child(l10n::t(
                             "Neon terminal look. Leave off for the standard theme (default).",
                         )),
-                ),
+                )
+                .child(wide_secondary_action_button(
+                    "settings-send-sounds",
+                    format!(
+                        "{}: {}",
+                        l10n::t("Sound On"),
+                        l10n::t(if home.send_sounds_enabled { "On" } else { "Off" }),
+                    ),
+                    cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_send_sounds(cx)),
+                )),
         ))
         .child(section_card(
             l10n::t("How to connect"),
@@ -5769,12 +6416,12 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 .gap_3()
                 .child(wide_secondary_action_button(
                     "net-policy",
-                    home.network_policy.label(),
+                    home.settings_network_policy.label(),
                     cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.cycle_network_policy(cx)
                     }),
                 ))
-                .when(home.network_policy != network::Policy::I2p, |content| {
+                .when(home.settings_network_policy != network::Policy::I2p, |content| {
                     content
                         .child(
                             div()
@@ -5793,7 +6440,7 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                             false,
                         ))
                 })
-                .when(home.network_policy != network::Policy::Clearnet, |content| {
+                .when(home.settings_network_policy != network::Policy::Clearnet, |content| {
                     content
                         .child(
                             div()
@@ -6121,26 +6768,21 @@ fn settings_card(home: &Home, window: &Window, cx: &mut Context<Home>) -> impl I
                 .flex_col()
                 .gap_3()
                 .child(destructive_action_button(
-                    "settings-remove",
-                    l10n::t("Remove wallet from this computer"),
+                    "settings-wipe-wallet",
+                    l10n::t("Wipe wallet and start over"),
                     cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.remove_stored_wallet(cx)
+                        this.request_wipe_confirmation(cx)
                     }),
                 ))
-                .when(home.removal_confirmation, |content| {
+                .when(home.wipe_confirmation, |content| {
                     content
-                        .child(div().text_sm().child(l10n::t("This will replace the existing wallet on this device.\n\nIf you continue, the currently stored mnemonic and scan state will be removed. Make sure you have your mnemonic backed up before proceeding.")))
-                        .child(wide_secondary_action_button("remove-backup-confirm", l10n::t("I wrote down my recovery seed"),
+                        .child(div().text_sm().child(l10n::t("This permanently removes your saved recovery phrase, wallet data, local sync cache, prepared-send recovery data, and settings. You will need to accept the Terms again, then create or restore a wallet. Make sure your recovery phrase is backed up; this cannot be undone.")))
+                        .child(destructive_action_button(
+                            "settings-wipe-confirm", l10n::t("Confirm wipe and start over"),
+                            cx.listener(|this, _: &ClickEvent, _, cx| this.confirm_wipe_wallet(cx))))
+                        .child(wide_secondary_action_button("settings-wipe-cancel", l10n::t("Cancel"),
                             cx.listener(|this, _: &ClickEvent, _, cx| {
-                                this.removal_backup_confirmed = !this.removal_backup_confirmed; cx.notify();
-                            })))
-                        .when(home.removal_backup_confirmed, |content| content.child(div().child(l10n::t("Confirmed"))))
-                        .when(home.removal_backup_confirmed, |content| content.child(destructive_action_button(
-                            "remove-confirm", l10n::t("Confirm"),
-                            cx.listener(|this, _: &ClickEvent, _, cx| this.remove_stored_wallet(cx)))))
-                        .child(wide_secondary_action_button("remove-cancel", l10n::t("Cancel"),
-                            cx.listener(|this, _: &ClickEvent, _, cx| {
-                                this.removal_confirmation = false; this.removal_backup_confirmed = false; cx.notify();
+                                this.wipe_confirmation = false; cx.notify();
                             })))
                 }),
         ))
@@ -6274,6 +6916,7 @@ fn transfer_detail(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> impl 
     let timestamp = format_timestamp(row.timestamp);
     let lookup_id = row.txid.clone();
     let refresh_id = row.txid.clone();
+    let copy_explorer_url = explorer_url.clone();
     let mut explorer_panel = div()
         .flex()
         .flex_col()
@@ -6342,20 +6985,35 @@ fn transfer_detail(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> impl 
                         explorer_panel = explorer_panel.child(div().text_sm().text_color(rgb(0xff5959)).child(l10n::t("The node reports a conflicting spend. Do not treat this as a confirmed payment.")));
                     }
                     if home.explorer_lookup.advanced_expanded && !home.explorer_lookup.loading {
-                        if let Some(details) = &data.details { explorer_panel = explorer_panel.child(explorer_advanced_panel(details, row.txid.clone(), cx)); }
+                        if let Some(details) = &data.details {
+                            explorer_panel = explorer_panel.child(explorer_advanced_panel(
+                                details,
+                                row.txid.clone(),
+                                cx,
+                            ));
+                        }
                     }
                 }
             }
         }
-        if let Some(error) = &home.explorer_lookup.page_error { explorer_panel = explorer_panel.child(div().text_sm().child(l10n::t(error.message()))); }
-        if home.explorer_lookup.loading && home.explorer_lookup.result.is_some() { explorer_panel = explorer_panel.child(div().text_sm().child(l10n::t("Loading transaction…"))); }
+        if let Some(error) = &home.explorer_lookup.page_error {
+            explorer_panel = explorer_panel.child(div().text_sm().child(l10n::t(error.message())));
+        }
+        if home.explorer_lookup.loading && home.explorer_lookup.result.is_some() {
+            explorer_panel =
+                explorer_panel.child(div().text_sm().child(l10n::t("Loading transaction…")));
+        }
         if home.explorer_enabled {
             let advanced_id = row.txid.clone();
             explorer_panel = explorer_panel.child(secondary_action_button(
-                "toggle-explorer-advanced", l10n::t("Advanced details"),
+                "toggle-explorer-advanced",
+                l10n::t("Advanced details"),
                 cx.listener(move |this, _, _, cx| {
-                    if this.explorer_lookup.advanced_expanded { this.collapse_explorer_advanced(cx); }
-                    else if !this.explorer_lookup.loading { this.load_explorer_page(advanced_id.clone(), 0, cx); }
+                    if this.explorer_lookup.advanced_expanded {
+                        this.collapse_explorer_advanced(cx);
+                    } else if !this.explorer_lookup.loading {
+                        this.load_explorer_page(advanced_id.clone(), 0, cx);
+                    }
                 }),
             ));
         }
@@ -6372,8 +7030,11 @@ fn transfer_detail(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> impl 
                 "refresh-explorer-details",
                 l10n::t("Refresh"),
                 cx.listener(move |this, _, _, cx| {
-                    if this.explorer_lookup.advanced_expanded { this.load_explorer_page(refresh_id.clone(), 0, cx); }
-                    else { this.open_explorer(refresh_id.clone(), cx); }
+                    if this.explorer_lookup.advanced_expanded {
+                        this.load_explorer_page(refresh_id.clone(), 0, cx);
+                    } else {
+                        this.open_explorer(refresh_id.clone(), cx);
+                    }
                 }),
             ));
         }
@@ -6475,14 +7136,36 @@ fn transfer_detail(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> impl 
             home.explorer_lookup.visible && home.explorer_lookup.txid == row.txid,
             |view| view.child(explorer_panel),
         )
-        .child(action_button(
-            "copy-transfer-explorer-link",
-            l10n::t("Copy Explorer Link"),
-            cx.listener(move |this, _: &ClickEvent, _, cx| {
-                cx.write_to_clipboard(gpui::ClipboardItem::new_string(explorer_url.clone()));
-                this.status = l10n::t("Link copied").to_string().into();
-            }),
-        ))
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb(theme_muted()))
+                .child(l10n::t("Copy Explorer Link")),
+        )
+        .child(
+            div()
+                .id("copy-transfer-explorer-link")
+                .w_full()
+                .px_2()
+                .py_2()
+                .rounded_md()
+                .bg(rgb(theme_field()))
+                .cursor(CursorStyle::PointingHand)
+                .aria_label(l10n::t("Copy Explorer Link"))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    cx.write_to_clipboard(gpui::ClipboardItem::new_string(
+                        copy_explorer_url.clone(),
+                    ));
+                    this.status = l10n::t("Link copied").to_string().into();
+                }))
+                .child(
+                    div()
+                        .w_full()
+                        .text_xs()
+                        .text_color(rgb(theme_accent()))
+                        .child(explorer_url.clone()),
+                ),
+        )
         .child(action_button(
             "copy-transfer-amount",
             l10n::t("Copy amount"),
@@ -6495,49 +7178,146 @@ fn transfer_detail(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> impl 
         ))
 }
 
-fn explorer_advanced_panel(d: &explorer_advanced::Advanced, txid: String, cx: &mut Context<Home>) -> impl IntoElement {
+fn explorer_advanced_panel(
+    d: &explorer_advanced::Advanced,
+    txid: String,
+    cx: &mut Context<Home>,
+) -> impl IntoElement {
     let unavailable = || l10n::t("Not available").to_string();
     let bytes = |n: Option<u64>| n.map(|n| format!("{n} B")).unwrap_or_else(unavailable);
     let mut lines = vec![
-        ("Type", l10n::t(if d.coinbase {"Miner transaction"} else {"Transfer"}).to_string()),
-        ("Version", d.version.to_string()), ("Serialized size", bytes(d.serialized_size)),
-        ("Downloaded size", bytes(Some(d.downloaded_size))), ("Weight", bytes(d.weight)),
-        ("Additional unlock condition", if d.unlock_kind == "none" {"—".into()} else {format!("{}: {}",l10n::t(if d.unlock_kind == "height" {"Height"} else {"Time"}),d.unlock_value)}),
-        ("Inputs", d.input_count.to_string()), ("Outputs", d.output_count.to_string()),
+        (
+            "Type",
+            l10n::t(if d.coinbase {
+                "Miner transaction"
+            } else {
+                "Transfer"
+            })
+            .to_string(),
+        ),
+        ("Version", d.version.to_string()),
+        ("Serialized size", bytes(d.serialized_size)),
+        ("Downloaded size", bytes(Some(d.downloaded_size))),
+        ("Weight", bytes(d.weight)),
+        (
+            "Additional unlock condition",
+            if d.unlock_kind == "none" {
+                "—".into()
+            } else {
+                format!(
+                    "{}: {}",
+                    l10n::t(if d.unlock_kind == "height" {
+                        "Height"
+                    } else {
+                        "Time"
+                    }),
+                    d.unlock_value
+                )
+            },
+        ),
+        ("Inputs", d.input_count.to_string()),
+        ("Outputs", d.output_count.to_string()),
     ];
-    if let Some(time) = d.received_timestamp { lines.push(("Observed by node",format_timestamp(Some(time)))); }
+    if let Some(time) = d.received_timestamp {
+        lines.push(("Observed by node", format_timestamp(Some(time))));
+    }
     let mut panel = div().flex().flex_col().gap_2().min_w(px(0.));
-    for (label, value) in lines { panel = panel.child(div().text_xs().child(format!("{}: {value}",l10n::t(label)))); }
-    panel = panel.child(div().text_xs().child(l10n::t("Ring members are possible inputs, not proof of which output was spent.")));
+    for (label, value) in lines {
+        panel = panel.child(
+            div()
+                .text_xs()
+                .child(format!("{}: {value}", l10n::t(label))),
+        );
+    }
+    panel = panel.child(div().text_xs().child(l10n::t(
+        "Ring members are possible inputs, not proof of which output was spent.",
+    )));
     for input in &d.inputs {
-        for line in [format!("{} #{}",l10n::t("Inputs"),input.index),format!("{}: {}",l10n::t("Key image"),input.key_image),
-            format!("{}: {}",l10n::t("Ring size"),input.ring_size),format!("{}: {}",l10n::t("Absolute output indices"),input.indices.join(", "))] {
+        for line in [
+            format!("{} #{}", l10n::t("Inputs"), input.index),
+            format!("{}: {}", l10n::t("Key image"), input.key_image),
+            format!("{}: {}", l10n::t("Ring size"), input.ring_size),
+            format!(
+                "{}: {}",
+                l10n::t("Absolute output indices"),
+                input.indices.join(", ")
+            ),
+        ] {
             panel = panel.child(div().text_xs().child(line));
         }
-        if input.truncated { panel = panel.child(div().text_xs().child(l10n::t("Preview truncated."))); }
+        if input.truncated {
+            panel = panel.child(div().text_xs().child(l10n::t("Preview truncated.")));
+        }
     }
     for output in &d.outputs {
-        for line in [format!("{} #{}",l10n::t("Outputs"),output.index),format!("{}: {}",l10n::t("One-time output key"),output.key),
-            format!("{}: {}",l10n::t("Amount"),output.amount.map(|n| format!("{} XMR",amount::format_for_input(n))).unwrap_or_else(||l10n::t("Hidden (RingCT)").to_string())),
-            format!("{}: {}",l10n::t("View tag"),output.view_tag.map(|n|format!("{n:02x}")).unwrap_or_else(||"—".into())),
-            format!("{}: {}",l10n::t("Global output index"),output.global_index.as_deref().unwrap_or("—"))] {
+        for line in [
+            format!("{} #{}", l10n::t("Outputs"), output.index),
+            format!("{}: {}", l10n::t("One-time output key"), output.key),
+            format!(
+                "{}: {}",
+                l10n::t("Amount"),
+                output
+                    .amount
+                    .map(|n| format!("{} XMR", amount::format_for_input(n)))
+                    .unwrap_or_else(|| l10n::t("Hidden (RingCT)").to_string())
+            ),
+            format!(
+                "{}: {}",
+                l10n::t("View tag"),
+                output
+                    .view_tag
+                    .map(|n| format!("{n:02x}"))
+                    .unwrap_or_else(|| "—".into())
+            ),
+            format!(
+                "{}: {}",
+                l10n::t("Global output index"),
+                output.global_index.as_deref().unwrap_or("—")
+            ),
+        ] {
             panel = panel.child(div().text_xs().child(line));
         }
     }
-    panel = panel.child(div().text_sm().child(format!("{} {}/{}",l10n::t("Page"),d.page + 1,d.page_count)));
+    panel = panel.child(div().text_sm().child(format!(
+        "{} {}/{}",
+        l10n::t("Page"),
+        d.page + 1,
+        d.page_count
+    )));
     if d.page > 0 {
-        let previous_id = txid.clone(); let page = d.page - 1;
-        panel = panel.child(secondary_action_button("explorer-previous-page",l10n::t("Previous"),cx.listener(move |this,_,_,cx| this.load_explorer_page(previous_id.clone(),page,cx))));
+        let previous_id = txid.clone();
+        let page = d.page - 1;
+        panel = panel.child(secondary_action_button(
+            "explorer-previous-page",
+            l10n::t("Previous"),
+            cx.listener(move |this, _, _, cx| {
+                this.load_explorer_page(previous_id.clone(), page, cx)
+            }),
+        ));
     }
     if d.page + 1 < d.page_count {
         let page = d.page + 1;
-        panel = panel.child(secondary_action_button("explorer-next-page",l10n::t("Next"),cx.listener(move |this,_,_,cx| this.load_explorer_page(txid.clone(),page,cx))));
+        panel = panel.child(secondary_action_button(
+            "explorer-next-page",
+            l10n::t("Next"),
+            cx.listener(move |this, _, _, cx| this.load_explorer_page(txid.clone(), page, cx)),
+        ));
     }
-    panel = panel.child(div().text_xs().child(l10n::t("Transaction extra (hex)")))
-        .child(div().text_xs().child(if d.extra.is_empty() {"—".to_string()} else {
-            d.extra.as_bytes().chunks(64).map(|line| std::str::from_utf8(line).unwrap_or("")).collect::<Vec<_>>().join("\n")
+    panel = panel
+        .child(div().text_xs().child(l10n::t("Transaction extra (hex)")))
+        .child(div().text_xs().child(if d.extra.is_empty() {
+            "—".to_string()
+        } else {
+            d.extra
+                .as_bytes()
+                .chunks(64)
+                .map(|line| std::str::from_utf8(line).unwrap_or(""))
+                .collect::<Vec<_>>()
+                .join("\n")
         }));
-    if d.extra_truncated { panel = panel.child(div().text_xs().child(l10n::t("Preview truncated."))); }
+    if d.extra_truncated {
+        panel = panel.child(div().text_xs().child(l10n::t("Preview truncated.")));
+    }
     panel
 }
 
@@ -6711,6 +7491,44 @@ fn wide_primary_action_button(
     clickable_settings_row(id, label, true, false, listener)
 }
 
+fn focusable_setup_action_button(
+    id: &'static str,
+    label: impl Into<SharedString>,
+    accessible_label: impl Into<SharedString>,
+    focus_handle: &FocusHandle,
+    focused: bool,
+    primary: bool,
+    listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    let display = theme_display_label(label.into()).to_string();
+    let (fill, border, fg) = if primary {
+        (theme_accent(), theme_accent(), theme_button_text())
+    } else {
+        (theme_row(), theme_accent(), theme_text())
+    };
+    div()
+        .id(id)
+        .track_focus(focus_handle)
+        .w_full()
+        .px_2()
+        .py_2()
+        .rounded_md()
+        .bg(rgb(fill))
+        .border_1()
+        .border_color(rgb(if focused { theme_text() } else { border }))
+        .cursor(CursorStyle::PointingHand)
+        .aria_label(accessible_label.into())
+        .on_click(listener)
+        .child(
+            div()
+                .w_full()
+                .text_sm()
+                .font_family(button_label_font())
+                .text_color(rgb(fg))
+                .child(display),
+        )
+}
+
 fn wide_secondary_action_button(
     id: &'static str,
     label: impl Into<SharedString>,
@@ -6835,10 +7653,7 @@ fn normalize_seed(raw: &str) -> String {
 }
 
 fn format_xmr(piconero: u64) -> String {
-    const PICONERO: u64 = 1_000_000_000_000;
-    let whole = piconero / PICONERO;
-    let frac = (piconero % PICONERO) / 1_000_000;
-    format!("{whole}.{frac:06} XMR")
+    amount::format_xmr(piconero)
 }
 
 fn truncate_middle(value: &str, head: usize, tail: usize) -> String {
@@ -7158,11 +7973,14 @@ fn main() {
                 let placement_observer = placement_in_window.clone();
                 let home = cx.new(|cx| {
                     cx.observe_window_activation(window, |this: &mut Home, window, cx| {
-                        if !window.is_window_active() && !this.unlocking &&
-                            (this.opened || !this.seed.is_empty()) {
+                        if !window.is_window_active()
+                            && !this.unlocking
+                            && (this.opened || !this.seed.is_empty())
+                        {
                             this.lock_for_inactivity(cx);
                         }
-                    }).detach();
+                    })
+                    .detach();
                     cx.observe_window_bounds(window, move |_, window, _| {
                         let window_bounds = window.window_bounds();
                         let maximized = matches!(window_bounds, WindowBounds::Maximized(_));

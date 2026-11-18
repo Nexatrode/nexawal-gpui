@@ -47,8 +47,16 @@ mod tests {
     #[test]
     fn sealed_background_sync_finishes_or_hits_its_privacy_limit() {
         let start = Instant::now();
-        assert!(!background_sync_should_close(start, start + IDLE_TIMEOUT, true));
+        assert!(!background_sync_should_close(
+            start,
+            start + IDLE_TIMEOUT,
+            true
+        ));
         assert!(background_sync_should_close(start, start, false));
-        assert!(background_sync_should_close(start, start + BACKGROUND_SYNC_LIMIT, true));
+        assert!(background_sync_should_close(
+            start,
+            start + BACKGROUND_SYNC_LIMIT,
+            true
+        ));
     }
 }

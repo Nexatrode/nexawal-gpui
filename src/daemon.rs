@@ -7,7 +7,11 @@ pub struct NodeProbe {
     pub latency_ms: u128,
 }
 
-pub fn fetch_suggested_restore_height(node_url: &str, proxy: Option<&str>, require_i2p: bool) -> Result<u64, String> {
+pub fn fetch_suggested_restore_height(
+    node_url: &str,
+    proxy: Option<&str>,
+    require_i2p: bool,
+) -> Result<u64, String> {
     let probe = probe(node_url, proxy, require_i2p)?;
     let tip = probe.target_height.max(probe.height);
     Ok(if tip > 10 { tip - 10 } else { 0 })
@@ -24,11 +28,14 @@ pub fn probe(node_url: &str, proxy: Option<&str>, require_i2p: bool) -> Result<N
     }
     let url = format!("{base}/get_info");
     let started = std::time::Instant::now();
-    let mut builder = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(5))
-        .redirects(0).try_proxy_from_env(false);
+    let mut builder = ureq::AgentBuilder::new()
+        .timeout(std::time::Duration::from_secs(5))
+        .redirects(0)
+        .try_proxy_from_env(false);
     if let Some(proxy) = proxy.filter(|s| !s.trim().is_empty()) {
         let proxy_url = crate::network::proxy_url(proxy);
-        builder = builder.proxy(ureq::Proxy::new(&proxy_url).map_err(|_| "Invalid I2P HTTP proxy")?);
+        builder =
+            builder.proxy(ureq::Proxy::new(&proxy_url).map_err(|_| "Invalid I2P HTTP proxy")?);
     }
     let json = builder
         .build()

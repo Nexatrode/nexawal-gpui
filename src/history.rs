@@ -370,13 +370,15 @@ fn row(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> gpui::Stateful<gp
                     } else {
                         l10n::interpolate(
                             "{0} confirmations",
-                            &[format!("{}",
-                            confirmations(
-                                row.height,
-                                row.is_pending,
-                                home.sync.as_ref().map_or(0, |s| s.chain_height),
-                                row.confirmations
-                            ))]
+                            &[format!(
+                                "{}",
+                                confirmations(
+                                    row.height,
+                                    row.is_pending,
+                                    home.sync.as_ref().map_or(0, |s| s.chain_height),
+                                    row.confirmations
+                                )
+                            )],
                         )
                     }
                 )),
@@ -402,7 +404,12 @@ fn row(row: &Transfer, home: &Home, cx: &mut Context<Home>) -> gpui::Stateful<gp
                         "{}{}",
                         l10n::interpolate("Fee {0}", &[format_xmr(fee)]),
                         if row.direction == "in" {
-                            format!(" · {}", l10n::t("Paid by the sender. Not deducted from the amount received."))
+                            format!(
+                                " · {}",
+                                l10n::t(
+                                    "Paid by the sender. Not deducted from the amount received."
+                                )
+                            )
                         } else {
                             String::new()
                         }

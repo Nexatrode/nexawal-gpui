@@ -26,25 +26,60 @@ fn explorer_starts_off_and_enabling_does_not_start_a_lookup(cx: &mut TestAppCont
 use gpui::TestAppContext;
 static NATIVE_SESSION_FIXTURE: Mutex<()> = Mutex::new(());
 
+#[gpui::test]
+fn send_sound_toggle_defaults_off_and_persists_both_states(cx: &mut TestAppContext) {
+    let directory = tempfile::tempdir().unwrap();
+    paths::with_test_data_dir(directory.path().to_owned(), || {
+        let home = cx.new(Home::new);
+        home.update(cx, |home, cx| {
+            assert!(!home.send_sounds_enabled);
+            assert!(!paths::load_send_sounds_enabled());
+
+            home.toggle_send_sounds(cx);
+            assert!(home.send_sounds_enabled);
+            assert!(paths::load_send_sounds_enabled());
+
+            home.toggle_send_sounds(cx);
+            assert!(!home.send_sounds_enabled);
+            assert!(!paths::load_send_sounds_enabled());
+        });
+    });
+}
+
 fn explorer_transfer() -> Transfer {
     Transfer {
-        txid: "a".repeat(64), direction: "in".into(), amount: 1, fee: Some(1),
-        height: Some(8), timestamp: Some(900), confirmations: 2, is_pending: false,
-        subaddress_major: None, subaddress_minor: None,
+        txid: "a".repeat(64),
+        direction: "in".into(),
+        amount: 1,
+        fee: Some(1),
+        height: Some(8),
+        timestamp: Some(900),
+        confirmations: 2,
+        is_pending: false,
+        subaddress_major: None,
+        subaddress_minor: None,
     }
 }
 
 fn explorer_observation(fee: u64) -> explorer::Observation {
     explorer::Observation {
-        status: "confirmed".into(), fee: Some(fee), height: Some(8),
-        block_hash: Some("b".repeat(64)), block_timestamp: Some(900),
-        confirmations: 2, node_ready: true, observed_at: 1000,
-        double_spend_seen: false, details: None,
+        status: "confirmed".into(),
+        fee: Some(fee),
+        height: Some(8),
+        block_hash: Some("b".repeat(64)),
+        block_timestamp: Some(900),
+        confirmations: 2,
+        node_ready: true,
+        observed_at: 1000,
+        double_spend_seen: false,
+        details: None,
     }
 }
 
 #[gpui::test]
-fn explorer_delayed_responses_cannot_cross_close_background_disable_or_wallet_change(cx: &mut TestAppContext) {
+fn explorer_delayed_responses_cannot_cross_close_background_disable_or_wallet_change(
+    cx: &mut TestAppContext,
+) {
     let _guard = NATIVE_SESSION_FIXTURE.lock().unwrap();
     for transition in ["close", "background", "disable", "wallet", "screen"] {
         let directory = tempfile::tempdir().unwrap();
@@ -54,35 +89,47 @@ fn explorer_delayed_responses_cannot_cross_close_background_disable_or_wallet_ch
             let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
             let count = calls.clone();
             let token = home.update(cx, |home, cx| {
-                home.opened = true; home.screen = Screen::Wallet;
+                home.opened = true;
+                home.screen = Screen::Wallet;
                 home.history_pages.selected = Some(explorer_transfer());
                 home.toggle_explorer(cx);
-                home.start_explorer("a".repeat(64), move |_, _| async move {
-                    count.fetch_add(1, AtomicOrdering::SeqCst);
-                    // Intentionally ignores cancellation to simulate a queued late response.
-                    receive.await.unwrap()
-                }, cx);
+                home.start_explorer(
+                    "a".repeat(64),
+                    move |_, _| async move {
+                        count.fetch_add(1, AtomicOrdering::SeqCst);
+                        // Intentionally ignores cancellation to simulate a queued late response.
+                        receive.await.unwrap()
+                    },
+                    cx,
+                );
                 home.explorer_lookup.cancel.clone()
             });
             cx.run_until_parked();
             assert_eq!(calls.load(AtomicOrdering::SeqCst), 1);
-            home.update(cx, |home, cx| {
-                match transition {
-                    "close" => home.explorer_lookup.clear(),
-                    "background" => home.lock_wallet(false, cx),
-                    "disable" => home.toggle_explorer(cx),
-                    "wallet" => { home.history_pages.clear(); home.reconcile_explorer(); }
-                    "screen" => { home.screen = Screen::Settings; home.reconcile_explorer(); }
-                    _ => unreachable!(),
+            home.update(cx, |home, cx| match transition {
+                "close" => home.explorer_lookup.clear(),
+                "background" => home.lock_wallet(false, cx),
+                "disable" => home.toggle_explorer(cx),
+                "wallet" => {
+                    home.history_pages.clear();
+                    home.reconcile_explorer();
                 }
+                "screen" => {
+                    home.screen = Screen::Settings;
+                    home.reconcile_explorer();
+                }
+                _ => unreachable!(),
             });
             cx.run_until_parked();
             assert!(token.load(AtomicOrdering::Acquire), "{transition}");
             home.update(cx, |home, cx| {
                 // Merely returning/re-enabling must not query or grant the old work authority.
-                home.opened = true; home.screen = Screen::Wallet;
+                home.opened = true;
+                home.screen = Screen::Wallet;
                 home.history_pages.selected = Some(explorer_transfer());
-                if !home.explorer_enabled { home.toggle_explorer(cx); }
+                if !home.explorer_enabled {
+                    home.toggle_explorer(cx);
+                }
             });
             send.send(Ok(explorer_observation(1))).unwrap();
             cx.run_until_parked();
@@ -92,12 +139,25 @@ fn explorer_delayed_responses_cannot_cross_close_background_disable_or_wallet_ch
             });
             assert_eq!(calls.load(AtomicOrdering::SeqCst), 1);
             // A new explicit user lookup is permitted and publishes normally.
-            home.update(cx, |home, cx| home.start_explorer("a".repeat(64), |_, _| async {
-                Ok(explorer_observation(2))
-            }, cx));
+            home.update(cx, |home, cx| {
+                home.start_explorer(
+                    "a".repeat(64),
+                    |_, _| async { Ok(explorer_observation(2)) },
+                    cx,
+                )
+            });
             cx.run_until_parked();
             home.update(cx, |home, _| {
-                assert_eq!(home.explorer_lookup.result.as_ref().unwrap().as_ref().unwrap().fee, Some(2));
+                assert_eq!(
+                    home.explorer_lookup
+                        .result
+                        .as_ref()
+                        .unwrap()
+                        .as_ref()
+                        .unwrap()
+                        .fee,
+                    Some(2)
+                );
             });
         });
     }
@@ -110,7 +170,8 @@ fn explorer_opt_out_cancels_even_when_preferences_cannot_be_written(cx: &mut Tes
         let home = cx.new(Home::new);
         let (send, receive) = tokio::sync::oneshot::channel();
         let token = home.update(cx, |home, cx| {
-            home.opened = true; home.screen = Screen::Wallet;
+            home.opened = true;
+            home.screen = Screen::Wallet;
             home.history_pages.selected = Some(explorer_transfer());
             home.toggle_explorer(cx);
             home.start_explorer("a".repeat(64), |_, _| async { receive.await.unwrap() }, cx);
@@ -125,7 +186,10 @@ fn explorer_opt_out_cancels_even_when_preferences_cannot_be_written(cx: &mut Tes
             home.toggle_explorer(cx);
             assert!(!home.explorer_enabled);
             assert!(!home.explorer_lookup.visible && !home.explorer_lookup.loading);
-            assert!(home.status.contains(l10n::t("Could not save settings.").as_ref()));
+            assert!(
+                home.status
+                    .contains(l10n::t("Could not save settings.").as_ref())
+            );
             // Failed opt-in must remain off, unlike immediate in-memory revocation.
             home.toggle_explorer(cx);
             assert!(!home.explorer_enabled);
@@ -146,13 +210,24 @@ fn explorer_old_success_or_error_cannot_replace_a_newer_refresh(cx: &mut TestApp
             let (old_send, old_receive) = tokio::sync::oneshot::channel();
             let (new_send, new_receive) = tokio::sync::oneshot::channel();
             home.update(cx, |home, cx| {
-                home.opened = true; home.screen = Screen::Wallet;
+                home.opened = true;
+                home.screen = Screen::Wallet;
                 home.history_pages.selected = Some(explorer_transfer());
                 home.toggle_explorer(cx);
-                home.start_explorer("a".repeat(64), |_, _| async { old_receive.await.unwrap() }, cx);
+                home.start_explorer(
+                    "a".repeat(64),
+                    |_, _| async { old_receive.await.unwrap() },
+                    cx,
+                );
             });
             cx.run_until_parked();
-            home.update(cx, |home, cx| home.start_explorer("a".repeat(64), |_, _| async { new_receive.await.unwrap() }, cx));
+            home.update(cx, |home, cx| {
+                home.start_explorer(
+                    "a".repeat(64),
+                    |_, _| async { new_receive.await.unwrap() },
+                    cx,
+                )
+            });
             cx.run_until_parked();
             if old_first {
                 old_send.send(Ok(explorer_observation(1))).unwrap();
@@ -169,7 +244,16 @@ fn explorer_old_success_or_error_cannot_replace_a_newer_refresh(cx: &mut TestApp
             cx.run_until_parked();
             home.update(cx, |home, _| {
                 assert!(!home.explorer_lookup.loading);
-                assert_eq!(home.explorer_lookup.result.as_ref().unwrap().as_ref().unwrap().fee, Some(2));
+                assert_eq!(
+                    home.explorer_lookup
+                        .result
+                        .as_ref()
+                        .unwrap()
+                        .as_ref()
+                        .unwrap()
+                        .fee,
+                    Some(2)
+                );
             });
         });
     }
@@ -183,13 +267,18 @@ fn explorer_cancelled_before_worker_starts_never_invokes_transport(cx: &mut Test
         let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let count = calls.clone();
         home.update(cx, |home, cx| {
-            home.opened = true; home.screen = Screen::Wallet;
+            home.opened = true;
+            home.screen = Screen::Wallet;
             home.history_pages.selected = Some(explorer_transfer());
             home.toggle_explorer(cx);
-            home.start_explorer("a".repeat(64), move |_, _| async move {
-                count.fetch_add(1, AtomicOrdering::SeqCst);
-                Ok(explorer_observation(1))
-            }, cx);
+            home.start_explorer(
+                "a".repeat(64),
+                move |_, _| async move {
+                    count.fetch_add(1, AtomicOrdering::SeqCst);
+                    Ok(explorer_observation(1))
+                },
+                cx,
+            );
             home.toggle_explorer(cx);
         });
         cx.run_until_parked();
@@ -203,37 +292,87 @@ fn explorer_advanced_collapse_cancels_old_page_and_failure_keeps_summary(cx: &mu
     let directory = tempfile::tempdir().unwrap();
     paths::with_test_data_dir(directory.path().to_owned(), || {
         let home = cx.new(Home::new);
-        let fixture = || explorer::parse_page(include_bytes!("../tests/fixtures/explorer_advanced_page0.json"), &"a".repeat(64),1000,Some(0)).unwrap();
-        let mut summary = fixture(); summary.details = None;
-        home.update(cx, |home,cx| {
-            home.opened = true; home.screen = Screen::Wallet; home.total_piconero = 123;
-            home.history_pages.selected = Some(explorer_transfer()); home.toggle_explorer(cx);
-            home.start_explorer("a".repeat(64),|_,_|async move {Ok(summary)},cx);
+        let fixture = || {
+            explorer::parse_page(
+                include_bytes!("../tests/fixtures/explorer_advanced_page0.json"),
+                &"a".repeat(64),
+                1000,
+                Some(0),
+            )
+            .unwrap()
+        };
+        let mut summary = fixture();
+        summary.details = None;
+        home.update(cx, |home, cx| {
+            home.opened = true;
+            home.screen = Screen::Wallet;
+            home.total_piconero = 123;
+            home.history_pages.selected = Some(explorer_transfer());
+            home.toggle_explorer(cx);
+            home.start_explorer("a".repeat(64), |_, _| async move { Ok(summary) }, cx);
         });
         cx.run_until_parked();
-        let (send,receive) = tokio::sync::oneshot::channel();
-        let cancel = home.update(cx, |home,cx| {
+        let (send, receive) = tokio::sync::oneshot::channel();
+        let cancel = home.update(cx, |home, cx| {
             assert!(!home.explorer_lookup.advanced_expanded);
-            home.start_explorer_page("a".repeat(64),Some(0),|_,_|async {receive.await.unwrap()},cx);
+            home.start_explorer_page(
+                "a".repeat(64),
+                Some(0),
+                |_, _| async { receive.await.unwrap() },
+                cx,
+            );
             home.explorer_lookup.cancel.clone()
         });
         cx.run_until_parked();
-        home.update(cx, |home,cx| home.collapse_explorer_advanced(cx));
+        home.update(cx, |home, cx| home.collapse_explorer_advanced(cx));
         assert!(cancel.load(AtomicOrdering::Acquire));
-        send.send(Ok(fixture())).unwrap(); cx.run_until_parked();
-        home.update(cx, |home,cx| {
+        send.send(Ok(fixture())).unwrap();
+        cx.run_until_parked();
+        home.update(cx, |home, cx| {
             assert!(!home.explorer_lookup.advanced_expanded);
-            assert!(home.explorer_lookup.result.as_ref().unwrap().as_ref().unwrap().details.is_none());
-            let details = fixture(); home.start_explorer_page("a".repeat(64),Some(0),|_,_|async move {Ok(details)},cx);
+            assert!(
+                home.explorer_lookup
+                    .result
+                    .as_ref()
+                    .unwrap()
+                    .as_ref()
+                    .unwrap()
+                    .details
+                    .is_none()
+            );
+            let details = fixture();
+            home.start_explorer_page(
+                "a".repeat(64),
+                Some(0),
+                |_, _| async move { Ok(details) },
+                cx,
+            );
         });
         cx.run_until_parked();
-        home.update(cx, |home,cx| home.start_explorer_page("a".repeat(64),Some(1),|_,_|async {Err(explorer::Failure::Unavailable)},cx));
+        home.update(cx, |home, cx| {
+            home.start_explorer_page(
+                "a".repeat(64),
+                Some(1),
+                |_, _| async { Err(explorer::Failure::Unavailable) },
+                cx,
+            )
+        });
         cx.run_until_parked();
-        home.update(cx, |home,_| {
-            assert_eq!(home.explorer_lookup.page_error,Some(explorer::Failure::Unavailable));
-            let previous = home.explorer_lookup.result.as_ref().unwrap().as_ref().unwrap();
-            assert!(previous.double_spend_seen); assert_eq!(previous.details.as_ref().unwrap().page,0);
-            assert_eq!(home.total_piconero,123); // explorer never replaces wallet state
+        home.update(cx, |home, _| {
+            assert_eq!(
+                home.explorer_lookup.page_error,
+                Some(explorer::Failure::Unavailable)
+            );
+            let previous = home
+                .explorer_lookup
+                .result
+                .as_ref()
+                .unwrap()
+                .as_ref()
+                .unwrap();
+            assert!(previous.double_spend_seen);
+            assert_eq!(previous.details.as_ref().unwrap().page, 0);
+            assert_eq!(home.total_piconero, 123); // explorer never replaces wallet state
         });
     });
 }
@@ -246,11 +385,17 @@ fn send_click_only_opens_review_and_changed_intents_are_rejected(cx: &mut TestAp
         let destination = api::primary_address_from_mnemonic(&seed, true).unwrap();
         let home = cx.new(Home::new);
         home.update(cx, |home, cx| {
-            home.opened = true; home.require_device_auth = false;
-            home.send_dest = destination.clone(); home.send_amount = "0.000000000010".into();
-            home.send_fee = Some(1); home.send_preview_amount = Some(10);
+            home.opened = true;
+            home.require_device_auth = false;
+            home.send_dest = destination.clone();
+            home.send_amount = "0.000000000010".into();
+            home.send_fee = Some(1);
+            home.send_preview_amount = Some(10);
             home.run_send(cx);
-            assert_eq!(home.send_confirmation.as_ref().unwrap().destination, destination);
+            assert_eq!(
+                home.send_confirmation.as_ref().unwrap().destination,
+                destination
+            );
             assert!(!home.send_operation.is_busy());
             assert!(paths::load_pending_send().unwrap().is_none());
             home.send_amount = "0.000000000020".into();
@@ -259,7 +404,9 @@ fn send_click_only_opens_review_and_changed_intents_are_rejected(cx: &mut TestAp
             assert!(home.send_confirmation.is_none() && home.send_fee.is_none());
             assert!(paths::load_pending_send().unwrap().is_none());
             // A lock invalidates a review even when the form later looks identical.
-            home.opened = true; home.send_fee = Some(1); home.send_preview_amount = Some(20);
+            home.opened = true;
+            home.send_fee = Some(1);
+            home.send_preview_amount = Some(20);
             home.run_send(cx);
             home.session_policy.invalidate();
             home.confirm_send(cx);
@@ -270,16 +417,18 @@ fn send_click_only_opens_review_and_changed_intents_are_rejected(cx: &mut TestAp
 }
 
 #[gpui::test]
-fn removal_click_requires_a_separate_backup_confirmation(cx: &mut TestAppContext) {
+fn wipe_requires_its_explicit_confirmation(cx: &mut TestAppContext) {
     let directory = tempfile::tempdir().unwrap();
     paths::with_test_data_dir(directory.path().to_owned(), || {
         paths::save_pending_send("fixture approved journal").unwrap();
         let home = cx.new(Home::new);
         home.update(cx, |home, cx| {
-            home.remove_stored_wallet(cx);
-            assert!(home.removal_confirmation);
-            assert!(!home.removal_backup_confirmed);
-            assert_eq!(paths::load_pending_send().unwrap().as_deref(), Some("fixture approved journal"));
+            home.request_wipe_confirmation(cx);
+            assert!(home.wipe_confirmation);
+            assert_eq!(
+                paths::load_pending_send().unwrap().as_deref(),
+                Some("fixture approved journal")
+            );
             assert!(!home.native_close_pending);
         });
     });
@@ -312,7 +461,10 @@ fn background_privacy_limit_closes_a_sealed_wallet_and_keeps_its_cache(cx: &mut 
 
 #[gpui::test]
 fn background_scan_seals_before_restart_and_never_reopens_ui(cx: &mut TestAppContext) {
-    use std::{io::{Read, Write}, net::TcpListener};
+    use std::{
+        io::{Read, Write},
+        net::TcpListener,
+    };
     let _guard = NATIVE_SESSION_FIXTURE.lock().unwrap();
     let directory = tempfile::tempdir().unwrap();
     paths::with_test_data_dir(directory.path().to_owned(), || {
@@ -327,28 +479,40 @@ fn background_scan_seals_before_restart_and_never_reopens_ui(cx: &mut TestAppCon
             let mut stream = loop {
                 match listener.accept() {
                     Ok((stream, _)) => break stream,
-                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock && Instant::now() < deadline =>
-                        std::thread::sleep(Duration::from_millis(2)),
+                    Err(error)
+                        if error.kind() == std::io::ErrorKind::WouldBlock
+                            && Instant::now() < deadline =>
+                    {
+                        std::thread::sleep(Duration::from_millis(2))
+                    }
                     Err(error) => panic!("fixture HTTP accept failed: {error}"),
                 }
             };
             stream.set_nonblocking(false).unwrap();
-            stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
             let mut request = [0; 8192];
             stream.read(&mut request).unwrap();
             // A controlled RPC failure must stay behind the locked surface, not reopen UI.
-            let _ = stream.write_all(b"HTTP/1.1 503 Unavailable\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}");
+            let _ = stream.write_all(
+                b"HTTP/1.1 503 Unavailable\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+            );
         });
         let home = cx.new(Home::new);
         home.update(cx, |home, cx| {
             home.opened = true;
-            home.mnemonic = seed.clone(); home.seed = seed.clone();
+            home.mnemonic = seed.clone();
+            home.seed = seed.clone();
             home.node_url = endpoint;
             home.lock_wallet(true, cx);
             assert!(!home.opened && home.mnemonic.is_empty() && home.seed.is_empty());
         });
         cx.run_until_parked();
-        assert!(api::is_sealed(WALLET_ID).unwrap(), "restart must not retain spend authority");
+        assert!(
+            api::is_sealed(WALLET_ID).unwrap(),
+            "restart must not retain spend authority"
+        );
         home.update(cx, |home, _| {
             assert!(home.native_background_sync && !home.native_close_pending);
             assert!(!home.opened);
@@ -378,7 +542,10 @@ fn damaged_receive_book_blocks_open_and_all_edits_without_overwriting_it(cx: &mu
             home.persist_recv_label();
             home.cycle_receive_address(true, cx);
             assert_eq!(home.receive_book, original);
-            assert_eq!(fs::read_to_string(paths::receive_book_path()).unwrap(), damaged);
+            assert_eq!(
+                fs::read_to_string(paths::receive_book_path()).unwrap(),
+                damaged
+            );
         });
     });
 }
@@ -392,11 +559,17 @@ fn corrupt_or_changed_receive_book_cannot_issue_a_reused_index() {
         fs::write(paths::receive_book_path(), damaged).unwrap();
         assert!(book.update_and_save(|b| b.allocate_new("Shop")).is_err());
         assert_eq!(book.next_index, 1);
-        assert_eq!(fs::read_to_string(paths::receive_book_path()).unwrap(), damaged);
+        assert_eq!(
+            fs::read_to_string(paths::receive_book_path()).unwrap(),
+            damaged
+        );
         fs::write(paths::receive_book_path(), "52\n51\n0|Primary\n51|Shop\n").unwrap();
         assert!(book.update_and_save(|b| b.allocate_new("Shop")).is_err());
         book = receive_book::load().unwrap();
-        assert_eq!(book.update_and_save(|b| b.allocate_new("Tips")).unwrap(), 52);
+        assert_eq!(
+            book.update_and_save(|b| b.allocate_new("Tips")).unwrap(),
+            52
+        );
         assert_eq!(receive_book::load().unwrap(), book);
     });
 }
@@ -470,18 +643,40 @@ fn secret_clipboard_expires_without_erasing_a_new_copy(cx: &mut TestAppContext) 
     let directory = tempfile::tempdir().unwrap();
     paths::with_test_data_dir(directory.path().to_owned(), || {
         let home = cx.new(Home::new);
-        home.update(cx, |home, cx| home.copy_secret("synthetic clipboard secret".into(), cx));
+        home.update(cx, |home, cx| {
+            home.copy_secret("synthetic clipboard secret".into(), cx)
+        });
         cx.run_until_parked();
-        assert_eq!(cx.read_from_clipboard().and_then(|item| item.text()).as_deref(), Some("synthetic clipboard secret"));
-        cx.executor().advance_clock(session_policy::CLIPBOARD_TIMEOUT);
+        assert_eq!(
+            cx.read_from_clipboard()
+                .and_then(|item| item.text())
+                .as_deref(),
+            Some("synthetic clipboard secret")
+        );
+        cx.executor()
+            .advance_clock(session_policy::CLIPBOARD_TIMEOUT);
         cx.run_until_parked();
-        assert!(cx.read_from_clipboard().and_then(|item| item.text()).is_none_or(|text| text.is_empty()));
-        home.update(cx, |home, cx| home.copy_secret("another synthetic secret".into(), cx));
+        assert!(
+            cx.read_from_clipboard()
+                .and_then(|item| item.text())
+                .is_none_or(|text| text.is_empty())
+        );
+        home.update(cx, |home, cx| {
+            home.copy_secret("another synthetic secret".into(), cx)
+        });
         cx.run_until_parked();
-        cx.write_to_clipboard(gpui::ClipboardItem::new_string("a later ordinary copy".into()));
-        cx.executor().advance_clock(session_policy::CLIPBOARD_TIMEOUT);
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string(
+            "a later ordinary copy".into(),
+        ));
+        cx.executor()
+            .advance_clock(session_policy::CLIPBOARD_TIMEOUT);
         cx.run_until_parked();
-        assert_eq!(cx.read_from_clipboard().and_then(|item| item.text()).as_deref(), Some("a later ordinary copy"));
+        assert_eq!(
+            cx.read_from_clipboard()
+                .and_then(|item| item.text())
+                .as_deref(),
+            Some("a later ordinary copy")
+        );
     });
 }
 
@@ -553,9 +748,13 @@ fn busy_lock_hides_wallet_blocks_replacement_and_ignores_late_completion(cx: &mu
 
             home.open_with_mnemonic("must never reach native open", 0, cx);
             home.try_unlock_stored(cx);
-            home.remove_stored_wallet(cx);
+            home.request_wipe_confirmation(cx);
+            home.confirm_wipe_wallet(cx);
             assert!(!home.opened);
-            assert_eq!(paths::load_pending_send().unwrap().as_deref(), Some("synthetic pending journal"));
+            assert_eq!(
+                paths::load_pending_send().unwrap().as_deref(),
+                Some("synthetic pending journal")
+            );
 
             // This is the guard used by success AND error callbacks for previews,
             // sends, and journal recovery. It must suppress normal result publication.
@@ -566,7 +765,10 @@ fn busy_lock_hides_wallet_blocks_replacement_and_ignores_late_completion(cx: &mu
             assert!(!home.opened);
             assert!(!home.opened && home.screen == Screen::Restore);
             assert!(home.send_fee.is_none());
-            assert_eq!(paths::load_pending_send().unwrap().as_deref(), Some("synthetic pending journal"));
+            assert_eq!(
+                paths::load_pending_send().unwrap().as_deref(),
+                Some("synthetic pending journal")
+            );
         });
     });
 }

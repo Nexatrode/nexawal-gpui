@@ -4,7 +4,8 @@ The October 12, 2026 audit fills missing desktop UI keys and untranslated prose
 using existing app translations first, then machine-generated drafts. This
 includes maintenance/cache, sending, recovery and rate/privacy disclosures.
 These are drafts, not fluent-speaker sign-off. Review security-critical wording
-before claiming native-language quality. Full bundled legal documents and raw
+before claiming native-language quality. The 15 wallet setup, wipe, and network messages added in November 2026 are
+machine-generated drafts that need fluent review. Full bundled legal documents and raw
 native diagnostics remain English; URLs, addresses and ISO currency codes are
 not translated.
 
